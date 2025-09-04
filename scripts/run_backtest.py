@@ -26,8 +26,9 @@ def main():
     
     # Configuration
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+    tickers = ['TTWO', 'MSFT', 'EA', 'SONY']
     signals = ['RSI', 'SMA', 'MACD']
-    signal_weights = {'RSI': 0.4, 'SMA': 0.4, 'MACD': 0.2}
+    signal_weights = {'RSI': 0.33, 'SMA': 0.33, 'MACD': 0.34}
     
     # Date range (last 2 years)
     end_date = date.today()
@@ -41,10 +42,12 @@ def main():
         rebalancing_frequency='monthly',
         evaluation_period='monthly',
         transaction_costs=0.001,
-        max_weight=0.15,
+        max_weight=0.3,
         risk_aversion=0.5,
         benchmark_ticker='SPY',
-        signal_weights=signal_weights
+        use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark
+        signal_weights=signal_weights,
+        forward_fill_signals=True  # Use latest available signal scores when missing
     )
     
     print(f"Tickers: {', '.join(tickers)}")
@@ -53,6 +56,8 @@ def main():
     print(f"Date range: {start_date} to {end_date}")
     print(f"Initial capital: ${config.initial_capital:,.2f}")
     print(f"Rebalancing: {config.rebalancing_frequency}")
+    print(f"Forward fill signals: {config.forward_fill_signals}")
+    print(f"Benchmark: {'Equal-weight portfolio' if config.use_equal_weight_benchmark else config.benchmark_ticker}")
     print()
     
     try:
@@ -121,11 +126,19 @@ def main():
             
             print("FINAL VALUES:")
             print(f"  Strategy Portfolio: ${final_portfolio_value:,.2f}")
-            print(f"  Benchmark (SPY): ${final_benchmark_value:,.2f}")
+            benchmark_name = "Equal-weight portfolio" if config.use_equal_weight_benchmark else f"Benchmark ({config.benchmark_ticker})"
+            print(f"  {benchmark_name}: ${final_benchmark_value:,.2f}")
             print(f"  Outperformance: ${final_portfolio_value - final_benchmark_value:,.2f}")
             print()
         
         print("Backtest completed successfully!")
+        
+        # Show portfolio data storage information
+        print("\nPortfolio Data Storage:")
+        print("-" * 25)
+        print(f"Portfolio values and weights have been stored in the database")
+        print(f"Backtest ID: {result.backtest_id}")
+        print(f"Use the query_portfolio_data.py script to analyze the stored data")
         
         # Create and display plots
         print("\nGenerating performance plots...")

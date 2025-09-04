@@ -61,6 +61,30 @@ class SignalDefinition:
     created_at: Optional[datetime] = None
 
 
+@dataclass
+class PortfolioValue:
+    """Represents a portfolio value at a specific date."""
+    portfolio_value_id: str
+    backtest_id: str
+    date: date
+    portfolio_value: float
+    benchmark_value: float
+    portfolio_return: float
+    benchmark_return: float
+    created_at: Optional[datetime] = None
+
+
+@dataclass
+class PortfolioWeight:
+    """Represents a stock weight in a portfolio at a specific date."""
+    portfolio_weight_id: str
+    backtest_id: str
+    date: date
+    ticker: str
+    weight: float
+    created_at: Optional[datetime] = None
+
+
 class DataFrameConverter:
     """Utility class to convert between DataFrames and model objects."""
     
@@ -128,5 +152,37 @@ class DataFrameConverter:
                 'information_ratio': result.information_ratio,
                 'execution_time_seconds': result.execution_time_seconds,
                 'created_at': result.created_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def portfolio_values_to_dataframe(values: List[PortfolioValue]) -> pd.DataFrame:
+        """Convert list of PortfolioValue objects to DataFrame."""
+        data = []
+        for value in values:
+            data.append({
+                'portfolio_value_id': value.portfolio_value_id,
+                'backtest_id': value.backtest_id,
+                'date': value.date,
+                'portfolio_value': value.portfolio_value,
+                'benchmark_value': value.benchmark_value,
+                'portfolio_return': value.portfolio_return,
+                'benchmark_return': value.benchmark_return,
+                'created_at': value.created_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def portfolio_weights_to_dataframe(weights: List[PortfolioWeight]) -> pd.DataFrame:
+        """Convert list of PortfolioWeight objects to DataFrame."""
+        data = []
+        for weight in weights:
+            data.append({
+                'portfolio_weight_id': weight.portfolio_weight_id,
+                'backtest_id': weight.backtest_id,
+                'date': weight.date,
+                'ticker': weight.ticker,
+                'weight': weight.weight,
+                'created_at': weight.created_at
             })
         return pd.DataFrame(data)

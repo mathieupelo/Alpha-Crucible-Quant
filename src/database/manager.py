@@ -13,7 +13,7 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 
-from .models import SignalScore, Portfolio, BacktestResult, SignalDefinition, DataFrameConverter
+from .models import SignalScore, Portfolio, BacktestResult, SignalDefinition, PortfolioValue, PortfolioWeight, DataFrameConverter
 
 # Load environment variables
 load_dotenv()
@@ -163,7 +163,8 @@ class DatabaseManager:
         return self.execute_query(query, tuple(params) if params else None)
     
     def get_signal_scores_dataframe(self, tickers: List[str], signals: List[str],
-                                   start_date: date, end_date: date) -> pd.DataFrame:
+                                   start_date: date, end_date: date, 
+                                   forward_fill: bool = True) -> pd.DataFrame:
         """Get signal scores as a pivot table (date x ticker x signal)."""
         df = self.get_signal_scores(tickers, signals, start_date, end_date)
         
@@ -177,6 +178,10 @@ class DatabaseManager:
             values='score',
             aggfunc='first'
         )
+        
+        # Forward fill missing values if requested
+        if forward_fill and not pivot_df.empty:
+            pivot_df = pivot_df.ffill()
         
         return pivot_df
     
@@ -325,6 +330,139 @@ class DatabaseManager:
         """Get list of enabled signal IDs."""
         df = self.get_signal_definitions(enabled_only=True)
         return df['signal_id'].tolist() if not df.empty else []
+    
+    # Portfolio Value Operations
+    
+    def store_portfolio_values(self, values: List[PortfolioValue]) -> int:
+        """Store portfolio values in the database."""
+        if not values:
+            return 0
+        
+        query = """
+        INSERT INTO portfolio_values (portfolio_value_id, backtest_id, date, portfolio_value, 
+                                    benchmark_value, portfolio_return, benchmark_return, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+            portfolio_value = VALUES(portfolio_value),
+            benchmark_value = VALUES(benchmark_value),
+            portfolio_return = VALUES(portfolio_return),
+            benchmark_return = VALUES(benchmark_return),
+            created_at = VALUES(created_at)
+        """
+        
+        params_list = []
+        for value in values:
+            params_list.append((
+                value.portfolio_value_id,
+                value.backtest_id,
+                value.date,
+                value.portfolio_value,
+                value.benchmark_value,
+                value.portfolio_return,
+                value.benchmark_return,
+                value.created_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_portfolio_values(self, backtest_id: Optional[str] = None,
+                           start_date: Optional[date] = None,
+                           end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve portfolio values from the database."""
+        query = "SELECT * FROM portfolio_values WHERE 1=1"
+        params = []
+        
+        if backtest_id:
+            query += " AND backtest_id = %s"
+            params.append(backtest_id)
+        
+        if start_date:
+            query += " AND date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND date <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY date"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
+    # Portfolio Weight Operations
+    
+    def store_portfolio_weights(self, weights: List[PortfolioWeight]) -> int:
+        """Store portfolio weights in the database."""
+        if not weights:
+            return 0
+        
+        query = """
+        INSERT INTO portfolio_weights (portfolio_weight_id, backtest_id, date, ticker, weight, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+            weight = VALUES(weight),
+            created_at = VALUES(created_at)
+        """
+        
+        params_list = []
+        for weight in weights:
+            params_list.append((
+                weight.portfolio_weight_id,
+                weight.backtest_id,
+                weight.date,
+                weight.ticker,
+                weight.weight,
+                weight.created_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_portfolio_weights(self, backtest_id: Optional[str] = None,
+                            tickers: Optional[List[str]] = None,
+                            start_date: Optional[date] = None,
+                            end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve portfolio weights from the database."""
+        query = "SELECT * FROM portfolio_weights WHERE 1=1"
+        params = []
+        
+        if backtest_id:
+            query += " AND backtest_id = %s"
+            params.append(backtest_id)
+        
+        if tickers:
+            placeholders = ','.join(['%s'] * len(tickers))
+            query += f" AND ticker IN ({placeholders})"
+            params.extend(tickers)
+        
+        if start_date:
+            query += " AND date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND date <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY date, ticker"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
+    def get_portfolio_weights_pivot(self, backtest_id: str, 
+                                  start_date: Optional[date] = None,
+                                  end_date: Optional[date] = None) -> pd.DataFrame:
+        """Get portfolio weights as a pivot table (date x ticker)."""
+        df = self.get_portfolio_weights(backtest_id, start_date=start_date, end_date=end_date)
+        
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Create pivot table with date as index, ticker as columns
+        pivot_df = df.pivot_table(
+            index='date',
+            columns='ticker',
+            values='weight',
+            aggfunc='first'
+        )
+        
+        return pivot_df
     
     # Utility Methods
     

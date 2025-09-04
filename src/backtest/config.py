@@ -46,6 +46,9 @@ class BacktestConfig:
     benchmark_ticker: str = 'SPY'
     """Benchmark ticker for comparison (default: SPY)"""
     
+    use_equal_weight_benchmark: bool = True
+    """Whether to use equal-weight portfolio of all stocks as benchmark (default: True)"""
+    
     min_lookback_days: int = 252
     """Minimum lookback period for price data (default: 1 year)"""
     
@@ -54,6 +57,9 @@ class BacktestConfig:
     
     signal_weights: Optional[dict] = None
     """Weights for combining signals (optional)"""
+    
+    forward_fill_signals: bool = True
+    """Whether to forward fill missing signal scores with latest available values (default: True)"""
     
     def __post_init__(self):
         """Validate configuration parameters."""
@@ -139,8 +145,10 @@ class BacktestConfig:
             'risk_aversion': self.risk_aversion,
             'universe_tickers': self.universe_tickers,
             'benchmark_ticker': self.benchmark_ticker,
+            'use_equal_weight_benchmark': self.use_equal_weight_benchmark,
             'min_lookback_days': self.min_lookback_days,
-            'max_lookback_days': self.max_lookback_days
+            'max_lookback_days': self.max_lookback_days,
+            'forward_fill_signals': self.forward_fill_signals
         }
     
     @classmethod

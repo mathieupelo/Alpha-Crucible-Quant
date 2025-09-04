@@ -25,6 +25,7 @@ def main():
     
     # Configuration (match backtest tickers)
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+    tickers = ['TTWO', 'MSFT', 'EA', 'SONY']
     signals = ['RSI', 'SMA', 'MACD']
     
     # Date range (last 2 years to match backtest)

@@ -6,6 +6,7 @@ Implements comprehensive backtesting with portfolio optimization and performance
 
 import logging
 import time
+import uuid
 from datetime import date, datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import pandas as pd
@@ -16,7 +17,7 @@ from .models import BacktestResult
 from .plotting import create_backtest_summary_plots
 from signals import SignalCalculator
 from solver import PortfolioSolver, SolverConfig
-from database import DatabaseManager
+from database import DatabaseManager, PortfolioValue, PortfolioWeight
 from utils import PriceFetcher, DateUtils
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,10 @@ class BacktestEngine:
             try:
                 self.database_manager.store_backtest_result(result)
                 logger.info("Stored backtest result in database")
+                
+                # Store portfolio values and weights
+                self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history)
+                logger.info("Stored portfolio data in database")
             except Exception as e:
                 logger.error(f"Error storing backtest result: {e}")
             
@@ -191,7 +196,8 @@ class BacktestEngine:
             extended_start = config.start_date - timedelta(days=config.max_lookback_days)
             
             signal_scores = self.signal_calculator.get_signal_scores_pivot(
-                tickers, signals, extended_start, config.end_date
+                tickers, signals, extended_start, config.end_date, 
+                forward_fill=config.forward_fill_signals
             )
             
             if signal_scores.empty:
@@ -229,17 +235,23 @@ class BacktestEngine:
         benchmark_ready = False
         
         # Get benchmark data
-        benchmark_data = self.price_fetcher.get_price_history(
-            config.benchmark_ticker, config.start_date, config.end_date
-        )
-        
-        # Ensure benchmark data is aligned with price data
-        if benchmark_data is not None and not benchmark_data.empty:
-            # Align benchmark data with price data dates
-            benchmark_data = benchmark_data.reindex(price_data.index, method='ffill')
+        if config.use_equal_weight_benchmark:
+            # Use equal-weight portfolio of all stocks as benchmark
+            logger.info("Using equal-weight portfolio of all stocks as benchmark")
+            benchmark_data = price_data  # Use the same price data as the strategy
         else:
-            logger.warning(f"No benchmark data available for {config.benchmark_ticker}")
-            benchmark_data = pd.DataFrame()
+            # Use traditional benchmark ticker (e.g., SPY)
+            benchmark_data = self.price_fetcher.get_price_history(
+                config.benchmark_ticker, config.start_date, config.end_date
+            )
+            
+            # Ensure benchmark data is aligned with price data
+            if benchmark_data is not None and not benchmark_data.empty:
+                # Align benchmark data with price data dates
+                benchmark_data = benchmark_data.reindex(price_data.index, method='ffill')
+            else:
+                logger.warning(f"No benchmark data available for {config.benchmark_ticker}")
+                benchmark_data = pd.DataFrame()
         
         # Find the first rebalancing date to ensure both strategy and benchmark start together
         first_rebalance_date = None
@@ -290,11 +302,19 @@ class BacktestEngine:
                     portfolio_value *= (1 + portfolio_return)
                     strategy_returns.loc[current_date] = portfolio_return
             
-            # Update benchmark value using actual SPY returns (only after first rebalance)
+            # Update benchmark value (only after first rebalance)
             if benchmark_ready and not benchmark_data.empty and current_date in benchmark_data.index:
-                benchmark_return = self._calculate_benchmark_return(
-                    benchmark_data, current_date, i
-                )
+                if config.use_equal_weight_benchmark:
+                    # Calculate equal-weight portfolio return
+                    benchmark_return = self._calculate_equal_weight_return(
+                        tickers, benchmark_data, current_date, i
+                    )
+                else:
+                    # Calculate traditional benchmark return (e.g., SPY)
+                    benchmark_return = self._calculate_benchmark_return(
+                        benchmark_data, current_date, i
+                    )
+                
                 if benchmark_return is not None:
                     benchmark_value *= (1 + benchmark_return)
                     benchmark_returns.loc[current_date] = benchmark_return
@@ -312,6 +332,7 @@ class BacktestEngine:
         # Store returns data for plotting
         self.strategy_returns = strategy_returns.dropna()
         self.benchmark_returns = benchmark_returns.dropna()
+        self._use_equal_weight_benchmark = config.use_equal_weight_benchmark
         
         # Store portfolio history for plotting
         for date_idx, date in enumerate(weights_history.index):
@@ -330,10 +351,18 @@ class BacktestEngine:
         try:
             # Get signal scores for current date
             if current_date not in signal_scores.index:
-                logger.warning(f"No signal scores available for {current_date}")
-                return None
-            
-            date_scores = signal_scores.loc[current_date]
+                # Try to find the latest available date before current_date
+                available_dates = signal_scores.index[signal_scores.index <= current_date]
+                if len(available_dates) == 0:
+                    logger.warning(f"No signal scores available for {current_date} or earlier")
+                    return None
+                
+                # Use the latest available date
+                latest_date = available_dates[-1]
+                logger.info(f"No signal scores for {current_date}, using latest available from {latest_date}")
+                date_scores = signal_scores.loc[latest_date]
+            else:
+                date_scores = signal_scores.loc[current_date]
             
             # Combine signals
             combined_scores = {}
@@ -411,6 +440,42 @@ class BacktestEngine:
             
         except Exception as e:
             logger.error(f"Error calculating portfolio return for {current_date}: {e}")
+            return None
+    
+    def _calculate_equal_weight_return(self, tickers: List[str], price_data: pd.DataFrame,
+                                     current_date: date, current_index: int) -> Optional[float]:
+        """Calculate equal-weight portfolio return for a given date."""
+        try:
+            if current_index == 0:
+                return 0.0  # No return on first day
+            
+            prev_date = price_data.index[current_index - 1]
+            
+            # Get current and previous prices for all tickers
+            current_prices = price_data.loc[current_date]
+            prev_prices = price_data.loc[prev_date]
+            
+            # Calculate individual stock returns
+            returns = []
+            for ticker in tickers:
+                if ticker in current_prices.index and ticker in prev_prices.index:
+                    current_price = current_prices[ticker]
+                    prev_price = prev_prices[ticker]
+                    
+                    if not pd.isna(current_price) and not pd.isna(prev_price) and prev_price > 0:
+                        stock_return = (current_price - prev_price) / prev_price
+                        returns.append(stock_return)
+            
+            if not returns:
+                return None
+            
+            # Equal-weight portfolio return is the average of individual returns
+            equal_weight_return = np.mean(returns)
+            
+            return equal_weight_return if not pd.isna(equal_weight_return) else None
+            
+        except Exception as e:
+            logger.error(f"Error calculating equal-weight return for {current_date}: {e}")
             return None
     
     def _calculate_benchmark_return(self, benchmark_data: pd.DataFrame,
@@ -523,6 +588,80 @@ class BacktestEngine:
         
         return np.max(max_weights) if max_weights else 0.0
     
+    def _store_portfolio_data(self, result: BacktestResult, portfolio_values: pd.Series, 
+                            benchmark_values: pd.Series, weights_history: pd.DataFrame):
+        """Store portfolio values and weights in the database."""
+        try:
+            # Store portfolio values
+            portfolio_value_objects = []
+            for date, portfolio_value in portfolio_values.items():
+                if pd.isna(portfolio_value):
+                    continue
+                    
+                benchmark_value = benchmark_values.get(date, 0.0)
+                if pd.isna(benchmark_value):
+                    benchmark_value = 0.0
+                
+                # Calculate returns
+                portfolio_return = 0.0
+                benchmark_return = 0.0
+                
+                if len(portfolio_values) > 1:
+                    prev_date = portfolio_values.index[portfolio_values.index < date]
+                    if len(prev_date) > 0:
+                        prev_date = prev_date[-1]
+                        prev_portfolio_value = portfolio_values.get(prev_date, portfolio_value)
+                        prev_benchmark_value = benchmark_values.get(prev_date, benchmark_value)
+                        
+                        if prev_portfolio_value > 0:
+                            portfolio_return = (portfolio_value - prev_portfolio_value) / prev_portfolio_value
+                        if prev_benchmark_value > 0:
+                            benchmark_return = (benchmark_value - prev_benchmark_value) / prev_benchmark_value
+                
+                portfolio_value_obj = PortfolioValue(
+                    portfolio_value_id=str(uuid.uuid4()),
+                    backtest_id=result.backtest_id,
+                    date=date,
+                    portfolio_value=float(portfolio_value),
+                    benchmark_value=float(benchmark_value),
+                    portfolio_return=float(portfolio_return),
+                    benchmark_return=float(benchmark_return),
+                    created_at=datetime.now()
+                )
+                portfolio_value_objects.append(portfolio_value_obj)
+            
+            if portfolio_value_objects:
+                self.database_manager.store_portfolio_values(portfolio_value_objects)
+                logger.info(f"Stored {len(portfolio_value_objects)} portfolio value records")
+            
+            # Store portfolio weights
+            portfolio_weight_objects = []
+            for date, weights_row in weights_history.iterrows():
+                if weights_row.isna().all():
+                    continue
+                    
+                for ticker, weight in weights_row.items():
+                    if pd.isna(weight) or weight == 0:
+                        continue
+                    
+                    portfolio_weight_obj = PortfolioWeight(
+                        portfolio_weight_id=str(uuid.uuid4()),
+                        backtest_id=result.backtest_id,
+                        date=date,
+                        ticker=ticker,
+                        weight=float(weight),
+                        created_at=datetime.now()
+                    )
+                    portfolio_weight_objects.append(portfolio_weight_obj)
+            
+            if portfolio_weight_objects:
+                self.database_manager.store_portfolio_weights(portfolio_weight_objects)
+                logger.info(f"Stored {len(portfolio_weight_objects)} portfolio weight records")
+                
+        except Exception as e:
+            logger.error(f"Error storing portfolio data: {e}")
+            raise
+    
     def create_plots(self, save_dir: Optional[str] = None, show_plots: bool = True) -> List:
         """
         Create simplified backtest visualization plots (returns and volatility only).
@@ -576,8 +715,9 @@ class BacktestEngine:
         # Plot cumulative returns
         ax1.plot(strategy_cumulative.index, strategy_cumulative.values, 
                 label='Strategy', color='#2E86AB', linewidth=2)
+        benchmark_label = 'Equal-Weight Portfolio' if hasattr(self, '_use_equal_weight_benchmark') and self._use_equal_weight_benchmark else 'Benchmark (SPY)'
         ax1.plot(benchmark_cumulative.index, benchmark_cumulative.values, 
-                label='Benchmark (SPY)', color='#A23B72', linewidth=2)
+                label=benchmark_label, color='#A23B72', linewidth=2)
         
         ax1.set_title('Strategy vs Benchmark Performance', fontsize=16, fontweight='bold')
         ax1.set_ylabel('Cumulative Returns', fontsize=12)

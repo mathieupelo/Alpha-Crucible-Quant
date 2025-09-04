@@ -184,7 +184,8 @@ class SignalCalculator:
             return pd.DataFrame()
     
     def get_signal_scores_pivot(self, tickers: List[str], signals: List[str],
-                               start_date: date, end_date: date) -> pd.DataFrame:
+                               start_date: date, end_date: date, 
+                               forward_fill: bool = True) -> pd.DataFrame:
         """
         Get signal scores as a pivot table.
         
@@ -193,12 +194,13 @@ class SignalCalculator:
             signals: List of signal IDs
             start_date: Start date
             end_date: End date
+            forward_fill: Whether to forward fill missing values with latest available scores
             
         Returns:
             Pivot DataFrame with dates as index and ticker-signal combinations as columns
         """
         try:
-            return self.database_manager.get_signal_scores_dataframe(tickers, signals, start_date, end_date)
+            return self.database_manager.get_signal_scores_dataframe(tickers, signals, start_date, end_date, forward_fill)
         except Exception as e:
             logger.error(f"Error retrieving signal scores pivot from database: {e}")
             return pd.DataFrame()

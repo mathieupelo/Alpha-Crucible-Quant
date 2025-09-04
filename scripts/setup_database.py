@@ -149,6 +149,43 @@ def create_tables():
         """)
         logger.info("Created backtest_results table")
         
+        # Portfolio values table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_values (
+                portfolio_value_id VARCHAR(100) PRIMARY KEY,
+                backtest_id VARCHAR(100) NOT NULL,
+                date DATE NOT NULL,
+                portfolio_value DECIMAL(15, 2) NOT NULL,
+                benchmark_value DECIMAL(15, 2) NOT NULL,
+                portfolio_return DECIMAL(10, 6) NOT NULL,
+                benchmark_return DECIMAL(10, 6) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_portfolio_value (backtest_id, date),
+                INDEX idx_backtest_date (backtest_id, date),
+                INDEX idx_date (date),
+                FOREIGN KEY (backtest_id) REFERENCES backtest_results(backtest_id) ON DELETE CASCADE
+            )
+        """)
+        logger.info("Created portfolio_values table")
+        
+        # Portfolio weights table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_weights (
+                portfolio_weight_id VARCHAR(100) PRIMARY KEY,
+                backtest_id VARCHAR(100) NOT NULL,
+                date DATE NOT NULL,
+                ticker VARCHAR(20) NOT NULL,
+                weight DECIMAL(10, 6) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_portfolio_weight (backtest_id, date, ticker),
+                INDEX idx_backtest_date (backtest_id, date),
+                INDEX idx_ticker_date (ticker, date),
+                INDEX idx_date (date),
+                FOREIGN KEY (backtest_id) REFERENCES backtest_results(backtest_id) ON DELETE CASCADE
+            )
+        """)
+        logger.info("Created portfolio_weights table")
+        
         connection.commit()
         cursor.close()
         connection.close()

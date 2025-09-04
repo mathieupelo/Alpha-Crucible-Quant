@@ -81,7 +81,7 @@ This script will:
 Test the portfolio storage system:
 
 ```bash
-python scripts/test_portfolio_storage.py
+python tests/test_portfolio_storage.py
 ```
 
 ## API Usage

@@ -142,7 +142,7 @@ Date       AAPL-RSI  AAPL-SMA  MSFT-RSI  MSFT-SMA
 Use the provided test script to verify forward-fill functionality:
 
 ```bash
-python scripts/test_forward_fill.py
+python tests/test_forward_fill.py
 ```
 
 This script will:

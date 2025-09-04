@@ -156,7 +156,7 @@ Strategy Performance:
 Use the provided test script to compare both benchmarks:
 
 ```bash
-python scripts/test_equal_weight_benchmark.py
+python tests/test_equal_weight_benchmark.py
 ```
 
 This script will:

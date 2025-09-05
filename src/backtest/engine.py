@@ -6,15 +6,13 @@ Implements comprehensive backtesting with portfolio optimization and performance
 
 import logging
 import time
-import uuid
 from datetime import date, datetime, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union, Any
 import pandas as pd
 import numpy as np
 
 from .config import BacktestConfig
 from .models import BacktestResult
-from .plotting import create_backtest_summary_plots
 from signals import SignalCalculator
 from solver import PortfolioSolver, SolverConfig
 from database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
@@ -24,7 +22,30 @@ logger = logging.getLogger(__name__)
 
 
 class BacktestEngine:
-    """Main backtesting engine for quantitative strategies."""
+    """
+    Main backtesting engine for quantitative strategies.
+    
+    This class orchestrates the entire backtesting process, including:
+    - Data preparation and validation
+    - Signal calculation and scoring
+    - Portfolio optimization and rebalancing
+    - Performance metrics calculation
+    - Results storage and visualization
+    
+    The engine supports multiple rebalancing frequencies (daily, weekly, monthly, quarterly)
+    and various portfolio optimization methods including score-based allocation and
+    mean-variance optimization.
+    
+    Attributes:
+        price_fetcher: Instance for fetching stock price data
+        signal_calculator: Instance for calculating investment signals
+        database_manager: Instance for database operations
+        portfolio_solver: Instance for portfolio optimization
+        strategy_returns: Series of strategy returns for plotting
+        benchmark_returns: Series of benchmark returns for plotting
+        universe_returns: Series of universe returns for plotting
+        portfolio_history: List of portfolio snapshots for plotting
+    """
     
     def __init__(self, price_fetcher: Optional[PriceFetcher] = None,
                  signal_calculator: Optional[SignalCalculator] = None,
@@ -65,110 +86,178 @@ class BacktestEngine:
         logger.info(f"Starting backtest for {len(tickers)} tickers, {len(signals)} signals from {config.start_date} to {config.end_date}")
         
         try:
-            # Generate unique run_id
-            run_id = f"backtest_{int(time.time())}_{config.start_date}_{config.end_date}"
+            # Initialize backtest
+            run_id, result = self._initialize_backtest(tickers, signals, config)
             
-            # Store backtest configuration
-            backtest_config = Backtest(
-                run_id=run_id,
-                start_date=config.start_date,
-                end_date=config.end_date,
-                frequency=config.rebalancing_frequency,
-                universe={'tickers': tickers, 'signals': signals},
-                benchmark=config.benchmark_ticker,
-                params={
-                    'initial_capital': config.initial_capital,
-                    'risk_aversion': config.risk_aversion,
-                    'max_weight': config.max_weight,
-                    'min_weight': config.min_weight,
-                    'transaction_costs': config.transaction_costs,
-                    'signal_weights': config.signal_weights
-                },
-                created_at=datetime.now()
+            # Prepare data
+            trading_days, rebalancing_dates, price_data, signal_scores = self._prepare_backtest_data(
+                tickers, signals, config
             )
             
-            # Store backtest configuration in database
-            try:
-                self.database_manager.store_backtest(backtest_config)
-                logger.info(f"Stored backtest configuration with run_id: {run_id}")
-            except Exception as e:
-                logger.error(f"Error storing backtest configuration: {e}")
-            
-            # Initialize result
-            result = BacktestResult(
-                backtest_id=run_id,
-                start_date=config.start_date,
-                end_date=config.end_date,
-                tickers=tickers,
-                signals=signals,
-                signal_weights=config.signal_weights or {signal: 1.0/len(signals) for signal in signals}
-            )
-            
-            # Get trading days
-            trading_days = DateUtils.get_trading_days(config.start_date, config.end_date)
-            logger.info(f"Found {len(trading_days)} trading days")
-            
-            # Get rebalancing dates
-            rebalancing_dates = self._get_rebalancing_dates(trading_days, config)
-            logger.info(f"Found {len(rebalancing_dates)} rebalancing dates")
-            
-            # Ensure signal scores exist for all rebalancing dates
-            rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(
-                rebalancing_dates, tickers, signals, config
-            )
-            logger.info(f"Adjusted to {len(rebalancing_dates)} rebalancing dates with signal scores")
-            
-            # Get price data for all tickers
-            price_data = self._get_price_data(tickers, config)
-            if price_data is None or price_data.empty:
-                logger.error("Failed to get price data")
+            if price_data is None or price_data.empty or signal_scores.empty:
+                logger.error("Failed to prepare backtest data")
                 return result
             
-            # Get signal scores (combined scores)
-            signal_scores = self._get_signal_scores(tickers, signals, config)
-            if signal_scores.empty:
-                logger.error("Failed to get signal scores")
-                return result
-            
-            # Run backtest simulation
+            # Run simulation
             portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation(
                 tickers, signals, signal_scores, price_data, rebalancing_dates, config
             )
             
-            # Calculate performance metrics
-            self._calculate_performance_metrics(result, portfolio_values, benchmark_values, config)
-            
-            # Store time series data
-            result.portfolio_values = portfolio_values
-            result.benchmark_values = benchmark_values
-            result.weights_history = weights_history
-            
-            # Calculate additional metrics
-            result.num_rebalances = len(rebalancing_dates)
-            result.avg_turnover = self._calculate_avg_turnover(weights_history)
-            result.avg_num_positions = self._calculate_avg_num_positions(weights_history)
-            result.max_concentration = self._calculate_max_concentration(weights_history)
-            
-            # Store portfolio data in database
-            try:
-                # Store portfolio values and weights
-                self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
-                logger.info("Stored portfolio data in database")
-            except Exception as e:
-                logger.error(f"Error storing portfolio data: {e}")
-            
-            # Calculate execution time
-            result.execution_time_seconds = time.time() - start_time
-            
-            logger.info(f"Backtest completed in {result.execution_time_seconds:.1f} seconds")
-            logger.info(f"Total return: {result.total_return:.2%}, Sharpe ratio: {result.sharpe_ratio:.2f}")
+            # Calculate and store results
+            self._finalize_backtest_results(
+                result, portfolio_values, benchmark_values, weights_history, 
+                first_rebalance_date, rebalancing_dates, start_time, config
+            )
             
             return result
             
         except Exception as e:
             logger.error(f"Error running backtest: {e}")
-            result.execution_time_seconds = time.time() - start_time
+            if 'result' in locals():
+                result.execution_time_seconds = time.time() - start_time
             return result
+    
+    def _initialize_backtest(self, tickers: List[str], signals: List[str], 
+                           config: BacktestConfig) -> Tuple[str, BacktestResult]:
+        """
+        Initialize backtest configuration and result object.
+        
+        Creates a unique run ID, stores the backtest configuration in the database,
+        and initializes the result object with basic metadata.
+        
+        Args:
+            tickers: List of stock ticker symbols to include in backtest
+            signals: List of signal IDs to use for portfolio construction
+            config: Backtesting configuration parameters
+            
+        Returns:
+            Tuple containing:
+                - run_id: Unique identifier for this backtest run
+                - result: Initialized BacktestResult object
+        """
+        # Generate unique run_id
+        run_id = f"backtest_{int(time.time())}_{config.start_date}_{config.end_date}"
+        
+        # Store backtest configuration
+        backtest_config = Backtest(
+            run_id=run_id,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            frequency=config.rebalancing_frequency,
+            universe={'tickers': tickers, 'signals': signals},
+            benchmark=config.benchmark_ticker,
+            params={
+                'initial_capital': config.initial_capital,
+                'risk_aversion': config.risk_aversion,
+                'max_weight': config.max_weight,
+                'min_weight': config.min_weight,
+                'transaction_costs': config.transaction_costs,
+                'signal_weights': config.signal_weights
+            },
+            created_at=datetime.now()
+        )
+        
+        # Store backtest configuration in database
+        try:
+            self.database_manager.store_backtest(backtest_config)
+            logger.info(f"Stored backtest configuration with run_id: {run_id}")
+        except Exception as e:
+            logger.error(f"Error storing backtest configuration: {e}")
+        
+        # Initialize result
+        result = BacktestResult(
+            backtest_id=run_id,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            tickers=tickers,
+            signals=signals,
+            signal_weights=config.signal_weights or {signal: 1.0/len(signals) for signal in signals}
+        )
+        
+        return run_id, result
+    
+    def _prepare_backtest_data(self, tickers: List[str], signals: List[str], 
+                             config: BacktestConfig) -> Tuple[List[date], List[date], Optional[pd.DataFrame], pd.DataFrame]:
+        """
+        Prepare all required data for backtesting.
+        
+        This method coordinates the preparation of:
+        - Trading days within the backtest period
+        - Rebalancing dates based on the specified frequency
+        - Price data for all tickers
+        - Signal scores for portfolio construction
+        
+        Args:
+            tickers: List of stock ticker symbols
+            signals: List of signal IDs to calculate
+            config: Backtesting configuration
+            
+        Returns:
+            Tuple containing:
+                - trading_days: List of valid trading dates
+                - rebalancing_dates: List of dates when portfolio should be rebalanced
+                - price_data: DataFrame with price data (or None if failed)
+                - signal_scores: DataFrame with signal scores (or empty if failed)
+        """
+        # Get trading days
+        trading_days = DateUtils.get_trading_days(config.start_date, config.end_date)
+        logger.info(f"Found {len(trading_days)} trading days")
+        
+        # Get rebalancing dates
+        rebalancing_dates = self._get_rebalancing_dates(trading_days, config)
+        logger.info(f"Found {len(rebalancing_dates)} rebalancing dates")
+        
+        # Ensure signal scores exist for all rebalancing dates
+        rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(
+            rebalancing_dates, tickers, signals, config
+        )
+        logger.info(f"Adjusted to {len(rebalancing_dates)} rebalancing dates with signal scores")
+        
+        # Get price data for all tickers
+        price_data = self._get_price_data(tickers, config)
+        if price_data is None or price_data.empty:
+            logger.error("Failed to get price data")
+            return trading_days, rebalancing_dates, None, pd.DataFrame()
+        
+        # Get signal scores (combined scores)
+        signal_scores = self._get_signal_scores(tickers, signals, config)
+        if signal_scores.empty:
+            logger.error("Failed to get signal scores")
+            return trading_days, rebalancing_dates, price_data, pd.DataFrame()
+        
+        return trading_days, rebalancing_dates, price_data, signal_scores
+    
+    def _finalize_backtest_results(self, result: BacktestResult, portfolio_values: pd.Series,
+                                 benchmark_values: pd.Series, weights_history: pd.DataFrame,
+                                 first_rebalance_date: date, rebalancing_dates: List[date],
+                                 start_time: float, config: BacktestConfig) -> None:
+        """Finalize backtest results with metrics and database storage."""
+        # Calculate performance metrics
+        self._calculate_performance_metrics(result, portfolio_values, benchmark_values, config)
+        
+        # Store time series data
+        result.portfolio_values = portfolio_values
+        result.benchmark_values = benchmark_values
+        result.weights_history = weights_history
+        
+        # Calculate additional metrics
+        result.num_rebalances = len(rebalancing_dates)
+        result.avg_turnover = self._calculate_avg_turnover(weights_history)
+        result.avg_num_positions = self._calculate_avg_num_positions(weights_history)
+        result.max_concentration = self._calculate_max_concentration(weights_history)
+        
+        # Store portfolio data in database
+        try:
+            self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
+            logger.info("Stored portfolio data in database")
+        except Exception as e:
+            logger.error(f"Error storing portfolio data: {e}")
+        
+        # Calculate execution time
+        result.execution_time_seconds = time.time() - start_time
+        
+        logger.info(f"Backtest completed in {result.execution_time_seconds:.1f} seconds")
+        logger.info(f"Total return: {result.total_return:.2%}, Sharpe ratio: {result.sharpe_ratio:.2f}")
     
     def _get_rebalancing_dates(self, trading_days: List[date], config: BacktestConfig) -> List[date]:
         """Get rebalancing dates based on frequency."""
@@ -394,7 +483,7 @@ class BacktestEngine:
     
     def _run_simulation(self, tickers: List[str], signals: List[str], 
                        signal_scores: pd.DataFrame, price_data: pd.DataFrame,
-                       rebalancing_dates: List[date], config: BacktestConfig) -> Tuple[pd.Series, pd.Series, pd.DataFrame]:
+                       rebalancing_dates: List[date], config: BacktestConfig) -> Tuple[pd.Series, pd.Series, pd.DataFrame, date]:
         """Run the backtest simulation."""
         logger.info("Starting backtest simulation...")
         

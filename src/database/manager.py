@@ -14,6 +14,7 @@ from mysql.connector import Error
 from dotenv import load_dotenv
 
 from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, DataFrameConverter
+from utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
 load_dotenv()
@@ -69,15 +70,12 @@ class DatabaseManager:
         if not self.is_connected():
             self.connect()
     
+    @handle_database_errors
     def execute_query(self, query: str, params: Optional[tuple] = None) -> pd.DataFrame:
         """Execute a SELECT query and return results as DataFrame."""
         self.ensure_connection()
-        try:
-            df = pd.read_sql(query, self._connection, params=params)
-            return df
-        except Error as e:
-            logger.error(f"Error executing query: {e}")
-            raise
+        df = pd.read_sql(query, self._connection, params=params)
+        return df
     
     def execute_insert(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute an INSERT query and return the last insert ID."""
@@ -559,54 +557,6 @@ class DatabaseManager:
         """Get information about a table structure."""
         query = f"DESCRIBE {table_name}"
         return self.execute_query(query)
-    
-    def get_signal_scores(self, start_date: Optional[date] = None,
-                         end_date: Optional[date] = None,
-                         tickers: Optional[List[str]] = None) -> pd.DataFrame:
-        """Retrieve signal scores from the database."""
-        query = "SELECT * FROM signals_raw WHERE 1=1"
-        params = []
-        
-        if start_date:
-            query += " AND asof_date >= %s"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND asof_date <= %s"
-            params.append(end_date)
-        
-        if tickers:
-            placeholders = ','.join(['%s'] * len(tickers))
-            query += f" AND ticker IN ({placeholders})"
-            params.extend(tickers)
-        
-        query += " ORDER BY asof_date, ticker, signal_name"
-        
-        return self.execute_query(query, tuple(params) if params else None)
-    
-    def get_combined_scores(self, start_date: Optional[date] = None,
-                           end_date: Optional[date] = None,
-                           tickers: Optional[List[str]] = None) -> pd.DataFrame:
-        """Retrieve combined scores from the database."""
-        query = "SELECT * FROM scores_combined WHERE 1=1"
-        params = []
-        
-        if start_date:
-            query += " AND asof_date >= %s"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND asof_date <= %s"
-            params.append(end_date)
-        
-        if tickers:
-            placeholders = ','.join(['%s'] * len(tickers))
-            query += f" AND ticker IN ({placeholders})"
-            params.extend(tickers)
-        
-        query += " ORDER BY asof_date, ticker, method"
-        
-        return self.execute_query(query, tuple(params) if params else None)
     
     def __enter__(self):
         """Context manager entry."""

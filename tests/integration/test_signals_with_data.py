@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 from data import RealTimeDataFetcher
 from signals import SignalCalculator

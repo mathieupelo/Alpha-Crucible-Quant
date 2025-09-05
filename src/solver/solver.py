@@ -129,8 +129,8 @@ class PortfolioSolver:
         Solve for portfolio weights based purely on alpha scores.
         
         This method allocates weights based on score ranking, with higher scores
-        getting higher allocations. Uses a tiered approach where top scores get
-        maximum allocation, and lower scores get proportionally less.
+        getting maximum allocation up to the max_weight constraint, and remaining
+        weight distributed proportionally among lower-ranked stocks.
         
         Args:
             alpha_scores: Dictionary mapping ticker to alpha score
@@ -150,77 +150,79 @@ class PortfolioSolver:
             
             # Initialize weights
             weights = np.zeros(len(tickers))
-            
-            # Define allocation tiers based on ranking
             n_assets = len(tickers)
             
-            if n_assets == 1:
-                # Single asset gets 100%
-                weights[0] = 1.0
-            elif n_assets == 2:
-                # Two assets: 70% to top, 30% to bottom
-                weights[sorted_indices[0]] = 0.7
-                weights[sorted_indices[1]] = 0.3
-            elif n_assets == 3:
-                # Three assets: 50% to top, 30% to middle, 20% to bottom
-                weights[sorted_indices[0]] = 0.5
-                weights[sorted_indices[1]] = 0.3
-                weights[sorted_indices[2]] = 0.2
-            elif n_assets == 4:
-                # Four assets: 30% to top two, 30% to third, 10% to bottom
-                weights[sorted_indices[0]] = 0.3  # Top score
-                weights[sorted_indices[1]] = 0.3  # Second score
-                weights[sorted_indices[2]] = 0.3  # Third score
-                weights[sorted_indices[3]] = 0.1  # Bottom score
-            else:
-                # For more than 4 assets, use exponential decay
-                # Top 2 get 30% each, rest get exponentially less
-                weights[sorted_indices[0]] = 0.3
-                weights[sorted_indices[1]] = 0.3
+            if n_assets == 0:
+                return weights
+            
+            # Step 1: Allocate maximum weight to highest ranking stocks
+            remaining_weight = 1.0
+            allocated_count = 0
+            
+            # Give maximum allocation to top stocks until we run out of weight or stocks
+            for i in range(n_assets):
+                if remaining_weight <= 0:
+                    break
                 
-                # Remaining weight distributed exponentially
-                remaining_weight = 0.4
-                remaining_assets = n_assets - 2
+                # Calculate how much weight to allocate to this stock
+                weight_to_allocate = min(self.config.max_weight, remaining_weight)
                 
-                if remaining_assets > 0:
-                    # Exponential decay: each subsequent asset gets half the weight of the previous
-                    decay_factor = 0.5
-                    for i in range(2, n_assets):
-                        if i == 2:
-                            weights[sorted_indices[i]] = remaining_weight * (1 - decay_factor)
+                # Only allocate if we have enough remaining weight
+                if weight_to_allocate >= self.config.min_weight:
+                    weights[sorted_indices[i]] = weight_to_allocate
+                    remaining_weight -= weight_to_allocate
+                    allocated_count += 1
+                else:
+                    break
+            
+            # Step 2: Distribute remaining weight proportionally among remaining stocks
+            if remaining_weight > 0 and allocated_count < n_assets:
+                # Get remaining stocks (those not yet allocated)
+                remaining_stocks = sorted_indices[allocated_count:]
+                
+                if len(remaining_stocks) > 0:
+                    # Calculate proportional weights based on scores
+                    remaining_scores = scores[remaining_stocks]
+                    
+                    # Handle case where all remaining scores are the same or zero
+                    if np.all(remaining_scores == remaining_scores[0]):
+                        # Equal distribution among remaining stocks
+                        equal_weight = remaining_weight / len(remaining_stocks)
+                        for idx in remaining_stocks:
+                            if equal_weight >= self.config.min_weight:
+                                weights[idx] = equal_weight
+                    else:
+                        # Proportional distribution based on scores
+                        # Normalize scores to positive values for proportional allocation
+                        min_score = np.min(remaining_scores)
+                        if min_score < 0:
+                            normalized_scores = remaining_scores - min_score + 1e-8
                         else:
-                            weights[sorted_indices[i]] = weights[sorted_indices[i-1]] * decay_factor
-                    
-                    # Renormalize to ensure sum is 1
-                    total_weight = np.sum(weights)
-                    if total_weight > 0:
-                        weights = weights / total_weight
+                            normalized_scores = remaining_scores + 1e-8
+                        
+                        # Calculate proportional weights
+                        total_normalized_score = np.sum(normalized_scores)
+                        if total_normalized_score > 0:
+                            proportional_weights = (normalized_scores / total_normalized_score) * remaining_weight
+                            
+                            # Apply proportional weights
+                            for i, idx in enumerate(remaining_stocks):
+                                if proportional_weights[i] >= self.config.min_weight:
+                                    weights[idx] = proportional_weights[i]
             
-            # Apply maximum weight constraint
-            if self.config.max_weight < 1.0:
-                # Redistribute excess weight proportionally among other assets
-                excess_mask = weights > self.config.max_weight
-                if np.any(excess_mask):
-                    # Cap weights at max_weight
-                    excess_weight = np.sum(weights[excess_mask]) - np.sum(excess_mask) * self.config.max_weight
-                    weights[excess_mask] = self.config.max_weight
-                    
-                    # Redistribute excess to non-capped assets
-                    non_excess_mask = ~excess_mask
-                    if np.any(non_excess_mask):
-                        weights[non_excess_mask] += excess_weight * weights[non_excess_mask] / np.sum(weights[non_excess_mask])
-            
-            # Apply minimum weight threshold
+            # Step 3: Apply minimum weight threshold and clean up
             weights[weights < self.config.min_weight] = 0.0
             
-            # Renormalize to ensure weights sum to 1
-            if np.sum(weights) > 0:
-                weights = weights / np.sum(weights)
+            # Step 4: Renormalize to ensure weights sum to 1
+            total_weight = np.sum(weights)
+            if total_weight > 0:
+                weights = weights / total_weight
             else:
-                # If all weights are zero, distribute equally
+                # If all weights are zero (shouldn't happen), distribute equally
                 weights = np.ones(len(tickers)) / len(tickers)
             
             logger.info(f"Score-based allocation completed. Weights: {dict(zip(tickers, weights))}")
+            logger.info(f"Allocation strategy: {allocated_count} stocks at max weight ({self.config.max_weight:.1%}), remainder distributed proportionally")
             return weights
             
         except Exception as e:

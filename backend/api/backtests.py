@@ -73,11 +73,6 @@ async def get_backtest_metrics(run_id: str):
 async def get_backtest_portfolios(run_id: str):
     """Get all portfolios for a backtest."""
     try:
-        # Check if backtest exists
-        backtest = db_service.get_backtest_by_run_id(run_id)
-        if backtest is None:
-            raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
-        
         portfolios = db_service.get_backtest_portfolios(run_id)
         return {
             "portfolios": portfolios,

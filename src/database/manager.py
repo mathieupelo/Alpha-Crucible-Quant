@@ -330,6 +330,7 @@ class DatabaseManager:
                 params = None
         
         return Portfolio(
+            id=row['id'],
             run_id=row['run_id'],
             asof_date=row['asof_date'],
             method=row['method'],
@@ -475,6 +476,7 @@ class DatabaseManager:
                 params = None
         
         return Backtest(
+            id=row['id'],
             run_id=row['run_id'],
             start_date=row['start_date'],
             end_date=row['end_date'],

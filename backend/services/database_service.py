@@ -109,7 +109,19 @@ class DatabaseService:
             if nav_df.empty:
                 return []
             
-            return nav_df.to_dict('records')
+            # Transform field names to match Pydantic model
+            nav_records = nav_df.to_dict('records')
+            for record in nav_records:
+                # Rename fields to match NavResponse model
+                if 'nav' in record:
+                    record['portfolio_nav'] = record.pop('nav')
+                if 'date' in record:
+                    record['nav_date'] = record.pop('date')
+                # Handle benchmark_nav field
+                if 'benchmark_nav' not in record and 'benchmark' in record:
+                    record['benchmark_nav'] = record.pop('benchmark')
+            
+            return nav_records
             
         except Exception as e:
             logger.error(f"Error getting NAV data for {run_id}: {e}")
@@ -231,14 +243,14 @@ class DatabaseService:
             
             # Convert to DataFrame for calculations
             nav_df = pd.DataFrame(nav_data)
-            nav_df['date'] = pd.to_datetime(nav_df['date'])
-            nav_df = nav_df.set_index('date').sort_index()
+            nav_df['nav_date'] = pd.to_datetime(nav_df['nav_date'])
+            nav_df = nav_df.set_index('nav_date').sort_index()
             
             if len(nav_df) < 2:
                 return None
             
             # Calculate returns
-            nav_series = nav_df['nav']
+            nav_series = nav_df['portfolio_nav']
             returns = nav_series.pct_change().dropna()
             
             # Calculate metrics

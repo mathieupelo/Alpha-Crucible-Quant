@@ -36,6 +36,7 @@ class ScoreCombined:
 @dataclass
 class Portfolio:
     """Represents a portfolio with metadata."""
+    id: int
     run_id: str
     asof_date: date
     method: str
@@ -58,6 +59,7 @@ class PortfolioPosition:
 @dataclass
 class Backtest:
     """Represents a backtest run configuration."""
+    id: int
     run_id: str
     start_date: date
     end_date: date

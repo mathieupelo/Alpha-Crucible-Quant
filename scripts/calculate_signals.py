@@ -3,6 +3,7 @@
 Example script to calculate signals using the Quant Project system.
 
 This script demonstrates how to calculate signals for a set of tickers.
+For SENTIMENT signals, no real price data is needed.
 """
 
 import sys
@@ -15,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from signals import SignalCalculator
 from database import DatabaseManager
-from utils import PriceFetcher
 
 
 def main():
@@ -25,8 +25,7 @@ def main():
     
     # Configuration (match backtest tickers)
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
-    tickers = ['TTWO', 'MSFT', 'EA', 'SONY']
-    signals = ['RSI', 'SMA', 'MACD']
+    signals = ['SENTIMENT']
     
     # Date range (last 2 years to match backtest)
     end_date = date.today()
@@ -38,11 +37,10 @@ def main():
     print()
     
     try:
-        # Initialize components
+        # Initialize components (no price fetcher needed for SENTIMENT signals)
         print("Initializing components...")
-        price_fetcher = PriceFetcher()
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher, database_manager)
+        signal_calculator = SignalCalculator(price_fetcher=None, database_manager=database_manager)
         
         # Calculate raw signals
         print("Calculating raw signals...")
@@ -119,29 +117,6 @@ def main():
                         print(f"  {row['asof_date']}: score = {row['score']:.3f}")
         else:
             print("No combined scores calculated")
-        
-        print()
-        
-        # Show missing signals
-        print("CHECKING FOR MISSING SIGNALS...")
-        missing_signals = signal_calculator.get_missing_signals(
-            tickers, signals, start_date, end_date
-        )
-        
-        if missing_signals:
-            print(f"Found {len(missing_signals)} missing signal calculations")
-            print("Calculating missing signals...")
-            
-            missing_scores = signal_calculator.calculate_missing_signals(
-                tickers, signals, start_date, end_date
-            )
-            
-            if not missing_scores.empty:
-                print(f"Calculated {len(missing_scores)} missing signals")
-            else:
-                print("No missing signals could be calculated")
-        else:
-            print("No missing signals found")
         
         print()
         print("Signal calculation completed successfully!")

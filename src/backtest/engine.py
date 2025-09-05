@@ -112,6 +112,12 @@ class BacktestEngine:
             rebalancing_dates = self._get_rebalancing_dates(trading_days, config)
             logger.info(f"Found {len(rebalancing_dates)} rebalancing dates")
             
+            # Ensure signal scores exist for all rebalancing dates
+            rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(
+                rebalancing_dates, tickers, signals, config
+            )
+            logger.info(f"Adjusted to {len(rebalancing_dates)} rebalancing dates with signal scores")
+            
             # Get price data for all tickers
             price_data = self._get_price_data(tickers, config)
             if price_data is None or price_data.empty:
@@ -193,6 +199,55 @@ class BacktestEngine:
         else:
             raise ValueError(f"Unknown rebalancing frequency: {config.rebalancing_frequency}")
     
+    def _ensure_signal_scores_for_rebalancing_dates(self, rebalancing_dates: List[date], 
+                                                   tickers: List[str], signals: List[str], 
+                                                   config: BacktestConfig) -> List[date]:
+        """Ensure signal scores exist for all rebalancing dates, adjusting dates if necessary."""
+        adjusted_dates = []
+        
+        for rebal_date in rebalancing_dates:
+            # Check if signal scores exist for this date
+            signal_scores = self.signal_calculator.get_scores_combined_pivot(
+                tickers, ['equal_weight'], rebal_date, rebal_date, 
+                forward_fill=False
+            )
+            
+            if not signal_scores.empty and rebal_date in signal_scores.index:
+                # Signal scores exist for this date
+                adjusted_dates.append(rebal_date)
+            else:
+                # No signal scores for this date, find the next available date with scores
+                logger.warning(f"No signal scores for rebalancing date {rebal_date}, finding next available date...")
+                
+                # Look for the next few days to find one with signal scores
+                found_date = None
+                for days_ahead in range(1, 8):  # Check up to 7 days ahead
+                    check_date = rebal_date + timedelta(days=days_ahead)
+                    
+                    # Skip weekends
+                    if check_date.weekday() >= 5:
+                        continue
+                    
+                    # Check if signal scores exist for this date
+                    signal_scores = self.signal_calculator.get_scores_combined_pivot(
+                        tickers, ['equal_weight'], check_date, check_date, 
+                        forward_fill=False
+                    )
+                    
+                    if not signal_scores.empty and check_date in signal_scores.index:
+                        found_date = check_date
+                        break
+                
+                if found_date:
+                    adjusted_dates.append(found_date)
+                    logger.info(f"Using {found_date} instead of {rebal_date} for rebalancing")
+                else:
+                    # If no signal scores found, use the original date and let forward fill handle it
+                    adjusted_dates.append(rebal_date)
+                    logger.warning(f"No signal scores found for {rebal_date} or nearby dates, will use forward fill")
+        
+        return adjusted_dates
+    
     def _get_price_data(self, tickers: List[str], config: BacktestConfig) -> Optional[pd.DataFrame]:
         """Get price data for all tickers."""
         try:
@@ -272,6 +327,10 @@ class BacktestEngine:
                 # Get rebalancing dates to check coverage
                 trading_days = DateUtils.get_trading_days(config.start_date, config.end_date)
                 rebalancing_dates = self._get_rebalancing_dates(trading_days, config)
+                # Ensure signal scores exist for all rebalancing dates
+                rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(
+                    rebalancing_dates, tickers, signals, config
+                )
                 
                 missing_dates = []
                 for rebal_date in rebalancing_dates:
@@ -279,7 +338,9 @@ class BacktestEngine:
                         missing_dates.append(rebal_date)
                 
                 if missing_dates:
-                    logger.warning(f"Missing signal scores for {len(missing_dates)} rebalancing dates: {missing_dates[:5]}...")
+                    logger.warning(f"Missing signal scores for {len(missing_dates)} rebalancing dates:")
+                    for i, missing_date in enumerate(missing_dates, 1):
+                        logger.warning(f"  {i}. {missing_date}")
                     
                     # Try to calculate missing signals for specific dates
                     if len(missing_dates) <= 5:  # Only for a few missing dates
@@ -317,6 +378,8 @@ class BacktestEngine:
                                 logger.warning(f"Failed to calculate signals for {missing_date}: {e}")
                     
                     # Forward fill any remaining missing dates
+                    # Sort the index first to ensure monotonic ordering
+                    signal_scores = signal_scores.sort_index()
                     signal_scores = signal_scores.reindex(rebalancing_dates, method='ffill')
                     logger.info("Forward filled remaining missing signal scores")
             

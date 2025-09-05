@@ -5,7 +5,7 @@ Calculates signals for multiple tickers and dates, integrating with the database
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
@@ -59,47 +59,109 @@ class SignalCalculator:
         # Calculate signals for each ticker and date
         all_signals = []
         
-        for ticker in tickers:
-            logger.info(f"Processing ticker: {ticker}")
-            
-            # Get price data for the ticker
-            price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
-            
-            if price_data is None or price_data.empty:
-                logger.warning(f"No price data available for {ticker}")
+        # Check if any signals need price data
+        signals_need_price_data = []
+        signals_no_price_data = []
+        
+        for signal_id in signals:
+            signal = self.registry.get_signal(signal_id)
+            if signal is None:
+                logger.warning(f"Signal not found: {signal_id}")
                 continue
             
-            # Calculate signals for each date
-            for target_date in trading_days:
-                if target_date not in price_data.index:
+            try:
+                # Test if signal needs price data
+                signal.get_required_price_data(start_date)
+                signals_need_price_data.append(signal_id)
+            except (NotImplementedError, AttributeError):
+                # Signal doesn't need price data
+                signals_no_price_data.append(signal_id)
+        
+        # Calculate signals that need price data
+        if signals_need_price_data:
+            for ticker in tickers:
+                logger.info(f"Processing ticker: {ticker} (signals needing price data)")
+                
+                # Get price data for the ticker
+                price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
+                
+                if price_data is None or price_data.empty:
+                    logger.warning(f"No price data available for {ticker}")
                     continue
                 
-                for signal_id in signals:
-                    try:
-                        # Get signal instance
-                        signal = self.registry.get_signal(signal_id)
-                        if signal is None:
-                            logger.warning(f"Signal not found: {signal_id}")
-                            continue
-                        
-                        # Calculate signal value using pre-fetched price data
-                        signal_value = signal.calculate(price_data, ticker, target_date)
-                        
-                        if not np.isnan(signal_value):
-                            # Store raw signal
-                            raw_signal = SignalRaw(
-                                asof_date=target_date,
-                                ticker=ticker,
-                                signal_name=signal_id,
-                                value=signal_value,
-                                metadata={'signal_class': signal.__class__.__name__},
-                                created_at=datetime.now()
-                            )
-                            all_signals.append(raw_signal)
-                        
-                    except Exception as e:
-                        logger.error(f"Error calculating {signal_id} for {ticker} on {target_date}: {e}")
+                # Calculate signals for each date
+                for target_date in trading_days:
+                    if target_date not in price_data.index:
                         continue
+                    
+                    for signal_id in signals_need_price_data:
+                        try:
+                            # Get signal instance
+                            signal = self.registry.get_signal(signal_id)
+                            if signal is None:
+                                logger.warning(f"Signal not found: {signal_id}")
+                                continue
+                            
+                            # Calculate signal value using pre-fetched price data
+                            signal_value = signal.calculate(price_data, ticker, target_date)
+                            
+                            if not np.isnan(signal_value):
+                                # Store raw signal
+                                raw_signal = SignalRaw(
+                                    asof_date=target_date,
+                                    ticker=ticker,
+                                    signal_name=signal_id,
+                                    value=signal_value,
+                                    metadata={'signal_class': signal.__class__.__name__},
+                                    created_at=datetime.now()
+                                )
+                                all_signals.append(raw_signal)
+                            
+                        except Exception as e:
+                            logger.error(f"Error calculating {signal_id} for {ticker} on {target_date}: {e}")
+                            continue
+        
+        # Calculate signals that don't need price data (like SENTIMENT)
+        if signals_no_price_data:
+            logger.info(f"Processing signals that don't need price data: {signals_no_price_data}")
+            
+            # Generate all dates in the range (not just trading days)
+            all_dates = []
+            current_date = start_date
+            while current_date <= end_date:
+                all_dates.append(current_date)
+                current_date += timedelta(days=1)
+            
+            for ticker in tickers:
+                logger.info(f"Processing ticker: {ticker} (signals not needing price data)")
+                
+                for target_date in all_dates:
+                    for signal_id in signals_no_price_data:
+                        try:
+                            # Get signal instance
+                            signal = self.registry.get_signal(signal_id)
+                            if signal is None:
+                                logger.warning(f"Signal not found: {signal_id}")
+                                continue
+                            
+                            # Calculate signal value without price data
+                            signal_value = signal.calculate(None, ticker, target_date)
+                            
+                            if not np.isnan(signal_value):
+                                # Store raw signal
+                                raw_signal = SignalRaw(
+                                    asof_date=target_date,
+                                    ticker=ticker,
+                                    signal_name=signal_id,
+                                    value=signal_value,
+                                    metadata={'signal_class': signal.__class__.__name__},
+                                    created_at=datetime.now()
+                                )
+                                all_signals.append(raw_signal)
+                            
+                        except Exception as e:
+                            logger.error(f"Error calculating {signal_id} for {ticker} on {target_date}: {e}")
+                            continue
         
         # Convert to DataFrame
         if all_signals:
@@ -145,16 +207,27 @@ class SignalCalculator:
                 logger.warning(f"Signal not found: {signal_id}")
                 return None
             
-            # Get required price data
-            start_date, end_date = signal.get_required_price_data(target_date)
-            price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
+            # Check if signal needs price data
+            try:
+                start_date, end_date = signal.get_required_price_data(target_date)
+                needs_price_data = True
+            except (NotImplementedError, AttributeError):
+                # Signal doesn't need price data (like SENTIMENT)
+                needs_price_data = False
             
-            if price_data is None or price_data.empty:
-                logger.warning(f"No price data available for {ticker}")
-                return None
-            
-            # Calculate signal using fetched price data
-            signal_value = signal.calculate(price_data, ticker, target_date)
+            if needs_price_data:
+                # Get required price data
+                price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
+                
+                if price_data is None or price_data.empty:
+                    logger.warning(f"No price data available for {ticker}")
+                    return None
+                
+                # Calculate signal using fetched price data
+                signal_value = signal.calculate(price_data, ticker, target_date)
+            else:
+                # Calculate signal without price data (like SENTIMENT)
+                signal_value = signal.calculate(None, ticker, target_date)
             
             if np.isnan(signal_value):
                 logger.warning(f"Signal calculation returned NaN for {ticker} on {target_date}")

@@ -18,9 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from data import RealTimeDataFetcher
 from signals import SignalCalculator
-from signals.rsi import RSISignal
-from signals.sma import SMASignal
-from signals.macd import MACDSignal
+from signals.sentiment import SentimentSignal
 
 
 def test_individual_signals():
@@ -39,43 +37,13 @@ def test_individual_signals():
     print(f"Tickers: {', '.join(tickers)}")
     print()
     
-    # Test RSI signal
-    print("1. Testing RSI Signal:")
-    rsi_signal = RSISignal(period=14, price_fetcher=data_fetcher)
+    # Test Sentiment signal
+    print("1. Testing Sentiment Signal:")
+    sentiment_signal = SentimentSignal(seed=42, price_fetcher=data_fetcher)
     
     for ticker in tickers:
         try:
-            signal_value = rsi_signal.calculate_with_data_fetch(ticker, test_date)
-            if not np.isnan(signal_value):
-                print(f"  {ticker}: {signal_value:.4f}")
-            else:
-                print(f"  {ticker}: No data available")
-        except Exception as e:
-            print(f"  {ticker}: Error - {e}")
-    print()
-    
-    # Test SMA signal
-    print("2. Testing SMA Signal:")
-    sma_signal = SMASignal(short_period=50, long_period=200, price_fetcher=data_fetcher)
-    
-    for ticker in tickers:
-        try:
-            signal_value = sma_signal.calculate_with_data_fetch(ticker, test_date)
-            if not np.isnan(signal_value):
-                print(f"  {ticker}: {signal_value:.4f}")
-            else:
-                print(f"  {ticker}: No data available")
-        except Exception as e:
-            print(f"  {ticker}: Error - {e}")
-    print()
-    
-    # Test MACD signal
-    print("3. Testing MACD Signal:")
-    macd_signal = MACDSignal(fast_period=12, slow_period=26, signal_period=9, price_fetcher=data_fetcher)
-    
-    for ticker in tickers:
-        try:
-            signal_value = macd_signal.calculate_with_data_fetch(ticker, test_date)
+            signal_value = sentiment_signal.calculate_with_data_fetch(ticker, test_date)
             if not np.isnan(signal_value):
                 print(f"  {ticker}: {signal_value:.4f}")
             else:
@@ -96,7 +64,7 @@ def test_signal_calculator():
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
-    signals = ['RSI', 'SMA', 'MACD']
+    signals = ['SENTIMENT']
     start_date = date(2024, 1, 1)
     end_date = date(2024, 1, 31)
     
@@ -172,7 +140,7 @@ def test_signal_combination():
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
-    signals = ['RSI', 'SMA', 'MACD']
+    signals = ['SENTIMENT']
     start_date = date(2024, 1, 1)
     end_date = date(2024, 1, 31)
     

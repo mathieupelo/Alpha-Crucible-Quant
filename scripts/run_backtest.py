@@ -31,8 +31,8 @@ def main():
     
     # Configuration
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
-    signals = ['RSI', 'SMA', 'MACD']
-    signal_weights = {'RSI': 0.33, 'SMA': 0.33, 'MACD': 0.34}
+    signals = ['SENTIMENT']
+    signal_weights = {'SENTIMENT': 1.0}
     
     # Date range (matching signal calculation)
     start_date = date(2023, 9, 5)
@@ -74,7 +74,7 @@ def main():
         evaluation_period='monthly',
         transaction_costs=0.001,
         max_weight=0.3,
-        risk_aversion=0.0,
+        risk_aversion=1.0,
         benchmark_ticker='SPY',
         use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark
         signal_weights=signal_weights,

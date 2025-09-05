@@ -8,9 +8,7 @@ from typing import Dict, List, Type, Optional
 import logging
 
 from .base import SignalBase
-from .rsi import RSISignal
-from .sma import SMASignal
-from .macd import MACDSignal
+from .sentiment import SentimentSignal
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +23,8 @@ class SignalRegistry:
     
     def _register_default_signals(self):
         """Register default signal implementations."""
-        self.register_signal(RSISignal)
-        self.register_signal(SMASignal)
-        self.register_signal(MACDSignal)
-        logger.info("Registered default signals: RSI, SMA, MACD")
+        self.register_signal(SentimentSignal)
+        logger.info("Registered default signals: SENTIMENT")
     
     def register_signal(self, signal_class: Type[SignalBase]):
         """

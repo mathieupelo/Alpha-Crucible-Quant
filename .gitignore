@@ -3,3 +3,4 @@
 /src/backtest/__pycache__
 *.pyc
 /frontend/node_modules
+/src/database/__pycache__

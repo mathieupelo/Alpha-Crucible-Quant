@@ -1,0 +1,143 @@
+/**
+ * TypeScript type definitions for Alpha Crucible Quant Frontend
+ */
+
+export interface Backtest {
+  id: number;
+  run_id: string;
+  start_date: string;
+  end_date: string;
+  frequency: string;
+  universe?: Record<string, any>;
+  benchmark?: string;
+  params?: Record<string, any>;
+  created_at: string;
+}
+
+export interface BacktestListResponse {
+  backtests: Backtest[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface BacktestMetrics {
+  run_id: string;
+  total_return: number;
+  annualized_return: number;
+  volatility: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  alpha: number;
+  beta: number;
+  information_ratio: number;
+  tracking_error: number;
+  num_rebalances: number;
+  avg_turnover: number;
+  avg_num_positions: number;
+  max_concentration: number;
+  execution_time_seconds: number;
+}
+
+export interface Portfolio {
+  id: number;
+  run_id: string;
+  asof_date: string;
+  method: string;
+  params?: Record<string, any>;
+  cash: number;
+  notes?: string;
+  created_at: string;
+  position_count?: number;
+  total_value?: number;
+}
+
+export interface Position {
+  id: number;
+  portfolio_id: number;
+  ticker: string;
+  weight: number;
+  price_used: number;
+  created_at: string;
+}
+
+export interface PortfolioDetails extends Portfolio {
+  positions: Position[];
+}
+
+export interface Signal {
+  id: number;
+  asof_date: string;
+  ticker: string;
+  signal_name: string;
+  value: number;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface Score {
+  id: number;
+  asof_date: string;
+  ticker: string;
+  score: number;
+  method: string;
+  params?: Record<string, any>;
+  created_at: string;
+}
+
+export interface NavData {
+  id: number;
+  run_id: string;
+  date: string;
+  nav: number;
+  benchmark_nav?: number;
+  pnl?: number;
+}
+
+export interface NavListResponse {
+  nav_data: NavData[];
+  total: number;
+  run_id: string;
+  start_date: string;
+  end_date: string;
+}
+
+export interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface ChartDataPoint {
+  date: string;
+  value: number;
+  benchmark?: number;
+}
+
+export interface SignalWeights {
+  RSI: number;
+  SMA: number;
+  MACD: number;
+}
+
+export interface Theme {
+  mode: 'light' | 'dark';
+  primary: string;
+  secondary: string;
+  success: string;
+  error: string;
+  warning: string;
+  background: string;
+  surface: string;
+  text: string;
+}
+
+export interface FilterOptions {
+  startDate?: string;
+  endDate?: string;
+  tickers?: string[];
+  signalNames?: string[];
+  methods?: string[];
+}
+

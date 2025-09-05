@@ -1,0 +1,261 @@
+/**
+ * Main Dashboard Page
+ * Displays overview of all backtests with performance metrics
+ */
+
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  Skeleton,
+  Alert,
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  ShowChart as ShowChartIcon,
+  Assessment as AssessmentIcon,
+  Speed as SpeedIcon,
+} from '@mui/icons-material';
+import { useQuery } from 'react-query';
+
+import { backtestApi } from '@/services/api';
+import { Backtest } from '@/types';
+import PerformanceChart from '@/components/charts/PerformanceChart';
+import MetricCard from '@/components/cards/MetricCard';
+
+const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const [selectedBacktest, setSelectedBacktest] = useState<string>('');
+
+  // Fetch backtests
+  const {
+    data: backtestsData,
+    isLoading: backtestsLoading,
+    error: backtestsError,
+  } = useQuery('backtests', () => backtestApi.getBacktests(1, 100));
+
+  // Fetch metrics for selected backtest
+  const {
+    data: metricsData,
+    isLoading: metricsLoading,
+  } = useQuery(
+    ['backtest-metrics', selectedBacktest],
+    () => backtestApi.getBacktestMetrics(selectedBacktest),
+    {
+      enabled: !!selectedBacktest,
+    }
+  );
+
+  // Fetch NAV data for selected backtest
+  const {
+    data: navData,
+    isLoading: navLoading,
+  } = useQuery(
+    ['backtest-nav', selectedBacktest],
+    () => backtestApi.getBacktest(selectedBacktest).then(() => 
+      backtestApi.getBacktestSignals(selectedBacktest).then(() => 
+        // This would be replaced with actual NAV API call
+        Promise.resolve({ nav_data: [], total: 0, run_id: selectedBacktest, start_date: '', end_date: '' })
+      )
+    ),
+    {
+      enabled: !!selectedBacktest,
+    }
+  );
+
+  const handleBacktestChange = (runId: string) => {
+    setSelectedBacktest(runId);
+  };
+
+  const handleBacktestClick = (backtest: Backtest) => {
+    navigate(`/backtest/${backtest.run_id}`);
+  };
+
+  if (backtestsError) {
+    return (
+      <Alert severity="error" sx={{ mt: 2 }}>
+        Failed to load backtests. Please check your connection and try again.
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
+          Dashboard
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Monitor and analyze your quantitative trading strategies
+        </Typography>
+      </Box>
+
+      {/* Backtest Selector */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Select Backtest
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Choose a backtest to analyze</InputLabel>
+            <Select
+              value={selectedBacktest}
+              onChange={(e) => handleBacktestChange(e.target.value)}
+              disabled={backtestsLoading}
+            >
+              {backtestsData?.backtests.map((backtest) => (
+                <MenuItem key={backtest.run_id} value={backtest.run_id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <Box>
+                      <Typography variant="body1">{backtest.run_id}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {backtest.start_date} to {backtest.end_date}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      label={backtest.frequency} 
+                      size="small" 
+                      color="primary" 
+                      variant="outlined"
+                    />
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </CardContent>
+      </Card>
+
+      {/* Metrics Cards */}
+      {selectedBacktest && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <MetricCard
+              title="Total Return"
+              value={metricsData?.total_return}
+              unit="%"
+              icon={<TrendingUpIcon />}
+              color="success"
+              loading={metricsLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <MetricCard
+              title="Sharpe Ratio"
+              value={metricsData?.sharpe_ratio}
+              icon={<AssessmentIcon />}
+              color="primary"
+              loading={metricsLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <MetricCard
+              title="Max Drawdown"
+              value={metricsData?.max_drawdown}
+              unit="%"
+              icon={<ShowChartIcon />}
+              color="error"
+              loading={metricsLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <MetricCard
+              title="Volatility"
+              value={metricsData?.volatility}
+              unit="%"
+              icon={<SpeedIcon />}
+              color="warning"
+              loading={metricsLoading}
+            />
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Performance Chart */}
+      {selectedBacktest && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Performance Overview
+            </Typography>
+            {navLoading ? (
+              <Skeleton variant="rectangular" height={400} />
+            ) : (
+              <PerformanceChart
+                data={navData?.nav_data || []}
+                height={400}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Backtests List */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            All Backtests
+          </Typography>
+          {backtestsLoading ? (
+            <Box>
+              {[...Array(5)].map((_, index) => (
+                <Skeleton key={index} variant="rectangular" height={80} sx={{ mb: 2 }} />
+              ))}
+            </Box>
+          ) : (
+            <Grid container spacing={2}>
+              {backtestsData?.backtests.map((backtest) => (
+                <Grid item xs={12} md={6} lg={4} key={backtest.run_id}>
+                  <Card
+                    sx={{
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: 4,
+                      },
+                    }}
+                    onClick={() => handleBacktestClick(backtest)}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+                          {backtest.run_id}
+                        </Typography>
+                        <Chip 
+                          label={backtest.frequency} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {backtest.start_date} to {backtest.end_date}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Created: {new Date(backtest.created_at).toLocaleDateString()}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
+export default Dashboard;
+

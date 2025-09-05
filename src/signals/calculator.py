@@ -265,7 +265,7 @@ class SignalCalculator:
         
         # Convert to DataFrame
         if combined_scores:
-            df = pd.DataFrame([{
+            df = pd.DataFrame([{ 
                 'asof_date': score.asof_date,
                 'ticker': score.ticker,
                 'score': score.score,

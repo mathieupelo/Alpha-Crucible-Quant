@@ -39,8 +39,8 @@ async def get_backtest_nav(
         actual_end_date = backtest["end_date"]
         
         if nav_data:
-            actual_start_date = min(record["date"] for record in nav_data)
-            actual_end_date = max(record["date"] for record in nav_data)
+            actual_start_date = min(record["nav_date"] for record in nav_data)
+            actual_end_date = max(record["nav_date"] for record in nav_data)
         
         return NavListResponse(
             nav_data=nav_data,

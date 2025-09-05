@@ -27,7 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from 'react-query';
 
-import { backtestApi } from '@/services/api';
+import { backtestApi, navApi } from '@/services/api';
 import { Backtest } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
@@ -61,12 +61,7 @@ const Dashboard: React.FC = () => {
     isLoading: navLoading,
   } = useQuery(
     ['backtest-nav', selectedBacktest],
-    () => backtestApi.getBacktest(selectedBacktest).then(() => 
-      backtestApi.getBacktestSignals(selectedBacktest).then(() => 
-        // This would be replaced with actual NAV API call
-        Promise.resolve({ nav_data: [], total: 0, run_id: selectedBacktest, start_date: '', end_date: '' })
-      )
-    ),
+    () => navApi.getBacktestNav(selectedBacktest),
     {
       enabled: !!selectedBacktest,
     }

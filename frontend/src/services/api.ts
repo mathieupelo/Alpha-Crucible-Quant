@@ -109,6 +109,18 @@ export const portfolioApi = {
   getPortfolioPositions: async (portfolioId: number): Promise<{ positions: any[]; total: number; portfolio_id: number }> => {
     const response = await api.get(`/portfolios/${portfolioId}/positions`);
     return response.data;
+  },
+
+  // Get portfolio signal scores
+  getPortfolioSignals: async (portfolioId: number): Promise<{ signals: any[]; total: number; portfolio_id: number }> => {
+    const response = await api.get(`/portfolios/${portfolioId}/signals`);
+    return response.data;
+  },
+
+  // Get portfolio combined scores
+  getPortfolioScores: async (portfolioId: number): Promise<{ scores: any[]; total: number; portfolio_id: number }> => {
+    const response = await api.get(`/portfolios/${portfolioId}/scores`);
+    return response.data;
   }
 };
 

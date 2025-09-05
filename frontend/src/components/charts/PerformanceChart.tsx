@@ -35,8 +35,8 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
 
   // Transform data for chart
   const chartData = data.map((item) => ({
-    date: item.date,
-    portfolio: item.nav,
+    date: item.nav_date,
+    portfolio: item.portfolio_nav,
     benchmark: item.benchmark_nav || null,
     pnl: item.pnl || 0,
   }));

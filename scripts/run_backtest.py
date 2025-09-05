@@ -43,7 +43,7 @@ def main():
         evaluation_period='monthly',
         transaction_costs=0.001,
         max_weight=0.3,
-        risk_aversion=0.5,
+        risk_aversion=0.0,
         benchmark_ticker='SPY',
         use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark
         signal_weights=signal_weights,

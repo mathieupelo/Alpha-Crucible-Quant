@@ -32,7 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from 'react-query';
 
-import { backtestApi } from '@/services/api';
+import { backtestApi, navApi } from '@/services/api';
 import { Portfolio } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
@@ -88,10 +88,7 @@ const BacktestDetail: React.FC = () => {
     isLoading: navLoading,
   } = useQuery(
     ['backtest-nav', runId],
-    () => backtestApi.getBacktestSignals(runId!).then(() => 
-      // This would be replaced with actual NAV API call
-      Promise.resolve({ nav_data: [], total: 0, run_id: runId!, start_date: '', end_date: '' })
-    ),
+    () => navApi.getBacktestNav(runId!),
     {
       enabled: !!runId,
     }

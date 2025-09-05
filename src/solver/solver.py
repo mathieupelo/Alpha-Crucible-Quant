@@ -76,20 +76,22 @@ class PortfolioSolver:
             
             logger.info(f"Solving portfolio for {len(common_tickers)} tickers on {target_date}")
             
-            # Prepare data
-            returns_data = self._prepare_returns_data(price_data, common_tickers)
-            if returns_data is None:
-                return None
-            
-            # Calculate expected returns and covariance matrix
-            expected_returns = self._calculate_expected_returns(alpha_scores, common_tickers)
-            covariance_matrix = self._calculate_covariance_matrix(returns_data, common_tickers)
-            
-            if expected_returns is None or covariance_matrix is None:
-                return None
-            
-            # Solve optimization problem
-            weights = self._solve_optimization(expected_returns, covariance_matrix, common_tickers)
+            # Choose allocation method based on config
+            if self.config.allocation_method == "score_based":
+                weights = self._solve_score_based_allocation(alpha_scores, common_tickers)
+            else:
+                # Use mean-variance optimization
+                returns_data = self._prepare_returns_data(price_data, common_tickers)
+                if returns_data is None:
+                    return None
+                
+                expected_returns = self._calculate_expected_returns(alpha_scores, common_tickers)
+                covariance_matrix = self._calculate_covariance_matrix(returns_data, common_tickers)
+                
+                if expected_returns is None or covariance_matrix is None:
+                    return None
+                
+                weights = self._solve_optimization(expected_returns, covariance_matrix, common_tickers)
             
             if weights is None:
                 return None
@@ -119,6 +121,110 @@ class PortfolioSolver:
             
         except Exception as e:
             logger.error(f"Error solving portfolio: {e}")
+            return None
+    
+    def _solve_score_based_allocation(self, alpha_scores: Dict[str, float], 
+                                    tickers: List[str]) -> Optional[np.ndarray]:
+        """
+        Solve for portfolio weights based purely on alpha scores.
+        
+        This method allocates weights based on score ranking, with higher scores
+        getting higher allocations. Uses a tiered approach where top scores get
+        maximum allocation, and lower scores get proportionally less.
+        
+        Args:
+            alpha_scores: Dictionary mapping ticker to alpha score
+            tickers: List of tickers to include
+            
+        Returns:
+            Array of weights or None if allocation fails
+        """
+        try:
+            # Get scores for common tickers
+            scores = np.array([alpha_scores.get(ticker, 0.0) for ticker in tickers])
+            
+            # Sort by score (descending)
+            sorted_indices = np.argsort(scores)[::-1]
+            sorted_scores = scores[sorted_indices]
+            sorted_tickers = [tickers[i] for i in sorted_indices]
+            
+            # Initialize weights
+            weights = np.zeros(len(tickers))
+            
+            # Define allocation tiers based on ranking
+            n_assets = len(tickers)
+            
+            if n_assets == 1:
+                # Single asset gets 100%
+                weights[0] = 1.0
+            elif n_assets == 2:
+                # Two assets: 70% to top, 30% to bottom
+                weights[sorted_indices[0]] = 0.7
+                weights[sorted_indices[1]] = 0.3
+            elif n_assets == 3:
+                # Three assets: 50% to top, 30% to middle, 20% to bottom
+                weights[sorted_indices[0]] = 0.5
+                weights[sorted_indices[1]] = 0.3
+                weights[sorted_indices[2]] = 0.2
+            elif n_assets == 4:
+                # Four assets: 30% to top two, 30% to third, 10% to bottom
+                weights[sorted_indices[0]] = 0.3  # Top score
+                weights[sorted_indices[1]] = 0.3  # Second score
+                weights[sorted_indices[2]] = 0.3  # Third score
+                weights[sorted_indices[3]] = 0.1  # Bottom score
+            else:
+                # For more than 4 assets, use exponential decay
+                # Top 2 get 30% each, rest get exponentially less
+                weights[sorted_indices[0]] = 0.3
+                weights[sorted_indices[1]] = 0.3
+                
+                # Remaining weight distributed exponentially
+                remaining_weight = 0.4
+                remaining_assets = n_assets - 2
+                
+                if remaining_assets > 0:
+                    # Exponential decay: each subsequent asset gets half the weight of the previous
+                    decay_factor = 0.5
+                    for i in range(2, n_assets):
+                        if i == 2:
+                            weights[sorted_indices[i]] = remaining_weight * (1 - decay_factor)
+                        else:
+                            weights[sorted_indices[i]] = weights[sorted_indices[i-1]] * decay_factor
+                    
+                    # Renormalize to ensure sum is 1
+                    total_weight = np.sum(weights)
+                    if total_weight > 0:
+                        weights = weights / total_weight
+            
+            # Apply maximum weight constraint
+            if self.config.max_weight < 1.0:
+                # Redistribute excess weight proportionally among other assets
+                excess_mask = weights > self.config.max_weight
+                if np.any(excess_mask):
+                    # Cap weights at max_weight
+                    excess_weight = np.sum(weights[excess_mask]) - np.sum(excess_mask) * self.config.max_weight
+                    weights[excess_mask] = self.config.max_weight
+                    
+                    # Redistribute excess to non-capped assets
+                    non_excess_mask = ~excess_mask
+                    if np.any(non_excess_mask):
+                        weights[non_excess_mask] += excess_weight * weights[non_excess_mask] / np.sum(weights[non_excess_mask])
+            
+            # Apply minimum weight threshold
+            weights[weights < self.config.min_weight] = 0.0
+            
+            # Renormalize to ensure weights sum to 1
+            if np.sum(weights) > 0:
+                weights = weights / np.sum(weights)
+            else:
+                # If all weights are zero, distribute equally
+                weights = np.ones(len(tickers)) / len(tickers)
+            
+            logger.info(f"Score-based allocation completed. Weights: {dict(zip(tickers, weights))}")
+            return weights
+            
+        except Exception as e:
+            logger.error(f"Error in score-based allocation: {e}")
             return None
     
     def _prepare_returns_data(self, price_data: pd.DataFrame, tickers: List[str]) -> Optional[pd.DataFrame]:
@@ -174,8 +280,21 @@ class PortfolioSolver:
         try:
             expected_returns = np.array([alpha_scores.get(ticker, 0.0) for ticker in tickers])
             
-            # Normalize expected returns to have zero mean
-            expected_returns = expected_returns - np.mean(expected_returns)
+            # For signal-based allocation, we want to preserve the relative ranking
+            # Higher scores should get higher allocations, lower scores should get lower allocations
+            # We'll use the raw scores as expected returns, but scale them appropriately
+            # to work with the mean-variance optimization
+            
+            # Scale scores to a reasonable range for expected returns (e.g., -0.1 to 0.1)
+            min_score = np.min(expected_returns)
+            max_score = np.max(expected_returns)
+            
+            if max_score > min_score:
+                # Scale to [-0.1, 0.1] range
+                expected_returns = 0.2 * (expected_returns - min_score) / (max_score - min_score) - 0.1
+            else:
+                # All scores are the same, set to zero
+                expected_returns = np.zeros_like(expected_returns)
             
             return expected_returns
             

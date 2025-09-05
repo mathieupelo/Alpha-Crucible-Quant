@@ -560,6 +560,54 @@ class DatabaseManager:
         query = f"DESCRIBE {table_name}"
         return self.execute_query(query)
     
+    def get_signal_scores(self, start_date: Optional[date] = None,
+                         end_date: Optional[date] = None,
+                         tickers: Optional[List[str]] = None) -> pd.DataFrame:
+        """Retrieve signal scores from the database."""
+        query = "SELECT * FROM signals_raw WHERE 1=1"
+        params = []
+        
+        if start_date:
+            query += " AND asof_date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND asof_date <= %s"
+            params.append(end_date)
+        
+        if tickers:
+            placeholders = ','.join(['%s'] * len(tickers))
+            query += f" AND ticker IN ({placeholders})"
+            params.extend(tickers)
+        
+        query += " ORDER BY asof_date, ticker, signal_name"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
+    def get_combined_scores(self, start_date: Optional[date] = None,
+                           end_date: Optional[date] = None,
+                           tickers: Optional[List[str]] = None) -> pd.DataFrame:
+        """Retrieve combined scores from the database."""
+        query = "SELECT * FROM scores_combined WHERE 1=1"
+        params = []
+        
+        if start_date:
+            query += " AND asof_date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND asof_date <= %s"
+            params.append(end_date)
+        
+        if tickers:
+            placeholders = ','.join(['%s'] * len(tickers))
+            query += f" AND ticker IN ({placeholders})"
+            params.extend(tickers)
+        
+        query += " ORDER BY asof_date, ticker, method"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
     def __enter__(self):
         """Context manager entry."""
         self.connect()

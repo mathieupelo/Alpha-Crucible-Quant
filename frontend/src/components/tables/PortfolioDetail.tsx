@@ -77,6 +77,32 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
     }
   );
 
+  // Fetch signal scores data
+  const {
+    data: signalData,
+    isLoading: signalLoading,
+    error: signalError,
+  } = useQuery(
+    ['portfolio-signals', portfolio.id],
+    () => portfolioApi.getPortfolioSignals(portfolio.id),
+    {
+      enabled: !!portfolio.id,
+    }
+  );
+
+  // Fetch combined scores data
+  const {
+    data: scoreData,
+    isLoading: scoreLoading,
+    error: scoreError,
+  } = useQuery(
+    ['portfolio-scores', portfolio.id],
+    () => portfolioApi.getPortfolioScores(portfolio.id),
+    {
+      enabled: !!portfolio.id,
+    }
+  );
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
@@ -252,14 +278,44 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                 </TableRow>
               </TableHead>
               <TableBody>
-                {/* This would be populated with actual signal data */}
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Signal data not available for this portfolio
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                {signalLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">
+                      <Skeleton variant="text" width="100%" />
+                    </TableCell>
+                  </TableRow>
+                ) : signalError ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">
+                      <Typography variant="body2" color="error">
+                        Error loading signal data
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : signalData?.signals && signalData.signals.length > 0 ? (
+                  signalData.signals.map((signal: any, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell>{signal.ticker}</TableCell>
+                      <TableCell align="right">
+                        {signal.rsi !== null ? signal.rsi.toFixed(4) : 'N/A'}
+                      </TableCell>
+                      <TableCell align="right">
+                        {signal.sma !== null ? signal.sma.toFixed(4) : 'N/A'}
+                      </TableCell>
+                      <TableCell align="right">
+                        {signal.macd !== null ? signal.macd.toFixed(4) : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        No signal data available for this portfolio
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -283,14 +339,39 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                 </TableRow>
               </TableHead>
               <TableBody>
-                {/* This would be populated with actual combined score data */}
-                <TableRow>
-                  <TableCell colSpan={3} align="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Combined score data not available for this portfolio
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                {scoreLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      <Skeleton variant="text" width="100%" />
+                    </TableCell>
+                  </TableRow>
+                ) : scoreError ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      <Typography variant="body2" color="error">
+                        Error loading score data
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : scoreData?.scores && scoreData.scores.length > 0 ? (
+                  scoreData.scores.map((score: any, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell>{score.ticker}</TableCell>
+                      <TableCell align="right">
+                        {score.combined_score !== null ? score.combined_score.toFixed(4) : 'N/A'}
+                      </TableCell>
+                      <TableCell align="right">{score.method}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        No combined score data available for this portfolio
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>

@@ -89,8 +89,8 @@ export interface Score {
 export interface NavData {
   id: number;
   run_id: string;
-  date: string;
-  nav: number;
+  nav_date: string;
+  portfolio_nav: number;
   benchmark_nav?: number;
   pnl?: number;
 }

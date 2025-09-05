@@ -70,3 +70,33 @@ async def get_scores(
         logger.error(f"Error getting scores: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/portfolios/{portfolio_id}/signals")
+async def get_portfolio_signals(portfolio_id: int):
+    """Get signal scores for a specific portfolio."""
+    try:
+        signals = db_service.get_portfolio_signals(portfolio_id)
+        return {
+            "signals": signals,
+            "total": len(signals),
+            "portfolio_id": portfolio_id
+        }
+    except Exception as e:
+        logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/portfolios/{portfolio_id}/scores")
+async def get_portfolio_scores(portfolio_id: int):
+    """Get combined scores for a specific portfolio."""
+    try:
+        scores = db_service.get_portfolio_scores(portfolio_id)
+        return {
+            "scores": scores,
+            "total": len(scores),
+            "portfolio_id": portfolio_id
+        }
+    except Exception as e:
+        logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

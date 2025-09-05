@@ -125,7 +125,7 @@ class BacktestEngine:
                 return result
             
             # Run backtest simulation
-            portfolio_values, benchmark_values, weights_history = self._run_simulation(
+            portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation(
                 tickers, signals, signal_scores, price_data, rebalancing_dates, config
             )
             
@@ -146,7 +146,7 @@ class BacktestEngine:
             # Store portfolio data in database
             try:
                 # Store portfolio values and weights
-                self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history)
+                self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
                 logger.info("Stored portfolio data in database")
             except Exception as e:
                 logger.error(f"Error storing portfolio data: {e}")
@@ -266,9 +266,9 @@ class BacktestEngine:
         """Run the backtest simulation."""
         logger.info("Starting backtest simulation...")
         
-        # Initialize tracking variables
-        portfolio_value = config.initial_capital
-        benchmark_value = config.initial_capital
+        # Initialize tracking variables (will be reset at first rebalance date)
+        portfolio_value = 0.0
+        benchmark_value = 0.0
         
         portfolio_values = pd.Series(index=price_data.index, dtype=float)
         benchmark_values = pd.Series(index=price_data.index, dtype=float)
@@ -304,14 +304,23 @@ class BacktestEngine:
         first_rebalance_date = None
         for current_date in price_data.index:
             if current_date >= config.start_date and current_date in rebalancing_dates:
-                first_rebalance_date = current_date
-                break
+                # Check if we can actually create a portfolio on this date
+                new_weights = self._rebalance_portfolio(
+                    tickers, signals, signal_scores, price_data, current_date, config
+                )
+                if new_weights is not None:
+                    first_rebalance_date = current_date
+                    break
         
         if first_rebalance_date is None:
             logger.error("No valid rebalancing dates found within the backtest period")
             return pd.Series(), pd.Series(), pd.DataFrame()
         
         logger.info(f"Strategy and benchmark will start on: {first_rebalance_date}")
+        
+        # Reset both portfolio and benchmark values to initial capital at first rebalance date
+        portfolio_value = config.initial_capital
+        benchmark_value = config.initial_capital
         
         for i, current_date in enumerate(price_data.index):
             if current_date < first_rebalance_date:
@@ -366,7 +375,7 @@ class BacktestEngine:
                     benchmark_value *= (1 + benchmark_return)
                     benchmark_returns.loc[current_date] = benchmark_return
             
-            # Store values
+            # Store values (only from first rebalance date onwards)
             portfolio_values.loc[current_date] = portfolio_value
             benchmark_values.loc[current_date] = benchmark_value
             
@@ -375,6 +384,10 @@ class BacktestEngine:
                 logger.info(f"Processed {i+1}/{len(price_data)} days, portfolio value: ${portfolio_value:,.2f}")
         
         logger.info("Backtest simulation completed")
+        
+        # Filter portfolio and benchmark values to only include data from first rebalance date onwards
+        portfolio_values = portfolio_values[portfolio_values.index >= first_rebalance_date].dropna()
+        benchmark_values = benchmark_values[benchmark_values.index >= first_rebalance_date].dropna()
         
         # Store returns data for plotting
         self.strategy_returns = strategy_returns.dropna()
@@ -389,7 +402,7 @@ class BacktestEngine:
                     'positions': weights_history.loc[date].to_dict()
                 })
         
-        return portfolio_values, benchmark_values, weights_history
+        return portfolio_values, benchmark_values, weights_history, first_rebalance_date
     
     def _rebalance_portfolio(self, tickers: List[str], signals: List[str],
                            signal_scores: pd.DataFrame, price_data: pd.DataFrame,
@@ -441,6 +454,7 @@ class BacktestEngine:
             
             # Create solver config
             solver_config = SolverConfig(
+                allocation_method="score_based",
                 risk_aversion=config.risk_aversion,
                 max_weight=config.max_weight,
                 min_weight=config.min_weight
@@ -638,7 +652,7 @@ class BacktestEngine:
         return np.max(max_weights) if max_weights else 0.0
     
     def _store_portfolio_data(self, result: BacktestResult, portfolio_values: pd.Series, 
-                            benchmark_values: pd.Series, weights_history: pd.DataFrame):
+                            benchmark_values: pd.Series, weights_history: pd.DataFrame, first_rebalance_date: date):
         """Store portfolio data in the database."""
         try:
             # Store backtest NAV data

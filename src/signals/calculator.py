@@ -229,7 +229,16 @@ class SignalCalculator:
                 
                 # Apply combination method
                 if method == 'equal_weight':
-                    combined_score = date_signals['value'].mean()
+                    # Only calculate mean if we have all required signals
+                    available_signals = set(date_signals['signal_name'].unique())
+                    required_signals = set(signal_names)
+                    
+                    if available_signals == required_signals:
+                        combined_score = date_signals['value'].mean()
+                    else:
+                        logger.warning(f"Missing signals for {ticker} on {asof_date}. "
+                                     f"Available: {available_signals}, Required: {required_signals}")
+                        continue
                 elif method == 'weighted':
                     weights = method_params.get('weights', {})
                     total_weight = 0

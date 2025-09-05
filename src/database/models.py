@@ -36,7 +36,6 @@ class ScoreCombined:
 @dataclass
 class Portfolio:
     """Represents a portfolio with metadata."""
-    id: int
     run_id: str
     asof_date: date
     method: str
@@ -44,6 +43,7 @@ class Portfolio:
     cash: float = 0.0
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
@@ -54,12 +54,12 @@ class PortfolioPosition:
     weight: float
     price_used: float
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
 class Backtest:
     """Represents a backtest run configuration."""
-    id: int
     run_id: str
     start_date: date
     end_date: date
@@ -68,6 +68,7 @@ class Backtest:
     benchmark: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass

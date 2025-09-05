@@ -19,6 +19,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 from database import DatabaseManager
 from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined
 
+# Import response models
+from models import PositionResponse
+
 logger = logging.getLogger(__name__)
 
 
@@ -159,7 +162,18 @@ class DatabaseService:
             
             # Get portfolio positions
             positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
-            positions = positions_df.to_dict('records') if not positions_df.empty else []
+            positions = []
+            if not positions_df.empty:
+                for _, row in positions_df.iterrows():
+                    position = PositionResponse(
+                        id=row['id'],
+                        portfolio_id=row['portfolio_id'],
+                        ticker=row['ticker'],
+                        weight=row['weight'],
+                        price_used=row['price_used'],
+                        created_at=row['created_at']
+                    )
+                    positions.append(position)
             
             return {
                 "id": portfolio.id,
@@ -175,6 +189,89 @@ class DatabaseService:
             
         except Exception as e:
             logger.error(f"Error getting portfolio {portfolio_id}: {e}")
+            raise
+    
+    def get_portfolio_signals(self, portfolio_id: int) -> List[Dict[str, Any]]:
+        """Get signal scores for a specific portfolio."""
+        try:
+            # Get portfolio details to get the date
+            portfolio = self.db_manager.get_portfolio_by_id(portfolio_id)
+            if portfolio is None:
+                return []
+            
+            # Get portfolio positions to get the tickers
+            positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
+            if positions_df.empty:
+                return []
+            
+            # Get the tickers from positions
+            tickers = positions_df['ticker'].tolist()
+            
+            # Get signal scores for the portfolio date and tickers
+            signals_df = self.db_manager.get_signal_scores(
+                portfolio.asof_date, portfolio.asof_date, tickers
+            )
+            
+            signals = []
+            if not signals_df.empty:
+                # Group by ticker and create signal score objects
+                for ticker in signals_df['ticker'].unique():
+                    ticker_signals = signals_df[signals_df['ticker'] == ticker]
+                    signal_data = {
+                        'ticker': ticker,
+                        'rsi': None,
+                        'sma': None,
+                        'macd': None
+                    }
+                    
+                    for _, row in ticker_signals.iterrows():
+                        signal_name = row['signal_name'].lower()
+                        if signal_name in signal_data:
+                            signal_data[signal_name] = row['value']
+                    
+                    signals.append(signal_data)
+            
+            return signals
+            
+        except Exception as e:
+            logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}")
+            raise
+    
+    def get_portfolio_scores(self, portfolio_id: int) -> List[Dict[str, Any]]:
+        """Get combined scores for a specific portfolio."""
+        try:
+            # Get portfolio details to get the date and positions
+            portfolio = self.db_manager.get_portfolio_by_id(portfolio_id)
+            if portfolio is None:
+                return []
+            
+            # Get portfolio positions to get the tickers
+            positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
+            if positions_df.empty:
+                return []
+            
+            # Get the tickers from positions
+            tickers = positions_df['ticker'].tolist()
+            
+            # Get combined scores for the portfolio date and tickers
+            scores_df = self.db_manager.get_combined_scores(
+                portfolio.asof_date, portfolio.asof_date, tickers
+            )
+            
+            scores = []
+            if not scores_df.empty:
+                for _, row in scores_df.iterrows():
+                    score_data = {
+                        'ticker': row['ticker'],
+                        'combined_score': row['score'],
+                        'method': row['method']
+                    }
+                    scores.append(score_data)
+            
+            return scores
+            
+        except Exception as e:
+            logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}")
             raise
     
     def get_backtest_signals(self, run_id: str, start_date: Optional[date] = None,

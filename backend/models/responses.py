@@ -47,27 +47,6 @@ class BacktestListResponse(BaseModel):
     size: int = Field(50, description="Page size")
 
 
-class PortfolioResponse(BaseModel):
-    """Portfolio response model."""
-    id: int = Field(..., description="Portfolio ID")
-    run_id: str = Field(..., description="Associated backtest run ID")
-    asof_date: date = Field(..., description="Portfolio date")
-    method: str = Field(..., description="Portfolio optimization method")
-    params: Optional[Dict[str, Any]] = Field(None, description="Portfolio parameters")
-    cash: float = Field(0.0, description="Cash allocation")
-    notes: Optional[str] = Field(None, description="Portfolio notes")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    
-    model_config = {"from_attributes": True}
-
-
-class PortfolioListResponse(BaseModel):
-    """Portfolio list response model."""
-    portfolios: List[PortfolioResponse] = Field(..., description="List of portfolios")
-    total: int = Field(..., description="Total number of portfolios")
-    run_id: str = Field(..., description="Associated backtest run ID")
-
-
 class PositionResponse(BaseModel):
     """Portfolio position response model."""
     id: int = Field(..., description="Position ID")
@@ -78,6 +57,28 @@ class PositionResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     
     model_config = {"from_attributes": True}
+
+
+class PortfolioResponse(BaseModel):
+    """Portfolio response model."""
+    id: int = Field(..., description="Portfolio ID")
+    run_id: str = Field(..., description="Associated backtest run ID")
+    asof_date: date = Field(..., description="Portfolio date")
+    method: str = Field(..., description="Portfolio optimization method")
+    params: Optional[Dict[str, Any]] = Field(None, description="Portfolio parameters")
+    cash: float = Field(0.0, description="Cash allocation")
+    notes: Optional[str] = Field(None, description="Portfolio notes")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    positions: List[PositionResponse] = Field(default=[], description="Portfolio positions")
+    
+    model_config = {"from_attributes": True}
+
+
+class PortfolioListResponse(BaseModel):
+    """Portfolio list response model."""
+    portfolios: List[PortfolioResponse] = Field(..., description="List of portfolios")
+    total: int = Field(..., description="Total number of portfolios")
+    run_id: str = Field(..., description="Associated backtest run ID")
 
 
 class SignalResponse(BaseModel):

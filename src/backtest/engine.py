@@ -229,35 +229,104 @@ class BacktestEngine:
             )
             
             if signal_scores.empty:
-                logger.warning("No combined scores found, calculating raw signals and combining...")
+                logger.info("No combined scores found in database, calculating signals...")
                 
-                # Calculate raw signals
+                # Calculate raw signals first
+                logger.info(f"Calculating raw signals for {len(tickers)} tickers from {extended_start} to {config.end_date}")
                 raw_signals = self.signal_calculator.calculate_signals(
-                    tickers, signals, extended_start, config.end_date
+                    tickers, signals, extended_start, config.end_date,
+                    store_in_db=True
                 )
                 
                 if not raw_signals.empty:
+                    logger.info(f"Calculated {len(raw_signals)} raw signals")
+                    
                     # Combine signals into scores
+                    logger.info("Combining signals into scores...")
                     signal_scores = self.signal_calculator.combine_signals_to_scores(
                         tickers, signals, extended_start, config.end_date,
                         method='equal_weight',
                         store_in_db=True
                     )
                     
-                    # Convert to pivot format
                     if not signal_scores.empty:
+                        logger.info(f"Combined signals into {len(signal_scores)} scores")
+                        
+                        # Convert to pivot format
                         signal_scores = signal_scores.pivot_table(
                             index='asof_date',
                             columns='ticker',
                             values='score',
                             aggfunc='first'
                         )
+                        logger.info(f"Created pivot table with {len(signal_scores)} dates and {len(signal_scores.columns)} tickers")
+                    else:
+                        logger.warning("No combined scores created")
+                else:
+                    logger.warning("No raw signals calculated")
+            else:
+                logger.info(f"Retrieved {len(signal_scores)} signal scores from database")
             
-            logger.info(f"Retrieved signal scores for {len(signal_scores.columns)} tickers")
+            # Ensure we have signal scores for all rebalancing dates
+            if not signal_scores.empty:
+                # Get rebalancing dates to check coverage
+                trading_days = DateUtils.get_trading_days(config.start_date, config.end_date)
+                rebalancing_dates = self._get_rebalancing_dates(trading_days, config)
+                
+                missing_dates = []
+                for rebal_date in rebalancing_dates:
+                    if rebal_date not in signal_scores.index:
+                        missing_dates.append(rebal_date)
+                
+                if missing_dates:
+                    logger.warning(f"Missing signal scores for {len(missing_dates)} rebalancing dates: {missing_dates[:5]}...")
+                    
+                    # Try to calculate missing signals for specific dates
+                    if len(missing_dates) <= 5:  # Only for a few missing dates
+                        logger.info("Attempting to calculate missing signals...")
+                        for missing_date in missing_dates:
+                            try:
+                                # Calculate signals for this specific date
+                                extended_start = missing_date - timedelta(days=config.max_lookback_days)
+                                raw_signals = self.signal_calculator.calculate_signals(
+                                    tickers, signals, extended_start, missing_date + timedelta(days=1),
+                                    store_in_db=True
+                                )
+                                
+                                if not raw_signals.empty:
+                                    # Combine signals for this date
+                                    combined_scores = self.signal_calculator.combine_signals_to_scores(
+                                        tickers, signals, extended_start, missing_date + timedelta(days=1),
+                                        method='equal_weight',
+                                        store_in_db=True
+                                    )
+                                    
+                                    if not combined_scores.empty:
+                                        # Add to signal_scores
+                                        date_scores = combined_scores[combined_scores['asof_date'] == missing_date]
+                                        if not date_scores.empty:
+                                            pivot_scores = date_scores.pivot_table(
+                                                index='asof_date',
+                                                columns='ticker',
+                                                values='score',
+                                                aggfunc='first'
+                                            )
+                                            signal_scores = pd.concat([signal_scores, pivot_scores])
+                                            logger.info(f"Calculated signals for {missing_date}")
+                            except Exception as e:
+                                logger.warning(f"Failed to calculate signals for {missing_date}: {e}")
+                    
+                    # Forward fill any remaining missing dates
+                    signal_scores = signal_scores.reindex(rebalancing_dates, method='ffill')
+                    logger.info("Forward filled remaining missing signal scores")
+            
+            logger.info(f"Final signal scores shape: {signal_scores.shape}")
             return signal_scores
             
         except Exception as e:
             logger.error(f"Error getting signal scores: {e}")
+            import traceback
+            traceback.print_exc()
             return pd.DataFrame()
     
     def _run_simulation(self, tickers: List[str], signals: List[str], 
@@ -430,6 +499,11 @@ class BacktestEngine:
                 try:
                     if ticker in date_scores.index:
                         score = date_scores[ticker]
+                        # Handle both scalar and Series values
+                        if isinstance(score, pd.Series):
+                            # If it's a Series, take the first non-null value
+                            score = score.dropna().iloc[0] if not score.dropna().empty else np.nan
+                        
                         if not pd.isna(score):
                             combined_scores[ticker] = float(score)
                         else:
@@ -647,7 +721,10 @@ class BacktestEngine:
         
         max_weights = []
         for _, weights in weights_history.iterrows():
-            max_weights.append(weights.max())
+            # Skip NaN values when calculating max
+            valid_weights = weights.dropna()
+            if not valid_weights.empty:
+                max_weights.append(valid_weights.max())
         
         return np.max(max_weights) if max_weights else 0.0
     

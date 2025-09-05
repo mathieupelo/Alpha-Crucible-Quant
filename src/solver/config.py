@@ -15,7 +15,7 @@ class SolverConfig:
     allocation_method: str = "mean_variance"
     """Allocation method: 'mean_variance' or 'score_based'"""
     
-    risk_aversion: float = 0.0
+    risk_aversion: float = 1.0
     """Risk aversion parameter (0 = no risk aversion, 1 = maximum risk aversion)"""
     
     max_weight: float = 0.1

@@ -16,18 +16,20 @@ from .base import SignalBase
 class SMASignal(SignalBase):
     """SMA (Simple Moving Average) signal implementation."""
     
-    def __init__(self, short_period: int = 50, long_period: int = 200):
+    def __init__(self, short_period: int = 50, long_period: int = 200, price_fetcher=None):
         """
         Initialize SMA signal.
         
         Args:
             short_period: Short-term SMA period (default: 50)
             long_period: Long-term SMA period (default: 200)
+            price_fetcher: Optional price fetcher for data retrieval
         """
         super().__init__(
             signal_id="SMA",
             name="Simple Moving Average",
-            parameters={"short_period": short_period, "long_period": long_period}
+            parameters={"short_period": short_period, "long_period": long_period},
+            price_fetcher=price_fetcher
         )
         self.short_period = short_period
         self.long_period = long_period

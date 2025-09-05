@@ -16,7 +16,7 @@ from .base import SignalBase
 class MACDSignal(SignalBase):
     """MACD (Moving Average Convergence Divergence) signal implementation."""
     
-    def __init__(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9):
+    def __init__(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9, price_fetcher=None):
         """
         Initialize MACD signal.
         
@@ -24,11 +24,13 @@ class MACDSignal(SignalBase):
             fast_period: Fast EMA period (default: 12)
             slow_period: Slow EMA period (default: 26)
             signal_period: Signal line EMA period (default: 9)
+            price_fetcher: Optional price fetcher for data retrieval
         """
         super().__init__(
             signal_id="MACD",
             name="Moving Average Convergence Divergence",
-            parameters={"fast_period": fast_period, "slow_period": slow_period, "signal_period": signal_period}
+            parameters={"fast_period": fast_period, "slow_period": slow_period, "signal_period": signal_period},
+            price_fetcher=price_fetcher
         )
         self.fast_period = fast_period
         self.slow_period = slow_period

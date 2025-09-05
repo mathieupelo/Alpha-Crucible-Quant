@@ -17,22 +17,53 @@ from backtest import BacktestEngine, BacktestConfig
 from signals import SignalCalculator
 from database import DatabaseManager
 from utils import PriceFetcher
+from data import RealTimeDataFetcher, DataValidator
 
 
 def main():
-    """Run a sample backtest."""
-    print("Quant Project - Backtest Example")
-    print("=" * 50)
+    """Run a sample backtest with real market data."""
+    print("Alpha Crucible Quant - Real-Time Backtest Example")
+    print("=" * 60)
+    
+    # Initialize real-time data fetcher and validator
+    data_fetcher = RealTimeDataFetcher()
+    data_validator = DataValidator()
     
     # Configuration
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
-    tickers = ['TTWO', 'MSFT', 'EA', 'SONY']
     signals = ['RSI', 'SMA', 'MACD']
     signal_weights = {'RSI': 0.33, 'SMA': 0.33, 'MACD': 0.34}
     
     # Date range (matching signal calculation)
     start_date = date(2023, 9, 5)
-    end_date = date(2025, 9, 4)
+    end_date = date(2024, 12, 31)  # More recent end date for real data
+    
+    print(f"Using real market data for {len(tickers)} tickers")
+    print(f"Date range: {start_date} to {end_date}")
+    
+    # Validate tickers
+    print("\nValidating tickers...")
+    valid_tickers = []
+    for ticker in tickers:
+        if data_fetcher.validate_ticker(ticker):
+            valid_tickers.append(ticker)
+            print(f"✓ {ticker} - Valid")
+        else:
+            print(f"✗ {ticker} - Invalid or unavailable")
+    
+    if not valid_tickers:
+        print("No valid tickers found. Exiting.")
+        return
+    
+    tickers = valid_tickers
+    print(f"Using {len(tickers)} valid tickers: {', '.join(tickers)}")
+    
+    # Check market status
+    print("\nChecking market status...")
+    market_status = data_fetcher.get_market_status()
+    for exchange, is_open in market_status.items():
+        status = "Open" if is_open else "Closed"
+        print(f"{exchange}: {status}")
     
     # Backtest configuration
     config = BacktestConfig(
@@ -50,6 +81,7 @@ def main():
         forward_fill_signals=True  # Use latest available signal scores when missing
     )
     
+    print(f"\nBacktest Configuration:")
     print(f"Tickers: {', '.join(tickers)}")
     print(f"Signals: {', '.join(signals)}")
     print(f"Signal weights: {signal_weights}")
@@ -63,10 +95,27 @@ def main():
     try:
         # Initialize components
         print("Initializing components...")
-        price_fetcher = PriceFetcher()
+        price_fetcher = PriceFetcher()  # This now uses the enhanced real-time fetcher
         database_manager = DatabaseManager()
         signal_calculator = SignalCalculator(price_fetcher, database_manager)
         backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
+        
+        # Test data fetching and validation
+        print("Testing data fetching and validation...")
+        test_data = data_fetcher.get_price_history('AAPL', start_date, start_date + timedelta(days=30))
+        if test_data is not None and not test_data.empty:
+            print(f"✓ Successfully fetched {len(test_data)} days of real market data")
+            
+            # Validate the data
+            validation_result = data_validator.validate_price_data(test_data)
+            if validation_result['is_valid']:
+                print("✓ Data validation passed")
+            else:
+                print("⚠ Data validation warnings:")
+                for warning in validation_result['warnings']:
+                    print(f"  - {warning}")
+        else:
+            print("⚠ Warning: Could not fetch real market data, using fallback")
         
         # Run backtest
         print("Running backtest...")

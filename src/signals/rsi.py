@@ -16,17 +16,19 @@ from .base import SignalBase
 class RSISignal(SignalBase):
     """RSI (Relative Strength Index) signal implementation."""
     
-    def __init__(self, period: int = 14):
+    def __init__(self, period: int = 14, price_fetcher=None):
         """
         Initialize RSI signal.
         
         Args:
             period: RSI calculation period (default: 14)
+            price_fetcher: Optional price fetcher for data retrieval
         """
         super().__init__(
             signal_id="RSI",
             name="Relative Strength Index",
-            parameters={"period": period}
+            parameters={"period": period},
+            price_fetcher=price_fetcher
         )
         self.period = period
     

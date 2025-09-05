@@ -82,7 +82,7 @@ class SignalCalculator:
                             logger.warning(f"Signal not found: {signal_id}")
                             continue
                         
-                        # Calculate signal value
+                        # Calculate signal value using pre-fetched price data
                         signal_value = signal.calculate(price_data, ticker, target_date)
                         
                         if not np.isnan(signal_value):
@@ -153,7 +153,7 @@ class SignalCalculator:
                 logger.warning(f"No price data available for {ticker}")
                 return None
             
-            # Calculate signal
+            # Calculate signal using fetched price data
             signal_value = signal.calculate(price_data, ticker, target_date)
             
             if np.isnan(signal_value):

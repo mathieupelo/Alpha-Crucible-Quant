@@ -1,27 +1,33 @@
-# Quant Project Architecture
+# Alpha Crucible Quant Architecture
 
 ## Overview
 
-The Quant Project is a unified quantitative investment system that combines signal generation, portfolio optimization, and backtesting in a single repository. This document describes the architecture, design decisions, and key components.
+Alpha Crucible Quant is a comprehensive quantitative investment system that combines signal generation, portfolio optimization, backtesting, and web-based visualization in a unified platform. This document describes the architecture, design decisions, and key components of the full-stack application.
 
 ## Architecture Principles
 
-### 1. Unified Repository
+### 1. Full-Stack Architecture
+- **Frontend**: React-based web dashboard with Material-UI components
+- **Backend**: FastAPI REST API with comprehensive endpoints
+- **Database**: MySQL for persistent data storage
+- **Containerization**: Docker-based deployment with docker-compose
+
+### 2. Unified Repository
 - **Single Source of Truth**: All components in one repository
 - **Simplified Dependencies**: No complex inter-repository dependencies
 - **Easy Deployment**: Single installation and configuration
 
-### 2. Local-First Design
+### 3. Local-First Design
 - **Local Database**: MySQL hosted on your machine (127.0.0.1:3306)
 - **Real-time Data**: yfinance integration for live stock prices
 - **No External Dependencies**: No reliance on external services
 
-### 3. DataFrame-Centric Communication
+### 4. DataFrame-Centric Communication
 - **Pandas Integration**: All data operations use pandas DataFrames
 - **Type Safety**: Strong typing with dataclasses and type hints
 - **Memory Efficiency**: Optimized data structures and operations
 
-### 4. Modular Design
+### 5. Modular Design
 - **Separation of Concerns**: Clear boundaries between components
 - **Extensible**: Easy to add new signals, solvers, or strategies
 - **Testable**: Comprehensive unit tests for all modules
@@ -92,7 +98,35 @@ The Quant Project is a unified quantitative investment system that combines sign
 - **Connection Management**: Automatic connection handling
 - **Error Handling**: Robust error handling and logging
 
-### 5. Utilities (`src/utils/`)
+### 5. Web Application (`frontend/` and `backend/`)
+
+**Purpose**: Modern web interface for system interaction and visualization
+
+**Frontend Components**:
+- `App.tsx`: Main React application with routing
+- `Dashboard.tsx`: Main dashboard with performance metrics
+- `BacktestDetail.tsx`: Detailed backtest analysis page
+- `PerformanceChart.tsx`: Interactive performance visualization
+- `PortfolioDetail.tsx`: Portfolio composition analysis
+- `MetricCard.tsx`: Reusable metric display components
+
+**Backend Components**:
+- `main.py`: FastAPI application with CORS and error handling
+- `api/backtests.py`: Backtest data endpoints
+- `api/portfolios.py`: Portfolio data endpoints
+- `api/signals.py`: Signal data endpoints
+- `api/nav.py`: NAV (Net Asset Value) endpoints
+- `services/database_service.py`: Database abstraction layer
+
+**Design Decisions**:
+- **React + TypeScript**: Type-safe frontend development
+- **Material-UI**: Consistent, professional UI components
+- **FastAPI**: High-performance async API with automatic documentation
+- **RESTful Design**: Clean API endpoints with proper HTTP methods
+- **CORS Support**: Cross-origin requests for development and production
+- **Error Handling**: Comprehensive error responses and logging
+
+### 6. Utilities (`src/utils/`)
 
 **Purpose**: Common utilities and data fetching
 
@@ -121,6 +155,16 @@ Signal Scores → Signal Combination → Portfolio Solver → Portfolio Weights
 ### 3. Backtesting Flow
 ```
 Historical Data → Signal Calculation → Portfolio Optimization → Performance Analysis
+```
+
+### 4. Web Application Flow
+```
+Frontend (React) → Backend API (FastAPI) → Database Service → MySQL Database
+```
+
+### 5. Real-time Data Flow
+```
+User Request → Frontend → API Endpoint → Database Query → Response → UI Update
 ```
 
 ## Database Schema
@@ -246,15 +290,49 @@ Historical Data → Signal Calculation → Portfolio Optimization → Performanc
 - **Memory Testing**: Memory usage and leak detection
 - **Speed Testing**: Performance benchmarking
 
+## Web Application Architecture
+
+### Frontend Architecture
+- **React 18**: Modern React with hooks and functional components
+- **TypeScript**: Type-safe development with comprehensive type definitions
+- **Material-UI**: Professional component library with dark theme
+- **React Router**: Client-side routing for single-page application
+- **React Query**: Data fetching and caching with automatic refetching
+- **Recharts**: Interactive data visualization and charting
+- **Vite**: Fast build tool and development server
+
+### Backend Architecture
+- **FastAPI**: Modern Python web framework with automatic API documentation
+- **Pydantic**: Data validation and serialization
+- **SQLAlchemy**: Database ORM for MySQL operations
+- **CORS**: Cross-origin resource sharing for frontend integration
+- **Logging**: Comprehensive logging with different levels
+- **Error Handling**: Global exception handling with proper HTTP status codes
+
+### API Design
+- **RESTful Endpoints**: Standard HTTP methods and status codes
+- **Pagination**: Efficient data pagination for large datasets
+- **Filtering**: Query parameter-based filtering
+- **Response Models**: Consistent response structure with Pydantic models
+- **Documentation**: Automatic OpenAPI/Swagger documentation
+
 ## Deployment
 
 ### 1. Local Development
 - **Virtual Environment**: Isolated Python environment
 - **Database Setup**: Local MySQL database
 - **Configuration**: Environment variable configuration
+- **Hot Reload**: Frontend and backend hot reloading for development
 
-### 2. Production Deployment
-- **Docker Support**: Containerized deployment (future)
+### 2. Docker Deployment
+- **Multi-container Setup**: Separate containers for frontend, backend, database, and nginx
+- **Docker Compose**: Orchestrated deployment with single command
+- **Volume Mounting**: Persistent data storage and code synchronization
+- **Network Isolation**: Secure container networking
+
+### 3. Production Deployment
+- **Nginx Reverse Proxy**: Load balancing and SSL termination
+- **Container Orchestration**: Docker Compose for production
 - **Monitoring**: Performance and error monitoring
 - **Backup**: Database backup and recovery procedures
 
@@ -273,8 +351,11 @@ Historical Data → Signal Calculation → Portfolio Optimization → Performanc
 ### 3. Infrastructure
 - **Cloud Deployment**: AWS/Azure deployment options
 - **API Interface**: REST API for external access
-- **Web Interface**: Web-based user interface
+- **Web Interface**: Enhanced web-based user interface
+- **Real-time Updates**: WebSocket support for live data
+- **Mobile App**: React Native mobile application
+- **Advanced Analytics**: Machine learning integration for insights
 
 ## Conclusion
 
-The Quant Project architecture provides a solid foundation for quantitative investment strategies. The unified design, local-first approach, and comprehensive testing make it suitable for both research and production use. The modular architecture allows for easy extension and customization while maintaining reliability and performance.
+The Alpha Crucible Quant architecture provides a comprehensive foundation for quantitative investment strategies with modern web-based visualization and interaction. The full-stack design combines powerful quantitative analysis with an intuitive user interface, making it suitable for both research and production use. The modular architecture allows for easy extension and customization while maintaining reliability and performance across all components.

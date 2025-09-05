@@ -1,12 +1,15 @@
 # Portfolio Data Storage
 
-This document explains how the portfolio data storage system works in the Quant Project.
+This document explains how the portfolio data storage system works in the Alpha Crucible Quant system.
 
 ## Overview
 
-The system now stores detailed portfolio information in the database, including:
+The Alpha Crucible Quant system stores comprehensive portfolio information in the database, including:
 - **Portfolio Values**: Daily portfolio and benchmark values with returns
 - **Portfolio Weights**: Individual stock weights for each rebalancing date
+- **Backtest Results**: Complete backtest performance metrics
+- **Signal Scores**: Historical signal calculations and combinations
+- **Portfolio Configurations**: Portfolio optimization parameters and constraints
 
 ## Database Schema
 
@@ -36,6 +39,40 @@ Stores individual stock weights for each rebalancing:
 | `date` | DATE | Date of the rebalancing |
 | `ticker` | VARCHAR(20) | Stock ticker symbol |
 | `weight` | DECIMAL(10,6) | Weight of the stock in portfolio |
+| `created_at` | TIMESTAMP | Record creation timestamp |
+
+### Backtest Results Table (`backtest_results`)
+
+Stores comprehensive backtest performance metrics:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `backtest_id` | VARCHAR(100) | Primary key |
+| `start_date` | DATE | Backtest start date |
+| `end_date` | DATE | Backtest end date |
+| `tickers` | TEXT | Comma-separated list of tickers |
+| `signals` | TEXT | Comma-separated list of signals |
+| `total_return` | DECIMAL(10,6) | Total return |
+| `annualized_return` | DECIMAL(10,6) | Annualized return |
+| `sharpe_ratio` | DECIMAL(10,6) | Sharpe ratio |
+| `max_drawdown` | DECIMAL(10,6) | Maximum drawdown |
+| `volatility` | DECIMAL(10,6) | Volatility |
+| `alpha` | DECIMAL(10,6) | Alpha vs benchmark |
+| `information_ratio` | DECIMAL(10,6) | Information ratio |
+| `execution_time_seconds` | DECIMAL(10,2) | Execution time |
+| `created_at` | TIMESTAMP | Record creation timestamp |
+
+### Signal Scores Table (`signal_scores`)
+
+Stores individual signal calculations:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INT | Primary key |
+| `ticker` | VARCHAR(20) | Stock ticker symbol |
+| `signal_id` | VARCHAR(50) | Signal identifier |
+| `date` | DATE | Date of calculation |
+| `score` | DECIMAL(10,6) | Signal score (-1 to 1) |
 | `created_at` | TIMESTAMP | Record creation timestamp |
 
 ## Usage
@@ -85,6 +122,53 @@ python tests/test_portfolio_storage.py
 ```
 
 ## API Usage
+
+### REST API Endpoints
+
+The system provides REST API endpoints for accessing portfolio data:
+
+#### Get Portfolio Data
+```http
+GET /api/portfolios/{portfolio_id}
+```
+
+#### Get Portfolio Positions
+```http
+GET /api/portfolios/{portfolio_id}/positions
+```
+
+#### Get Backtest Portfolios
+```http
+GET /api/backtests/{run_id}/portfolios
+```
+
+#### Get Backtest NAV Data
+```http
+GET /api/backtests/{run_id}/nav?start_date=2024-01-01&end_date=2024-01-31
+```
+
+### Python API Client
+
+```python
+import requests
+
+# Base URL
+BASE_URL = "http://localhost:8000/api"
+
+# Get portfolio details
+portfolio_id = 1
+response = requests.get(f"{BASE_URL}/portfolios/{portfolio_id}")
+portfolio = response.json()
+
+# Get portfolio positions
+response = requests.get(f"{BASE_URL}/portfolios/{portfolio_id}/positions")
+positions = response.json()
+
+# Get backtest NAV data
+backtest_id = "backtest_123"
+response = requests.get(f"{BASE_URL}/backtests/{backtest_id}/nav")
+nav_data = response.json()
+```
 
 ### Database Manager Methods
 
@@ -178,6 +262,30 @@ top_5_weight = latest_weights.nlargest(5, 'weight')['weight'].sum()
 print(f"Top 5 concentration: {top_5_weight:.2%}")
 ```
 
+## Web Application Integration
+
+### Frontend Components
+
+The web application provides interactive components for portfolio analysis:
+
+#### Portfolio Detail Component
+- **Portfolio Overview**: Display portfolio composition and key metrics
+- **Position Analysis**: Show individual stock positions and weights
+- **Performance Charts**: Visualize portfolio performance over time
+- **Risk Metrics**: Display risk analysis and concentration metrics
+
+#### Dashboard Integration
+- **Portfolio Summary**: Quick overview of all portfolios
+- **Performance Comparison**: Compare different portfolio strategies
+- **Historical Analysis**: Track portfolio evolution over time
+
+### Real-time Data Updates
+
+The system supports real-time data updates through the API:
+- **Automatic Refresh**: Frontend automatically refreshes data
+- **Live Metrics**: Real-time performance calculations
+- **Interactive Charts**: Dynamic visualization of portfolio data
+
 ## Benefits
 
 1. **Detailed Tracking**: Every portfolio value and weight is stored for analysis
@@ -185,6 +293,9 @@ print(f"Top 5 concentration: {top_5_weight:.2%}")
 3. **Performance Attribution**: Understand which stocks contributed to performance
 4. **Risk Analysis**: Analyze concentration, turnover, and other risk metrics
 5. **Backtesting**: Compare different strategies and their portfolio compositions
+6. **Web Interface**: Interactive web-based portfolio analysis and visualization
+7. **API Access**: Programmatic access to all portfolio data
+8. **Real-time Updates**: Live data updates and performance monitoring
 
 ## Notes
 

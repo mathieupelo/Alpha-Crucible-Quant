@@ -1,26 +1,30 @@
 # Directory Structure
 
-This document explains the organization of the Quant Project codebase.
+This document explains the organization of the Alpha Crucible Quant codebase.
 
 ## Overview
 
-The project follows a clear separation between operational scripts, tests, and source code:
+The project follows a clear separation between source code, web application, operational scripts, and tests:
 
 ```
 Alpha-Crucible-Quant/
-├── src/                    # Source code
-├── scripts/               # Operational scripts
-├── tests/                 # Test files and demos
-├── docs/                  # Documentation
-├── data/                  # Data files
-├── config/                # Configuration files
-└── temp/                  # Temporary files
+├── src/                    # Core quantitative analysis source code
+├── backend/                # FastAPI backend application
+├── frontend/               # React frontend application
+├── scripts/                # Operational scripts
+├── tests/                  # Test files and demos
+├── docs/                   # Documentation
+├── data/                   # Data files
+├── config/                 # Configuration files
+├── temp/                   # Temporary files
+├── docker-compose.yml      # Docker orchestration
+└── nginx.conf              # Nginx configuration
 ```
 
 ## Directory Purposes
 
-### `src/` - Source Code
-Contains the main application code organized by functionality:
+### `src/` - Core Source Code
+Contains the main quantitative analysis code organized by functionality:
 
 ```
 src/
@@ -29,6 +33,48 @@ src/
 ├── signals/               # Signal calculation and processing
 ├── solver/                # Portfolio optimization
 └── utils/                 # Utility functions
+```
+
+### `backend/` - FastAPI Backend
+Contains the REST API backend application:
+
+```
+backend/
+├── api/                   # API route handlers
+│   ├── backtests.py       # Backtest endpoints
+│   ├── portfolios.py      # Portfolio endpoints
+│   ├── signals.py         # Signal endpoints
+│   └── nav.py             # NAV endpoints
+├── models/                # Pydantic response models
+├── services/              # Business logic services
+│   └── database_service.py # Database abstraction
+├── main.py                # FastAPI application entry point
+├── requirements.txt       # Python dependencies
+└── Dockerfile             # Backend container configuration
+```
+
+### `frontend/` - React Frontend
+Contains the React web application:
+
+```
+frontend/
+├── src/                   # React source code
+│   ├── components/        # React components
+│   │   ├── cards/         # Metric card components
+│   │   ├── charts/        # Chart components
+│   │   ├── common/        # Common components
+│   │   └── tables/        # Table components
+│   ├── pages/             # Page components
+│   ├── services/          # API service layer
+│   ├── types/             # TypeScript type definitions
+│   ├── utils/             # Utility functions
+│   └── styles/            # Styling files
+├── public/                # Static assets
+├── dist/                  # Built application
+├── package.json           # Node.js dependencies
+├── tsconfig.json          # TypeScript configuration
+├── vite.config.ts         # Vite build configuration
+└── Dockerfile             # Frontend container configuration
 ```
 
 ### `scripts/` - Operational Scripts
@@ -97,7 +143,37 @@ Contains temporary files generated during operations.
 - Follow Python package conventions
 - Include `__init__.py` files for proper imports
 
-## Running Scripts vs Tests
+## Running the Application
+
+### Web Application (Recommended)
+```bash
+# Start all services with Docker Compose
+docker-compose up -d
+
+# Or start individual services
+docker-compose up mysql backend frontend nginx
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/api/docs
+```
+
+### Development Mode
+```bash
+# Backend development
+cd backend
+pip install -r requirements.txt
+python main.py
+
+# Frontend development
+cd frontend
+npm install
+npm run dev
+
+# Database setup
+python scripts/setup_database.py
+```
 
 ### Operational Scripts
 ```bash
@@ -129,7 +205,33 @@ python tests/demo_forward_fill.py
 pytest tests/test_signals.py
 ```
 
+## Web Application Components
+
+### Frontend Components
+- **Dashboard**: Main overview with key metrics and charts
+- **BacktestDetail**: Detailed analysis of individual backtests
+- **PerformanceChart**: Interactive performance visualization
+- **PortfolioDetail**: Portfolio composition and analysis
+- **MetricCard**: Reusable metric display components
+
+### Backend API Endpoints
+- **Backtests**: `/api/backtests` - Backtest management and retrieval
+- **Portfolios**: `/api/portfolios` - Portfolio data and positions
+- **Signals**: `/api/signals` - Signal data and scores
+- **NAV**: `/api/backtests/{run_id}/nav` - Net Asset Value data
+
+### Database Integration
+- **DatabaseService**: Abstraction layer for database operations
+- **Response Models**: Pydantic models for API responses
+- **Error Handling**: Comprehensive error handling and logging
+
 ## Best Practices
+
+### Web Application
+- **Frontend**: Use TypeScript for type safety, Material-UI for consistency
+- **Backend**: Follow RESTful principles, use Pydantic for validation
+- **API Design**: Consistent response formats, proper HTTP status codes
+- **Error Handling**: User-friendly error messages, comprehensive logging
 
 ### Scripts Directory
 - Keep only operational scripts

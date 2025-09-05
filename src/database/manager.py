@@ -13,7 +13,7 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 
-from .models import SignalScore, Portfolio, BacktestResult, SignalDefinition, PortfolioValue, PortfolioWeight, DataFrameConverter
+from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, DataFrameConverter
 
 # Load environment variables
 load_dotenv()
@@ -32,7 +32,7 @@ class DatabaseManager:
         self.port = port or int(os.getenv('DB_PORT', '3306'))
         self.user = user or os.getenv('DB_USER', 'root')
         self.password = password or os.getenv('DB_PASSWORD', '')
-        self.database = database or os.getenv('DB_NAME', 'quant_project')
+        self.database = database or os.getenv('DB_NAME', 'signal_forge')
         self._connection = None
     
     def connect(self) -> bool:
@@ -105,39 +105,46 @@ class DatabaseManager:
         finally:
             cursor.close()
     
-    # Signal Score Operations
+    # Signal Raw Operations
     
-    def store_signal_scores(self, scores: List[SignalScore]) -> int:
-        """Store signal scores in the database."""
-        if not scores:
+    def store_signals_raw(self, signals: List[SignalRaw]) -> int:
+        """Store raw signals in the database."""
+        if not signals:
             return 0
         
         query = """
-        INSERT INTO signal_scores (ticker, signal_id, date, score, created_at)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO signals_raw (asof_date, ticker, signal_name, value, metadata, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE 
-            score = VALUES(score),
+            value = VALUES(value),
+            metadata = VALUES(metadata),
             created_at = VALUES(created_at)
         """
         
         params_list = []
-        for score in scores:
+        for signal in signals:
+            metadata_json = None
+            if signal.metadata:
+                import json
+                metadata_json = json.dumps(signal.metadata)
+            
             params_list.append((
-                score.ticker,
-                score.signal_id,
-                score.date,
-                score.score,
-                score.created_at or datetime.now()
+                signal.asof_date,
+                signal.ticker,
+                signal.signal_name,
+                signal.value,
+                metadata_json,
+                signal.created_at or datetime.now()
             ))
         
         return self.execute_many(query, params_list)
     
-    def get_signal_scores(self, tickers: Optional[List[str]] = None,
-                         signals: Optional[List[str]] = None,
-                         start_date: Optional[date] = None,
-                         end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve signal scores from the database."""
-        query = "SELECT * FROM signal_scores WHERE 1=1"
+    def get_signals_raw(self, tickers: Optional[List[str]] = None,
+                       signal_names: Optional[List[str]] = None,
+                       start_date: Optional[date] = None,
+                       end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve raw signals from the database."""
+        query = "SELECT * FROM signals_raw WHERE 1=1"
         params = []
         
         if tickers:
@@ -145,36 +152,101 @@ class DatabaseManager:
             query += f" AND ticker IN ({placeholders})"
             params.extend(tickers)
         
-        if signals:
-            placeholders = ','.join(['%s'] * len(signals))
-            query += f" AND signal_id IN ({placeholders})"
-            params.extend(signals)
+        if signal_names:
+            placeholders = ','.join(['%s'] * len(signal_names))
+            query += f" AND signal_name IN ({placeholders})"
+            params.extend(signal_names)
         
         if start_date:
-            query += " AND date >= %s"
+            query += " AND asof_date >= %s"
             params.append(start_date)
         
         if end_date:
-            query += " AND date <= %s"
+            query += " AND asof_date <= %s"
             params.append(end_date)
         
-        query += " ORDER BY date, ticker, signal_id"
+        query += " ORDER BY asof_date, ticker, signal_name"
         
         return self.execute_query(query, tuple(params) if params else None)
     
-    def get_signal_scores_dataframe(self, tickers: List[str], signals: List[str],
-                                   start_date: date, end_date: date, 
-                                   forward_fill: bool = True) -> pd.DataFrame:
-        """Get signal scores as a pivot table (date x ticker x signal)."""
-        df = self.get_signal_scores(tickers, signals, start_date, end_date)
+    # Score Combined Operations
+    
+    def store_scores_combined(self, scores: List[ScoreCombined]) -> int:
+        """Store combined scores in the database."""
+        if not scores:
+            return 0
+        
+        query = """
+        INSERT INTO scores_combined (asof_date, ticker, score, method, params, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+            score = VALUES(score),
+            method = VALUES(method),
+            params = VALUES(params),
+            created_at = VALUES(created_at)
+        """
+        
+        params_list = []
+        for score in scores:
+            params_json = None
+            if score.params:
+                import json
+                params_json = json.dumps(score.params)
+            
+            params_list.append((
+                score.asof_date,
+                score.ticker,
+                score.score,
+                score.method,
+                params_json,
+                score.created_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_scores_combined(self, tickers: Optional[List[str]] = None,
+                           methods: Optional[List[str]] = None,
+                           start_date: Optional[date] = None,
+                           end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve combined scores from the database."""
+        query = "SELECT * FROM scores_combined WHERE 1=1"
+        params = []
+        
+        if tickers:
+            placeholders = ','.join(['%s'] * len(tickers))
+            query += f" AND ticker IN ({placeholders})"
+            params.extend(tickers)
+        
+        if methods:
+            placeholders = ','.join(['%s'] * len(methods))
+            query += f" AND method IN ({placeholders})"
+            params.extend(methods)
+        
+        if start_date:
+            query += " AND asof_date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND asof_date <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY asof_date, ticker, method"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
+    def get_scores_combined_pivot(self, tickers: List[str], methods: List[str],
+                                 start_date: date, end_date: date, 
+                                 forward_fill: bool = True) -> pd.DataFrame:
+        """Get combined scores as a pivot table (date x ticker x method)."""
+        df = self.get_scores_combined(tickers, methods, start_date, end_date)
         
         if df.empty:
             return pd.DataFrame()
         
-        # Create pivot table with date as index, ticker-signal as columns
+        # Create pivot table with date as index, ticker-method as columns
         pivot_df = df.pivot_table(
-            index='date',
-            columns=['ticker', 'signal_id'],
+            index='asof_date',
+            columns=['ticker', 'method'],
             values='score',
             aggfunc='first'
         )
@@ -190,92 +262,180 @@ class DatabaseManager:
     def store_portfolio(self, portfolio: Portfolio) -> int:
         """Store a portfolio in the database."""
         query = """
-        INSERT INTO portfolios (portfolio_id, creation_date, weights, signal_weights, 
-                              risk_aversion, max_weight, created_at)
+        INSERT INTO portfolios (run_id, asof_date, method, params, cash, notes, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            weights = VALUES(weights),
-            signal_weights = VALUES(signal_weights),
-            risk_aversion = VALUES(risk_aversion),
-            max_weight = VALUES(max_weight),
+            method = VALUES(method),
+            params = VALUES(params),
+            cash = VALUES(cash),
+            notes = VALUES(notes),
             created_at = VALUES(created_at)
         """
         
+        params_json = None
+        if portfolio.params:
+            import json
+            params_json = json.dumps(portfolio.params)
+        
         params = (
-            portfolio.portfolio_id,
-            portfolio.creation_date,
-            str(portfolio.weights),  # Store as JSON string
-            str(portfolio.signal_weights),  # Store as JSON string
-            portfolio.risk_aversion,
-            portfolio.max_weight,
+            portfolio.run_id,
+            portfolio.asof_date,
+            portfolio.method,
+            params_json,
+            portfolio.cash,
+            portfolio.notes,
             portfolio.created_at or datetime.now()
         )
         
         return self.execute_insert(query, params)
     
-    def get_portfolios(self, start_date: Optional[date] = None,
+    def get_portfolios(self, run_id: Optional[str] = None,
+                      start_date: Optional[date] = None,
                       end_date: Optional[date] = None) -> pd.DataFrame:
         """Retrieve portfolios from the database."""
         query = "SELECT * FROM portfolios WHERE 1=1"
         params = []
         
+        if run_id:
+            query += " AND run_id = %s"
+            params.append(run_id)
+        
         if start_date:
-            query += " AND creation_date >= %s"
+            query += " AND asof_date >= %s"
             params.append(start_date)
         
         if end_date:
-            query += " AND creation_date <= %s"
+            query += " AND asof_date <= %s"
             params.append(end_date)
         
-        query += " ORDER BY creation_date"
+        query += " ORDER BY asof_date"
         
         return self.execute_query(query, tuple(params) if params else None)
     
-    # Backtest Results Operations
+    def get_portfolio_by_id(self, portfolio_id: int) -> Optional[Portfolio]:
+        """Get a specific portfolio by ID."""
+        query = "SELECT * FROM portfolios WHERE id = %s"
+        df = self.execute_query(query, (portfolio_id,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        params = None
+        if row.get('params'):
+            import json
+            try:
+                params = json.loads(row['params'])
+            except (json.JSONDecodeError, TypeError):
+                params = None
+        
+        return Portfolio(
+            run_id=row['run_id'],
+            asof_date=row['asof_date'],
+            method=row['method'],
+            params=params,
+            cash=row.get('cash', 0.0),
+            notes=row.get('notes'),
+            created_at=row.get('created_at')
+        )
     
-    def store_backtest_result(self, result: BacktestResult) -> int:
-        """Store backtest results in the database."""
+    # Portfolio Position Operations
+    
+    def store_portfolio_positions(self, positions: List[PortfolioPosition]) -> int:
+        """Store portfolio positions in the database."""
+        if not positions:
+            return 0
+        
         query = """
-        INSERT INTO backtest_results (backtest_id, start_date, end_date, tickers, signals,
-                                    total_return, annualized_return, sharpe_ratio, max_drawdown,
-                                    volatility, alpha, information_ratio, execution_time_seconds, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            total_return = VALUES(total_return),
-            annualized_return = VALUES(annualized_return),
-            sharpe_ratio = VALUES(sharpe_ratio),
-            max_drawdown = VALUES(max_drawdown),
-            volatility = VALUES(volatility),
-            alpha = VALUES(alpha),
-            information_ratio = VALUES(information_ratio),
-            execution_time_seconds = VALUES(execution_time_seconds),
+        INSERT INTO portfolio_positions (portfolio_id, ticker, weight, price_used, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+            weight = VALUES(weight),
+            price_used = VALUES(price_used),
             created_at = VALUES(created_at)
         """
         
+        params_list = []
+        for position in positions:
+            params_list.append((
+                position.portfolio_id,
+                position.ticker,
+                position.weight,
+                position.price_used,
+                position.created_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_portfolio_positions(self, portfolio_id: Optional[int] = None,
+                               tickers: Optional[List[str]] = None) -> pd.DataFrame:
+        """Retrieve portfolio positions from the database."""
+        query = "SELECT * FROM portfolio_positions WHERE 1=1"
+        params = []
+        
+        if portfolio_id:
+            query += " AND portfolio_id = %s"
+            params.append(portfolio_id)
+        
+        if tickers:
+            placeholders = ','.join(['%s'] * len(tickers))
+            query += f" AND ticker IN ({placeholders})"
+            params.extend(tickers)
+        
+        query += " ORDER BY portfolio_id, ticker"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
+    # Backtest Operations
+    
+    def store_backtest(self, backtest: Backtest) -> int:
+        """Store a backtest configuration in the database."""
+        query = """
+        INSERT INTO backtests (run_id, start_date, end_date, frequency, universe, benchmark, params, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            start_date = VALUES(start_date),
+            end_date = VALUES(end_date),
+            frequency = VALUES(frequency),
+            universe = VALUES(universe),
+            benchmark = VALUES(benchmark),
+            params = VALUES(params),
+            created_at = VALUES(created_at)
+        """
+        
+        universe_json = None
+        if backtest.universe:
+            import json
+            universe_json = json.dumps(backtest.universe)
+        
+        params_json = None
+        if backtest.params:
+            import json
+            params_json = json.dumps(backtest.params)
+        
         params = (
-            result.backtest_id,
-            result.start_date,
-            result.end_date,
-            ','.join(result.tickers),
-            ','.join(result.signals),
-            result.total_return,
-            result.annualized_return,
-            result.sharpe_ratio,
-            result.max_drawdown,
-            result.volatility,
-            result.alpha,
-            result.information_ratio,
-            result.execution_time_seconds,
-            result.created_at or datetime.now()
+            backtest.run_id,
+            backtest.start_date,
+            backtest.end_date,
+            backtest.frequency,
+            universe_json,
+            backtest.benchmark,
+            params_json,
+            backtest.created_at or datetime.now()
         )
         
         return self.execute_insert(query, params)
     
-    def get_backtest_results(self, start_date: Optional[date] = None,
-                           end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve backtest results from the database."""
-        query = "SELECT * FROM backtest_results WHERE 1=1"
+    def get_backtests(self, run_id: Optional[str] = None,
+                     start_date: Optional[date] = None,
+                     end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve backtests from the database."""
+        query = "SELECT * FROM backtests WHERE 1=1"
         params = []
+        
+        if run_id:
+            query += " AND run_id = %s"
+            params.append(run_id)
         
         if start_date:
             query += " AND start_date >= %s"
@@ -289,180 +449,93 @@ class DatabaseManager:
         
         return self.execute_query(query, tuple(params) if params else None)
     
-    # Signal Definition Operations
-    
-    def store_signal_definition(self, signal_def: SignalDefinition) -> int:
-        """Store a signal definition in the database."""
-        query = """
-        INSERT INTO signal_definitions (signal_id, name, parameters, enabled, created_at)
-        VALUES (%s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            name = VALUES(name),
-            parameters = VALUES(parameters),
-            enabled = VALUES(enabled),
-            created_at = VALUES(created_at)
-        """
-        
-        params = (
-            signal_def.signal_id,
-            signal_def.name,
-            str(signal_def.parameters),  # Store as JSON string
-            signal_def.enabled,
-            signal_def.created_at or datetime.now()
-        )
-        
-        return self.execute_insert(query, params)
-    
-    def get_signal_definitions(self, enabled_only: bool = True) -> pd.DataFrame:
-        """Retrieve signal definitions from the database."""
-        query = "SELECT * FROM signal_definitions"
-        params = []
-        
-        if enabled_only:
-            query += " WHERE enabled = %s"
-            params.append(True)
-        
-        query += " ORDER BY signal_id"
-        
-        return self.execute_query(query, tuple(params) if params else None)
-    
-    def get_enabled_signals(self) -> List[str]:
-        """Get list of enabled signal IDs."""
-        df = self.get_signal_definitions(enabled_only=True)
-        return df['signal_id'].tolist() if not df.empty else []
-    
-    # Portfolio Value Operations
-    
-    def store_portfolio_values(self, values: List[PortfolioValue]) -> int:
-        """Store portfolio values in the database."""
-        if not values:
-            return 0
-        
-        query = """
-        INSERT INTO portfolio_values (portfolio_value_id, backtest_id, date, portfolio_value, 
-                                    benchmark_value, portfolio_return, benchmark_return, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            portfolio_value = VALUES(portfolio_value),
-            benchmark_value = VALUES(benchmark_value),
-            portfolio_return = VALUES(portfolio_return),
-            benchmark_return = VALUES(benchmark_return),
-            created_at = VALUES(created_at)
-        """
-        
-        params_list = []
-        for value in values:
-            params_list.append((
-                value.portfolio_value_id,
-                value.backtest_id,
-                value.date,
-                value.portfolio_value,
-                value.benchmark_value,
-                value.portfolio_return,
-                value.benchmark_return,
-                value.created_at or datetime.now()
-            ))
-        
-        return self.execute_many(query, params_list)
-    
-    def get_portfolio_values(self, backtest_id: Optional[str] = None,
-                           start_date: Optional[date] = None,
-                           end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve portfolio values from the database."""
-        query = "SELECT * FROM portfolio_values WHERE 1=1"
-        params = []
-        
-        if backtest_id:
-            query += " AND backtest_id = %s"
-            params.append(backtest_id)
-        
-        if start_date:
-            query += " AND date >= %s"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND date <= %s"
-            params.append(end_date)
-        
-        query += " ORDER BY date"
-        
-        return self.execute_query(query, tuple(params) if params else None)
-    
-    # Portfolio Weight Operations
-    
-    def store_portfolio_weights(self, weights: List[PortfolioWeight]) -> int:
-        """Store portfolio weights in the database."""
-        if not weights:
-            return 0
-        
-        query = """
-        INSERT INTO portfolio_weights (portfolio_weight_id, backtest_id, date, ticker, weight, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            weight = VALUES(weight),
-            created_at = VALUES(created_at)
-        """
-        
-        params_list = []
-        for weight in weights:
-            params_list.append((
-                weight.portfolio_weight_id,
-                weight.backtest_id,
-                weight.date,
-                weight.ticker,
-                weight.weight,
-                weight.created_at or datetime.now()
-            ))
-        
-        return self.execute_many(query, params_list)
-    
-    def get_portfolio_weights(self, backtest_id: Optional[str] = None,
-                            tickers: Optional[List[str]] = None,
-                            start_date: Optional[date] = None,
-                            end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve portfolio weights from the database."""
-        query = "SELECT * FROM portfolio_weights WHERE 1=1"
-        params = []
-        
-        if backtest_id:
-            query += " AND backtest_id = %s"
-            params.append(backtest_id)
-        
-        if tickers:
-            placeholders = ','.join(['%s'] * len(tickers))
-            query += f" AND ticker IN ({placeholders})"
-            params.extend(tickers)
-        
-        if start_date:
-            query += " AND date >= %s"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND date <= %s"
-            params.append(end_date)
-        
-        query += " ORDER BY date, ticker"
-        
-        return self.execute_query(query, tuple(params) if params else None)
-    
-    def get_portfolio_weights_pivot(self, backtest_id: str, 
-                                  start_date: Optional[date] = None,
-                                  end_date: Optional[date] = None) -> pd.DataFrame:
-        """Get portfolio weights as a pivot table (date x ticker)."""
-        df = self.get_portfolio_weights(backtest_id, start_date=start_date, end_date=end_date)
+    def get_backtest_by_run_id(self, run_id: str) -> Optional[Backtest]:
+        """Get a specific backtest by run_id."""
+        query = "SELECT * FROM backtests WHERE run_id = %s"
+        df = self.execute_query(query, (run_id,))
         
         if df.empty:
-            return pd.DataFrame()
+            return None
         
-        # Create pivot table with date as index, ticker as columns
-        pivot_df = df.pivot_table(
-            index='date',
-            columns='ticker',
-            values='weight',
-            aggfunc='first'
+        row = df.iloc[0]
+        universe = None
+        if row.get('universe'):
+            import json
+            try:
+                universe = json.loads(row['universe'])
+            except (json.JSONDecodeError, TypeError):
+                universe = None
+        
+        params = None
+        if row.get('params'):
+            import json
+            try:
+                params = json.loads(row['params'])
+            except (json.JSONDecodeError, TypeError):
+                params = None
+        
+        return Backtest(
+            run_id=row['run_id'],
+            start_date=row['start_date'],
+            end_date=row['end_date'],
+            frequency=row['frequency'],
+            universe=universe,
+            benchmark=row.get('benchmark'),
+            params=params,
+            created_at=row.get('created_at')
         )
+    
+    # Backtest NAV Operations
+    
+    def store_backtest_nav(self, nav_data: List[BacktestNav]) -> int:
+        """Store backtest NAV data in the database."""
+        if not nav_data:
+            return 0
         
-        return pivot_df
+        query = """
+        INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+            nav = VALUES(nav),
+            benchmark_nav = VALUES(benchmark_nav),
+            pnl = VALUES(pnl)
+        """
+        
+        params_list = []
+        for nav in nav_data:
+            params_list.append((
+                nav.run_id,
+                nav.date,
+                nav.nav,
+                nav.benchmark_nav,
+                nav.pnl
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_backtest_nav(self, run_id: Optional[str] = None,
+                        start_date: Optional[date] = None,
+                        end_date: Optional[date] = None) -> pd.DataFrame:
+        """Retrieve backtest NAV data from the database."""
+        query = "SELECT * FROM backtest_nav WHERE 1=1"
+        params = []
+        
+        if run_id:
+            query += " AND run_id = %s"
+            params.append(run_id)
+        
+        if start_date:
+            query += " AND date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND date <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY run_id, date"
+        
+        return self.execute_query(query, tuple(params) if params else None)
+    
     
     # Utility Methods
     

@@ -31,7 +31,7 @@ def create_database():
     port = int(os.getenv('DB_PORT', '3306'))
     user = os.getenv('DB_USER', 'root')
     password = os.getenv('DB_PASSWORD', '')
-    database = os.getenv('DB_NAME', 'quant_project')
+    database = os.getenv('DB_NAME', 'signal_forge')
     
     try:
         # Connect without specifying database
@@ -67,7 +67,7 @@ def create_tables():
     port = int(os.getenv('DB_PORT', '3306'))
     user = os.getenv('DB_USER', 'root')
     password = os.getenv('DB_PASSWORD', '')
-    database = os.getenv('DB_NAME', 'quant_project')
+    database = os.getenv('DB_NAME', 'signal_forge')
     
     try:
         connection = mysql.connector.connect(
@@ -80,111 +80,117 @@ def create_tables():
         
         cursor = connection.cursor()
         
-        # Signal definitions table
+        # Signals raw table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS signal_definitions (
-                signal_id VARCHAR(50) PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                parameters TEXT,
-                enabled BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        """)
-        logger.info("Created signal_definitions table")
-        
-        # Signal scores table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS signal_scores (
+            CREATE TABLE IF NOT EXISTS signals_raw (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                asof_date DATE NOT NULL,
                 ticker VARCHAR(20) NOT NULL,
-                signal_id VARCHAR(50) NOT NULL,
-                date DATE NOT NULL,
-                score DECIMAL(10, 6) NOT NULL,
+                signal_name VARCHAR(100) NOT NULL,
+                value FLOAT NOT NULL,
+                metadata JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_signal_score (ticker, signal_id, date),
-                INDEX idx_ticker_date (ticker, date),
-                INDEX idx_signal_date (signal_id, date),
-                INDEX idx_date (date)
+                UNIQUE KEY unique_signal_raw (asof_date, ticker, signal_name),
+                INDEX idx_asof_date (asof_date),
+                INDEX idx_ticker (ticker),
+                INDEX idx_signal_name (signal_name),
+                INDEX idx_date_ticker (asof_date, ticker)
             )
         """)
-        logger.info("Created signal_scores table")
+        logger.info("Created signals_raw table")
         
-        # Portfolios table
+        # Scores combined table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS portfolios (
-                portfolio_id VARCHAR(100) PRIMARY KEY,
-                creation_date DATE NOT NULL,
-                weights TEXT NOT NULL,
-                signal_weights TEXT NOT NULL,
-                risk_aversion DECIMAL(10, 6) NOT NULL,
-                max_weight DECIMAL(10, 6) NOT NULL,
+            CREATE TABLE IF NOT EXISTS scores_combined (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                asof_date DATE NOT NULL,
+                ticker VARCHAR(20) NOT NULL,
+                score FLOAT NOT NULL,
+                method VARCHAR(100) NOT NULL,
+                params JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_creation_date (creation_date)
+                UNIQUE KEY unique_score_combined (asof_date, ticker, method),
+                INDEX idx_asof_date (asof_date),
+                INDEX idx_ticker (ticker),
+                INDEX idx_method (method),
+                INDEX idx_date_ticker (asof_date, ticker)
             )
         """)
-        logger.info("Created portfolios table")
+        logger.info("Created scores_combined table")
         
-        # Backtest results table
+        # Backtests table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS backtest_results (
-                backtest_id VARCHAR(100) PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS backtests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                run_id VARCHAR(100) UNIQUE NOT NULL,
                 start_date DATE NOT NULL,
                 end_date DATE NOT NULL,
-                tickers TEXT NOT NULL,
-                signals TEXT NOT NULL,
-                total_return DECIMAL(10, 6) NOT NULL,
-                annualized_return DECIMAL(10, 6) NOT NULL,
-                sharpe_ratio DECIMAL(10, 6) NOT NULL,
-                max_drawdown DECIMAL(10, 6) NOT NULL,
-                volatility DECIMAL(10, 6) NOT NULL,
-                alpha DECIMAL(10, 6) NOT NULL,
-                information_ratio DECIMAL(10, 6) NOT NULL,
-                execution_time_seconds DECIMAL(10, 3) NOT NULL,
+                frequency ENUM('daily', 'weekly', 'monthly', 'quarterly') NOT NULL,
+                universe JSON,
+                benchmark VARCHAR(20),
+                params JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_run_id (run_id),
                 INDEX idx_start_date (start_date),
                 INDEX idx_end_date (end_date),
                 INDEX idx_created_at (created_at)
             )
         """)
-        logger.info("Created backtest_results table")
+        logger.info("Created backtests table")
         
-        # Portfolio values table
+        # Portfolios table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS portfolio_values (
-                portfolio_value_id VARCHAR(100) PRIMARY KEY,
-                backtest_id VARCHAR(100) NOT NULL,
-                date DATE NOT NULL,
-                portfolio_value DECIMAL(15, 2) NOT NULL,
-                benchmark_value DECIMAL(15, 2) NOT NULL,
-                portfolio_return DECIMAL(10, 6) NOT NULL,
-                benchmark_return DECIMAL(10, 6) NOT NULL,
+            CREATE TABLE IF NOT EXISTS portfolios (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                run_id VARCHAR(100) NOT NULL,
+                asof_date DATE NOT NULL,
+                method VARCHAR(100) NOT NULL,
+                params JSON,
+                cash FLOAT DEFAULT 0.0,
+                notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_portfolio_value (backtest_id, date),
-                INDEX idx_backtest_date (backtest_id, date),
-                INDEX idx_date (date),
-                FOREIGN KEY (backtest_id) REFERENCES backtest_results(backtest_id) ON DELETE CASCADE
+                UNIQUE KEY unique_portfolio (run_id, asof_date),
+                INDEX idx_run_id (run_id),
+                INDEX idx_asof_date (asof_date),
+                INDEX idx_method (method),
+                FOREIGN KEY (run_id) REFERENCES backtests(run_id) ON DELETE CASCADE
             )
         """)
-        logger.info("Created portfolio_values table")
+        logger.info("Created portfolios table")
         
-        # Portfolio weights table
+        # Portfolio positions table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS portfolio_weights (
-                portfolio_weight_id VARCHAR(100) PRIMARY KEY,
-                backtest_id VARCHAR(100) NOT NULL,
-                date DATE NOT NULL,
+            CREATE TABLE IF NOT EXISTS portfolio_positions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                portfolio_id INT NOT NULL,
                 ticker VARCHAR(20) NOT NULL,
-                weight DECIMAL(10, 6) NOT NULL,
+                weight FLOAT NOT NULL,
+                price_used FLOAT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_portfolio_weight (backtest_id, date, ticker),
-                INDEX idx_backtest_date (backtest_id, date),
-                INDEX idx_ticker_date (ticker, date),
-                INDEX idx_date (date),
-                FOREIGN KEY (backtest_id) REFERENCES backtest_results(backtest_id) ON DELETE CASCADE
+                UNIQUE KEY unique_portfolio_position (portfolio_id, ticker),
+                INDEX idx_portfolio_id (portfolio_id),
+                INDEX idx_ticker (ticker),
+                FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
             )
         """)
-        logger.info("Created portfolio_weights table")
+        logger.info("Created portfolio_positions table")
+        
+        # Backtest NAV table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS backtest_nav (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                run_id VARCHAR(100) NOT NULL,
+                date DATE NOT NULL,
+                nav FLOAT NOT NULL,
+                benchmark_nav FLOAT,
+                pnl FLOAT,
+                UNIQUE KEY unique_backtest_nav (run_id, date),
+                INDEX idx_run_id (run_id),
+                INDEX idx_date (date),
+                FOREIGN KEY (run_id) REFERENCES backtests(run_id) ON DELETE CASCADE
+            )
+        """)
+        logger.info("Created backtest_nav table")
         
         connection.commit()
         cursor.close()
@@ -197,48 +203,6 @@ def create_tables():
         return False
 
 
-def insert_default_signal_definitions():
-    """Insert default signal definitions."""
-    host = os.getenv('DB_HOST', '127.0.0.1')
-    port = int(os.getenv('DB_PORT', '3306'))
-    user = os.getenv('DB_USER', 'root')
-    password = os.getenv('DB_PASSWORD', '')
-    database = os.getenv('DB_NAME', 'quant_project')
-    
-    try:
-        connection = mysql.connector.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database=database
-        )
-        
-        cursor = connection.cursor()
-        
-        # Default signal definitions
-        signals = [
-            ('RSI', 'Relative Strength Index', '{"period": 14}'),
-            ('SMA', 'Simple Moving Average', '{"short_period": 50, "long_period": 200}'),
-            ('MACD', 'Moving Average Convergence Divergence', '{"fast_period": 12, "slow_period": 26, "signal_period": 9}'),
-        ]
-        
-        for signal_id, name, parameters in signals:
-            cursor.execute("""
-                INSERT IGNORE INTO signal_definitions (signal_id, name, parameters, enabled)
-                VALUES (%s, %s, %s, %s)
-            """, (signal_id, name, parameters, True))
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("Inserted default signal definitions")
-        return True
-        
-    except Error as e:
-        logger.error(f"Error inserting signal definitions: {e}")
-        return False
 
 
 def main():
@@ -253,11 +217,6 @@ def main():
     # Create tables
     if not create_tables():
         logger.error("Failed to create tables")
-        return False
-    
-    # Insert default signal definitions
-    if not insert_default_signal_definitions():
-        logger.error("Failed to insert signal definitions")
         return False
     
     logger.info("Database setup completed successfully!")

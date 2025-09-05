@@ -31,114 +31,144 @@ def main():
             print("Failed to connect to database")
             return 1
         
-        # Get recent backtest results
-        print("\nRecent Backtest Results:")
+        # Get recent backtests
+        print("\nRecent Backtests:")
         print("-" * 30)
-        backtest_results = db_manager.get_backtest_results()
+        backtests = db_manager.get_backtests()
         
-        if backtest_results.empty:
-            print("No backtest results found in database")
+        if backtests.empty:
+            print("No backtests found in database")
             return 0
         
         # Show recent backtests
-        recent_backtests = backtest_results.head(5)
-        for _, result in recent_backtests.iterrows():
-            print(f"Backtest ID: {result['backtest_id']}")
-            print(f"  Period: {result['start_date']} to {result['end_date']}")
-            print(f"  Total Return: {result['total_return']:.2%}")
-            print(f"  Sharpe Ratio: {result['sharpe_ratio']:.2f}")
-            print(f"  Created: {result['created_at']}")
+        recent_backtests = backtests.head(5)
+        for _, backtest in recent_backtests.iterrows():
+            print(f"Run ID: {backtest['run_id']}")
+            print(f"  Period: {backtest['start_date']} to {backtest['end_date']}")
+            print(f"  Frequency: {backtest['frequency']}")
+            print(f"  Benchmark: {backtest['benchmark']}")
+            print(f"  Created: {backtest['created_at']}")
             print()
         
         # Get the most recent backtest ID
-        latest_backtest_id = recent_backtests.iloc[0]['backtest_id']
-        print(f"Analyzing portfolio data for backtest: {latest_backtest_id}")
+        latest_run_id = recent_backtests.iloc[0]['run_id']
+        print(f"Analyzing portfolio data for backtest: {latest_run_id}")
         
-        # Get portfolio values
-        print("\nPortfolio Values:")
+        # Get backtest NAV data
+        print("\nBacktest NAV Data:")
         print("-" * 20)
-        portfolio_values = db_manager.get_portfolio_values(backtest_id=latest_backtest_id)
+        nav_data = db_manager.get_backtest_nav(run_id=latest_run_id)
         
-        if not portfolio_values.empty:
-            print(f"Found {len(portfolio_values)} portfolio value records")
+        if not nav_data.empty:
+            print(f"Found {len(nav_data)} NAV records")
             
             # Show first and last values
-            first_value = portfolio_values.iloc[0]
-            last_value = portfolio_values.iloc[-1]
+            first_nav = nav_data.iloc[0]
+            last_nav = nav_data.iloc[-1]
             
-            print(f"\nFirst Record ({first_value['date']}):")
-            print(f"  Portfolio Value: ${first_value['portfolio_value']:,.2f}")
-            print(f"  Benchmark Value: ${first_value['benchmark_value']:,.2f}")
-            print(f"  Portfolio Return: {first_value['portfolio_return']:.2%}")
-            print(f"  Benchmark Return: {first_value['benchmark_return']:.2%}")
+            print(f"\nFirst Record ({first_nav['date']}):")
+            print(f"  NAV: ${first_nav['nav']:,.2f}")
+            if first_nav['benchmark_nav']:
+                print(f"  Benchmark NAV: ${first_nav['benchmark_nav']:,.2f}")
+            if first_nav['pnl']:
+                print(f"  PnL: ${first_nav['pnl']:,.2f}")
             
-            print(f"\nLast Record ({last_value['date']}):")
-            print(f"  Portfolio Value: ${last_value['portfolio_value']:,.2f}")
-            print(f"  Benchmark Value: ${last_value['benchmark_value']:,.2f}")
-            print(f"  Portfolio Return: {last_value['portfolio_return']:.2%}")
-            print(f"  Benchmark Return: {last_value['benchmark_return']:.2%}")
+            print(f"\nLast Record ({last_nav['date']}):")
+            print(f"  NAV: ${last_nav['nav']:,.2f}")
+            if last_nav['benchmark_nav']:
+                print(f"  Benchmark NAV: ${last_nav['benchmark_nav']:,.2f}")
+            if last_nav['pnl']:
+                print(f"  PnL: ${last_nav['pnl']:,.2f}")
             
             # Calculate total performance
-            total_portfolio_return = (last_value['portfolio_value'] / first_value['portfolio_value']) - 1
-            total_benchmark_return = (last_value['benchmark_value'] / first_value['benchmark_value']) - 1
+            total_return = (last_nav['nav'] / first_nav['nav']) - 1
+            print(f"\nTotal Return: {total_return:.2%}")
             
-            print(f"\nTotal Performance:")
-            print(f"  Portfolio: {total_portfolio_return:.2%}")
-            print(f"  Benchmark: {total_benchmark_return:.2%}")
-            print(f"  Outperformance: {total_portfolio_return - total_benchmark_return:.2%}")
+            if first_nav['benchmark_nav'] and last_nav['benchmark_nav']:
+                total_benchmark_return = (last_nav['benchmark_nav'] / first_nav['benchmark_nav']) - 1
+                print(f"Total Benchmark Return: {total_benchmark_return:.2%}")
+                print(f"Outperformance: {total_return - total_benchmark_return:.2%}")
         else:
-            print("No portfolio values found")
+            print("No NAV data found")
         
-        # Get portfolio weights
-        print("\nPortfolio Weights:")
+        # Get portfolios
+        print("\nPortfolios:")
         print("-" * 20)
-        portfolio_weights = db_manager.get_portfolio_weights(backtest_id=latest_backtest_id)
+        portfolios = db_manager.get_portfolios(run_id=latest_run_id)
         
-        if not portfolio_weights.empty:
-            print(f"Found {len(portfolio_weights)} portfolio weight records")
+        if not portfolios.empty:
+            print(f"Found {len(portfolios)} portfolio records")
             
-            # Get unique tickers
-            unique_tickers = portfolio_weights['ticker'].unique()
-            print(f"Unique tickers: {', '.join(sorted(unique_tickers))}")
-            
-            # Show latest weights
-            latest_date = portfolio_weights['date'].max()
-            latest_weights = portfolio_weights[portfolio_weights['date'] == latest_date]
-            
-            print(f"\nLatest Portfolio Weights ({latest_date}):")
-            for _, weight in latest_weights.iterrows():
-                if weight['weight'] > 0:
-                    print(f"  {weight['ticker']}: {weight['weight']:.2%}")
-            
-            # Show weight evolution for top tickers
-            print(f"\nWeight Evolution (Top 5 Tickers):")
-            ticker_weights = portfolio_weights.groupby('ticker')['weight'].sum().sort_values(ascending=False)
-            top_tickers = ticker_weights.head(5).index.tolist()
-            
-            for ticker in top_tickers:
-                ticker_data = portfolio_weights[portfolio_weights['ticker'] == ticker].sort_values('date')
-                if not ticker_data.empty:
-                    first_weight = ticker_data.iloc[0]['weight']
-                    last_weight = ticker_data.iloc[-1]['weight']
-                    print(f"  {ticker}: {first_weight:.2%} → {last_weight:.2%}")
+            # Show recent portfolios
+            recent_portfolios = portfolios.tail(3)
+            for _, portfolio in recent_portfolios.iterrows():
+                print(f"\nPortfolio ({portfolio['asof_date']}):")
+                print(f"  Method: {portfolio['method']}")
+                print(f"  Cash: ${portfolio['cash']:,.2f}")
+                if portfolio['notes']:
+                    print(f"  Notes: {portfolio['notes']}")
         else:
-            print("No portfolio weights found")
+            print("No portfolios found")
         
-        # Get portfolio weights as pivot table
-        print("\nPortfolio Weights Pivot Table:")
-        print("-" * 30)
-        weights_pivot = db_manager.get_portfolio_weights_pivot(latest_backtest_id)
-        
-        if not weights_pivot.empty:
-            print(f"Pivot table shape: {weights_pivot.shape}")
-            print(f"Date range: {weights_pivot.index.min()} to {weights_pivot.index.max()}")
-            print(f"Tickers: {', '.join(weights_pivot.columns.tolist())}")
+        # Get portfolio positions for the most recent portfolio
+        if not portfolios.empty:
+            latest_portfolio = portfolios.iloc[-1]
+            portfolio_id = latest_portfolio.name  # Assuming the index is the portfolio ID
             
-            # Show sample of pivot table
-            print(f"\nSample of pivot table (last 5 dates):")
-            print(weights_pivot.tail().round(4))
+            print(f"\nPortfolio Positions (Portfolio ID: {portfolio_id}):")
+            print("-" * 40)
+            positions = db_manager.get_portfolio_positions(portfolio_id=portfolio_id)
+            
+            if not positions.empty:
+                print(f"Found {len(positions)} position records")
+                
+                # Show positions
+                print(f"\nPositions:")
+                for _, position in positions.iterrows():
+                    if position['weight'] > 0:
+                        print(f"  {position['ticker']}: {position['weight']:.2%} (Price: ${position['price_used']:.2f})")
+            else:
+                print("No positions found")
+        
+        # Get signals raw data
+        print("\nRaw Signals:")
+        print("-" * 20)
+        raw_signals = db_manager.get_signals_raw()
+        
+        if not raw_signals.empty:
+            print(f"Found {len(raw_signals)} raw signal records")
+            
+            # Show unique signal names
+            unique_signals = raw_signals['signal_name'].unique()
+            print(f"Signal types: {', '.join(sorted(unique_signals))}")
+            
+            # Show recent signals
+            recent_signals = raw_signals.tail(5)
+            print(f"\nRecent signals:")
+            for _, signal in recent_signals.iterrows():
+                print(f"  {signal['asof_date']}: {signal['ticker']} - {signal['signal_name']} = {signal['value']:.3f}")
         else:
-            print("No pivot table data available")
+            print("No raw signals found")
+        
+        # Get combined scores
+        print("\nCombined Scores:")
+        print("-" * 20)
+        combined_scores = db_manager.get_scores_combined()
+        
+        if not combined_scores.empty:
+            print(f"Found {len(combined_scores)} combined score records")
+            
+            # Show unique methods
+            unique_methods = combined_scores['method'].unique()
+            print(f"Combination methods: {', '.join(sorted(unique_methods))}")
+            
+            # Show recent scores
+            recent_scores = combined_scores.tail(5)
+            print(f"\nRecent scores:")
+            for _, score in recent_scores.iterrows():
+                print(f"  {score['asof_date']}: {score['ticker']} - {score['method']} = {score['score']:.3f}")
+        else:
+            print("No combined scores found")
         
         db_manager.disconnect()
         print("\nPortfolio data query completed successfully!")

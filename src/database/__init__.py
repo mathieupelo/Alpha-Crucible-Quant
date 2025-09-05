@@ -5,6 +5,6 @@ Provides simplified MySQL database operations using pandas DataFrames.
 """
 
 from .manager import DatabaseManager
-from .models import SignalScore, Portfolio, BacktestResult, SignalDefinition, PortfolioValue, PortfolioWeight
+from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav
 
-__all__ = ['DatabaseManager', 'SignalScore', 'Portfolio', 'BacktestResult', 'SignalDefinition', 'PortfolioValue', 'PortfolioWeight']
+__all__ = ['DatabaseManager', 'SignalRaw', 'ScoreCombined', 'Portfolio', 'PortfolioPosition', 'Backtest', 'BacktestNav']

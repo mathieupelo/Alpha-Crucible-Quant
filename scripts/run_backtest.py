@@ -30,9 +30,9 @@ def main():
     signals = ['RSI', 'SMA', 'MACD']
     signal_weights = {'RSI': 0.33, 'SMA': 0.33, 'MACD': 0.34}
     
-    # Date range (last 2 years)
-    end_date = date.today()
-    start_date = end_date - timedelta(days=730)
+    # Date range (matching signal calculation)
+    start_date = date(2023, 9, 5)
+    end_date = date(2025, 9, 4)
     
     # Backtest configuration
     config = BacktestConfig(

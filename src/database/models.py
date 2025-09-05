@@ -6,112 +6,151 @@ Defines the data structures used throughout the system.
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import pandas as pd
+import json
 
 
 @dataclass
-class SignalScore:
-    """Represents a signal score for a specific ticker and date."""
+class SignalRaw:
+    """Represents raw signal data for a specific ticker and date."""
+    asof_date: date
     ticker: str
-    signal_id: str
-    date: date
+    signal_name: str
+    value: float
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+
+
+@dataclass
+class ScoreCombined:
+    """Represents combined scores derived from raw signals."""
+    asof_date: date
+    ticker: str
     score: float
+    method: str
+    params: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
 
 
 @dataclass
 class Portfolio:
-    """Represents a portfolio with weights and metadata."""
-    portfolio_id: str
-    creation_date: date
-    weights: Dict[str, float]  # ticker -> weight
-    signal_weights: Dict[str, float]  # signal_id -> weight
-    risk_aversion: float
-    max_weight: float
+    """Represents a portfolio with metadata."""
+    run_id: str
+    asof_date: date
+    method: str
+    params: Optional[Dict[str, Any]] = None
+    cash: float = 0.0
+    notes: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
 @dataclass
-class BacktestResult:
-    """Represents the results of a backtest."""
-    backtest_id: str
-    start_date: date
-    end_date: date
-    tickers: List[str]
-    signals: List[str]
-    total_return: float
-    annualized_return: float
-    sharpe_ratio: float
-    max_drawdown: float
-    volatility: float
-    alpha: float
-    information_ratio: float
-    execution_time_seconds: float
-    created_at: Optional[datetime] = None
-
-
-@dataclass
-class SignalDefinition:
-    """Represents a signal definition with parameters."""
-    signal_id: str
-    name: str
-    parameters: Dict[str, any]
-    enabled: bool = True
-    created_at: Optional[datetime] = None
-
-
-@dataclass
-class PortfolioValue:
-    """Represents a portfolio value at a specific date."""
-    portfolio_value_id: str
-    backtest_id: str
-    date: date
-    portfolio_value: float
-    benchmark_value: float
-    portfolio_return: float
-    benchmark_return: float
-    created_at: Optional[datetime] = None
-
-
-@dataclass
-class PortfolioWeight:
-    """Represents a stock weight in a portfolio at a specific date."""
-    portfolio_weight_id: str
-    backtest_id: str
-    date: date
+class PortfolioPosition:
+    """Represents a position within a portfolio."""
+    portfolio_id: int
     ticker: str
     weight: float
+    price_used: float
     created_at: Optional[datetime] = None
+
+
+@dataclass
+class Backtest:
+    """Represents a backtest run configuration."""
+    run_id: str
+    start_date: date
+    end_date: date
+    frequency: str
+    universe: Optional[Dict[str, Any]] = None
+    benchmark: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+
+
+@dataclass
+class BacktestNav:
+    """Represents daily NAV data for a backtest."""
+    run_id: str
+    date: date
+    nav: float
+    benchmark_nav: Optional[float] = None
+    pnl: Optional[float] = None
 
 
 class DataFrameConverter:
     """Utility class to convert between DataFrames and model objects."""
     
     @staticmethod
-    def signal_scores_to_dataframe(scores: List[SignalScore]) -> pd.DataFrame:
-        """Convert list of SignalScore objects to DataFrame."""
+    def signals_raw_to_dataframe(signals: List[SignalRaw]) -> pd.DataFrame:
+        """Convert list of SignalRaw objects to DataFrame."""
+        data = []
+        for signal in signals:
+            data.append({
+                'asof_date': signal.asof_date,
+                'ticker': signal.ticker,
+                'signal_name': signal.signal_name,
+                'value': signal.value,
+                'metadata': json.dumps(signal.metadata) if signal.metadata else None,
+                'created_at': signal.created_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_signals_raw(df: pd.DataFrame) -> List[SignalRaw]:
+        """Convert DataFrame to list of SignalRaw objects."""
+        signals = []
+        for _, row in df.iterrows():
+            metadata = None
+            if row.get('metadata'):
+                try:
+                    metadata = json.loads(row['metadata'])
+                except (json.JSONDecodeError, TypeError):
+                    metadata = None
+            
+            signals.append(SignalRaw(
+                asof_date=row['asof_date'],
+                ticker=row['ticker'],
+                signal_name=row['signal_name'],
+                value=row['value'],
+                metadata=metadata,
+                created_at=row.get('created_at')
+            ))
+        return signals
+    
+    @staticmethod
+    def scores_combined_to_dataframe(scores: List[ScoreCombined]) -> pd.DataFrame:
+        """Convert list of ScoreCombined objects to DataFrame."""
         data = []
         for score in scores:
             data.append({
+                'asof_date': score.asof_date,
                 'ticker': score.ticker,
-                'signal_id': score.signal_id,
-                'date': score.date,
                 'score': score.score,
+                'method': score.method,
+                'params': json.dumps(score.params) if score.params else None,
                 'created_at': score.created_at
             })
         return pd.DataFrame(data)
     
     @staticmethod
-    def dataframe_to_signal_scores(df: pd.DataFrame) -> List[SignalScore]:
-        """Convert DataFrame to list of SignalScore objects."""
+    def dataframe_to_scores_combined(df: pd.DataFrame) -> List[ScoreCombined]:
+        """Convert DataFrame to list of ScoreCombined objects."""
         scores = []
         for _, row in df.iterrows():
-            scores.append(SignalScore(
+            params = None
+            if row.get('params'):
+                try:
+                    params = json.loads(row['params'])
+                except (json.JSONDecodeError, TypeError):
+                    params = None
+            
+            scores.append(ScoreCombined(
+                asof_date=row['asof_date'],
                 ticker=row['ticker'],
-                signal_id=row['signal_id'],
-                date=row['date'],
                 score=row['score'],
+                method=row['method'],
+                params=params,
                 created_at=row.get('created_at')
             ))
         return scores
@@ -122,67 +161,139 @@ class DataFrameConverter:
         data = []
         for portfolio in portfolios:
             data.append({
-                'portfolio_id': portfolio.portfolio_id,
-                'creation_date': portfolio.creation_date,
-                'weights': portfolio.weights,
-                'signal_weights': portfolio.signal_weights,
-                'risk_aversion': portfolio.risk_aversion,
-                'max_weight': portfolio.max_weight,
+                'run_id': portfolio.run_id,
+                'asof_date': portfolio.asof_date,
+                'method': portfolio.method,
+                'params': json.dumps(portfolio.params) if portfolio.params else None,
+                'cash': portfolio.cash,
+                'notes': portfolio.notes,
                 'created_at': portfolio.created_at
             })
         return pd.DataFrame(data)
     
     @staticmethod
-    def backtest_results_to_dataframe(results: List[BacktestResult]) -> pd.DataFrame:
-        """Convert list of BacktestResult objects to DataFrame."""
+    def dataframe_to_portfolios(df: pd.DataFrame) -> List[Portfolio]:
+        """Convert DataFrame to list of Portfolio objects."""
+        portfolios = []
+        for _, row in df.iterrows():
+            params = None
+            if row.get('params'):
+                try:
+                    params = json.loads(row['params'])
+                except (json.JSONDecodeError, TypeError):
+                    params = None
+            
+            portfolios.append(Portfolio(
+                run_id=row['run_id'],
+                asof_date=row['asof_date'],
+                method=row['method'],
+                params=params,
+                cash=row.get('cash', 0.0),
+                notes=row.get('notes'),
+                created_at=row.get('created_at')
+            ))
+        return portfolios
+    
+    @staticmethod
+    def portfolio_positions_to_dataframe(positions: List[PortfolioPosition]) -> pd.DataFrame:
+        """Convert list of PortfolioPosition objects to DataFrame."""
         data = []
-        for result in results:
+        for position in positions:
             data.append({
-                'backtest_id': result.backtest_id,
-                'start_date': result.start_date,
-                'end_date': result.end_date,
-                'tickers': ','.join(result.tickers),
-                'signals': ','.join(result.signals),
-                'total_return': result.total_return,
-                'annualized_return': result.annualized_return,
-                'sharpe_ratio': result.sharpe_ratio,
-                'max_drawdown': result.max_drawdown,
-                'volatility': result.volatility,
-                'alpha': result.alpha,
-                'information_ratio': result.information_ratio,
-                'execution_time_seconds': result.execution_time_seconds,
-                'created_at': result.created_at
+                'portfolio_id': position.portfolio_id,
+                'ticker': position.ticker,
+                'weight': position.weight,
+                'price_used': position.price_used,
+                'created_at': position.created_at
             })
         return pd.DataFrame(data)
     
     @staticmethod
-    def portfolio_values_to_dataframe(values: List[PortfolioValue]) -> pd.DataFrame:
-        """Convert list of PortfolioValue objects to DataFrame."""
+    def dataframe_to_portfolio_positions(df: pd.DataFrame) -> List[PortfolioPosition]:
+        """Convert DataFrame to list of PortfolioPosition objects."""
+        positions = []
+        for _, row in df.iterrows():
+            positions.append(PortfolioPosition(
+                portfolio_id=row['portfolio_id'],
+                ticker=row['ticker'],
+                weight=row['weight'],
+                price_used=row['price_used'],
+                created_at=row.get('created_at')
+            ))
+        return positions
+    
+    @staticmethod
+    def backtests_to_dataframe(backtests: List[Backtest]) -> pd.DataFrame:
+        """Convert list of Backtest objects to DataFrame."""
         data = []
-        for value in values:
+        for backtest in backtests:
             data.append({
-                'portfolio_value_id': value.portfolio_value_id,
-                'backtest_id': value.backtest_id,
-                'date': value.date,
-                'portfolio_value': value.portfolio_value,
-                'benchmark_value': value.benchmark_value,
-                'portfolio_return': value.portfolio_return,
-                'benchmark_return': value.benchmark_return,
-                'created_at': value.created_at
+                'run_id': backtest.run_id,
+                'start_date': backtest.start_date,
+                'end_date': backtest.end_date,
+                'frequency': backtest.frequency,
+                'universe': json.dumps(backtest.universe) if backtest.universe else None,
+                'benchmark': backtest.benchmark,
+                'params': json.dumps(backtest.params) if backtest.params else None,
+                'created_at': backtest.created_at
             })
         return pd.DataFrame(data)
     
     @staticmethod
-    def portfolio_weights_to_dataframe(weights: List[PortfolioWeight]) -> pd.DataFrame:
-        """Convert list of PortfolioWeight objects to DataFrame."""
+    def dataframe_to_backtests(df: pd.DataFrame) -> List[Backtest]:
+        """Convert DataFrame to list of Backtest objects."""
+        backtests = []
+        for _, row in df.iterrows():
+            universe = None
+            if row.get('universe'):
+                try:
+                    universe = json.loads(row['universe'])
+                except (json.JSONDecodeError, TypeError):
+                    universe = None
+            
+            params = None
+            if row.get('params'):
+                try:
+                    params = json.loads(row['params'])
+                except (json.JSONDecodeError, TypeError):
+                    params = None
+            
+            backtests.append(Backtest(
+                run_id=row['run_id'],
+                start_date=row['start_date'],
+                end_date=row['end_date'],
+                frequency=row['frequency'],
+                universe=universe,
+                benchmark=row.get('benchmark'),
+                params=params,
+                created_at=row.get('created_at')
+            ))
+        return backtests
+    
+    @staticmethod
+    def backtest_nav_to_dataframe(nav_data: List[BacktestNav]) -> pd.DataFrame:
+        """Convert list of BacktestNav objects to DataFrame."""
         data = []
-        for weight in weights:
+        for nav in nav_data:
             data.append({
-                'portfolio_weight_id': weight.portfolio_weight_id,
-                'backtest_id': weight.backtest_id,
-                'date': weight.date,
-                'ticker': weight.ticker,
-                'weight': weight.weight,
-                'created_at': weight.created_at
+                'run_id': nav.run_id,
+                'date': nav.date,
+                'nav': nav.nav,
+                'benchmark_nav': nav.benchmark_nav,
+                'pnl': nav.pnl
             })
         return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_backtest_nav(df: pd.DataFrame) -> List[BacktestNav]:
+        """Convert DataFrame to list of BacktestNav objects."""
+        nav_data = []
+        for _, row in df.iterrows():
+            nav_data.append(BacktestNav(
+                run_id=row['run_id'],
+                date=row['date'],
+                nav=row['nav'],
+                benchmark_nav=row.get('benchmark_nav'),
+                pnl=row.get('pnl')
+            ))
+        return nav_data

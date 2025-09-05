@@ -17,7 +17,7 @@ from .models import BacktestResult
 from .plotting import create_backtest_summary_plots
 from signals import SignalCalculator
 from solver import PortfolioSolver, SolverConfig
-from database import DatabaseManager, PortfolioValue, PortfolioWeight
+from database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
 from utils import PriceFetcher, DateUtils
 
 logger = logging.getLogger(__name__)
@@ -65,8 +65,38 @@ class BacktestEngine:
         logger.info(f"Starting backtest for {len(tickers)} tickers, {len(signals)} signals from {config.start_date} to {config.end_date}")
         
         try:
+            # Generate unique run_id
+            run_id = f"backtest_{int(time.time())}_{config.start_date}_{config.end_date}"
+            
+            # Store backtest configuration
+            backtest_config = Backtest(
+                run_id=run_id,
+                start_date=config.start_date,
+                end_date=config.end_date,
+                frequency=config.rebalancing_frequency,
+                universe={'tickers': tickers, 'signals': signals},
+                benchmark=config.benchmark_ticker,
+                params={
+                    'initial_capital': config.initial_capital,
+                    'risk_aversion': config.risk_aversion,
+                    'max_weight': config.max_weight,
+                    'min_weight': config.min_weight,
+                    'transaction_costs': config.transaction_costs,
+                    'signal_weights': config.signal_weights
+                },
+                created_at=datetime.now()
+            )
+            
+            # Store backtest configuration in database
+            try:
+                self.database_manager.store_backtest(backtest_config)
+                logger.info(f"Stored backtest configuration with run_id: {run_id}")
+            except Exception as e:
+                logger.error(f"Error storing backtest configuration: {e}")
+            
             # Initialize result
             result = BacktestResult(
+                backtest_id=run_id,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 tickers=tickers,
@@ -88,7 +118,7 @@ class BacktestEngine:
                 logger.error("Failed to get price data")
                 return result
             
-            # Get signal scores
+            # Get signal scores (combined scores)
             signal_scores = self._get_signal_scores(tickers, signals, config)
             if signal_scores.empty:
                 logger.error("Failed to get signal scores")
@@ -113,16 +143,13 @@ class BacktestEngine:
             result.avg_num_positions = self._calculate_avg_num_positions(weights_history)
             result.max_concentration = self._calculate_max_concentration(weights_history)
             
-            # Store in database
+            # Store portfolio data in database
             try:
-                self.database_manager.store_backtest_result(result)
-                logger.info("Stored backtest result in database")
-                
                 # Store portfolio values and weights
                 self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history)
                 logger.info("Stored portfolio data in database")
             except Exception as e:
-                logger.error(f"Error storing backtest result: {e}")
+                logger.error(f"Error storing portfolio data: {e}")
             
             # Calculate execution time
             result.execution_time_seconds = time.time() - start_time
@@ -195,18 +222,38 @@ class BacktestEngine:
             # Extend start date to get enough lookback data
             extended_start = config.start_date - timedelta(days=config.max_lookback_days)
             
-            signal_scores = self.signal_calculator.get_signal_scores_pivot(
-                tickers, signals, extended_start, config.end_date, 
+            # First try to get combined scores
+            signal_scores = self.signal_calculator.get_scores_combined_pivot(
+                tickers, ['equal_weight'], extended_start, config.end_date, 
                 forward_fill=config.forward_fill_signals
             )
             
             if signal_scores.empty:
-                logger.warning("No signal scores found, calculating them...")
-                signal_scores = self.signal_calculator.calculate_signals(
+                logger.warning("No combined scores found, calculating raw signals and combining...")
+                
+                # Calculate raw signals
+                raw_signals = self.signal_calculator.calculate_signals(
                     tickers, signals, extended_start, config.end_date
                 )
+                
+                if not raw_signals.empty:
+                    # Combine signals into scores
+                    signal_scores = self.signal_calculator.combine_signals_to_scores(
+                        tickers, signals, extended_start, config.end_date,
+                        method='equal_weight',
+                        store_in_db=True
+                    )
+                    
+                    # Convert to pivot format
+                    if not signal_scores.empty:
+                        signal_scores = signal_scores.pivot_table(
+                            index='asof_date',
+                            columns='ticker',
+                            values='score',
+                            aggfunc='first'
+                        )
             
-            logger.info(f"Retrieved signal scores for {len(signal_scores.columns)} ticker-signal combinations")
+            logger.info(f"Retrieved signal scores for {len(signal_scores.columns)} tickers")
             return signal_scores
             
         except Exception as e:
@@ -364,19 +411,21 @@ class BacktestEngine:
             else:
                 date_scores = signal_scores.loc[current_date]
             
-            # Combine signals
+            # Use combined scores directly (already combined from database)
             combined_scores = {}
             for ticker in tickers:
-                ticker_scores = []
-                for signal in signals:
-                    if (ticker, signal) in date_scores.index:
-                        score = date_scores[(ticker, signal)]
+                try:
+                    if ticker in date_scores.index:
+                        score = date_scores[ticker]
                         if not pd.isna(score):
-                            signal_weight = (config.signal_weights or {}).get(signal, 1.0/len(signals))
-                            ticker_scores.append(score * signal_weight)
-                
-                if ticker_scores:
-                    combined_scores[ticker] = np.mean(ticker_scores)
+                            combined_scores[ticker] = float(score)
+                        else:
+                            combined_scores[ticker] = 0.0
+                    else:
+                        combined_scores[ticker] = 0.0
+                except Exception as e:
+                    logger.warning(f"Error getting score for {ticker}: {e}")
+                    combined_scores[ticker] = 0.0
             
             if not combined_scores:
                 logger.warning(f"No valid signal scores for {current_date}")
@@ -590,10 +639,10 @@ class BacktestEngine:
     
     def _store_portfolio_data(self, result: BacktestResult, portfolio_values: pd.Series, 
                             benchmark_values: pd.Series, weights_history: pd.DataFrame):
-        """Store portfolio values and weights in the database."""
+        """Store portfolio data in the database."""
         try:
-            # Store portfolio values
-            portfolio_value_objects = []
+            # Store backtest NAV data
+            nav_objects = []
             for date, portfolio_value in portfolio_values.items():
                 if pd.isna(portfolio_value):
                     continue
@@ -602,61 +651,73 @@ class BacktestEngine:
                 if pd.isna(benchmark_value):
                     benchmark_value = 0.0
                 
-                # Calculate returns
-                portfolio_return = 0.0
-                benchmark_return = 0.0
-                
+                # Calculate PnL
+                pnl = 0.0
                 if len(portfolio_values) > 1:
                     prev_date = portfolio_values.index[portfolio_values.index < date]
                     if len(prev_date) > 0:
                         prev_date = prev_date[-1]
                         prev_portfolio_value = portfolio_values.get(prev_date, portfolio_value)
-                        prev_benchmark_value = benchmark_values.get(prev_date, benchmark_value)
-                        
                         if prev_portfolio_value > 0:
-                            portfolio_return = (portfolio_value - prev_portfolio_value) / prev_portfolio_value
-                        if prev_benchmark_value > 0:
-                            benchmark_return = (benchmark_value - prev_benchmark_value) / prev_benchmark_value
+                            pnl = portfolio_value - prev_portfolio_value
                 
-                portfolio_value_obj = PortfolioValue(
-                    portfolio_value_id=str(uuid.uuid4()),
-                    backtest_id=result.backtest_id,
+                nav_obj = BacktestNav(
+                    run_id=result.backtest_id,
                     date=date,
-                    portfolio_value=float(portfolio_value),
-                    benchmark_value=float(benchmark_value),
-                    portfolio_return=float(portfolio_return),
-                    benchmark_return=float(benchmark_return),
-                    created_at=datetime.now()
+                    nav=float(portfolio_value),
+                    benchmark_nav=float(benchmark_value) if benchmark_value > 0 else None,
+                    pnl=float(pnl)
                 )
-                portfolio_value_objects.append(portfolio_value_obj)
+                nav_objects.append(nav_obj)
             
-            if portfolio_value_objects:
-                self.database_manager.store_portfolio_values(portfolio_value_objects)
-                logger.info(f"Stored {len(portfolio_value_objects)} portfolio value records")
+            if nav_objects:
+                self.database_manager.store_backtest_nav(nav_objects)
+                logger.info(f"Stored {len(nav_objects)} NAV records")
             
-            # Store portfolio weights
-            portfolio_weight_objects = []
+            # Store portfolios and positions
             for date, weights_row in weights_history.iterrows():
                 if weights_row.isna().all():
                     continue
-                    
+                
+                # Create portfolio
+                portfolio = Portfolio(
+                    run_id=result.backtest_id,
+                    asof_date=date,
+                    method='optimization',
+                    params={'risk_aversion': result.signal_weights},
+                    cash=0.0,  # Assuming no cash for now
+                    notes=f'Portfolio for {date}',
+                    created_at=datetime.now()
+                )
+                
+                # Store portfolio and get ID
+                portfolio_id = self.database_manager.store_portfolio(portfolio)
+                
+                # Store portfolio positions
+                positions = []
                 for ticker, weight in weights_row.items():
                     if pd.isna(weight) or weight == 0:
                         continue
                     
-                    portfolio_weight_obj = PortfolioWeight(
-                        portfolio_weight_id=str(uuid.uuid4()),
-                        backtest_id=result.backtest_id,
-                        date=date,
+                    # Get price used (simplified - using last available price)
+                    try:
+                        price_data = self.price_fetcher.get_price_history(ticker, date, date)
+                        price_used = price_data.iloc[-1]['Close'] if not price_data.empty else 0.0
+                    except:
+                        price_used = 0.0
+                    
+                    position = PortfolioPosition(
+                        portfolio_id=portfolio_id,
                         ticker=ticker,
                         weight=float(weight),
+                        price_used=float(price_used),
                         created_at=datetime.now()
                     )
-                    portfolio_weight_objects.append(portfolio_weight_obj)
-            
-            if portfolio_weight_objects:
-                self.database_manager.store_portfolio_weights(portfolio_weight_objects)
-                logger.info(f"Stored {len(portfolio_weight_objects)} portfolio weight records")
+                    positions.append(position)
+                
+                if positions:
+                    self.database_manager.store_portfolio_positions(positions)
+                    logger.info(f"Stored {len(positions)} positions for portfolio {portfolio_id}")
                 
         except Exception as e:
             logger.error(f"Error storing portfolio data: {e}")

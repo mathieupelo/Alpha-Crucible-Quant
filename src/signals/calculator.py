@@ -589,3 +589,96 @@ class SignalCalculator:
             } for signal in all_signals])
         else:
             return pd.DataFrame()
+    
+    def _enforce_signal_range(self, signal_value: float, min_range: float = -1.0, max_range: float = 1.0) -> float:
+        """
+        Enforce signal values to be within the specified range [-1, 1].
+        
+        Args:
+            signal_value: Raw signal value
+            min_range: Minimum allowed value (default: -1.0)
+            max_range: Maximum allowed value (default: 1.0)
+            
+        Returns:
+            Signal value clamped to the specified range
+        """
+        if np.isnan(signal_value) or np.isinf(signal_value):
+            logger.warning(f"Invalid signal value: {signal_value}, returning 0.0")
+            return 0.0
+        
+        # Clamp to range
+        clamped_value = np.clip(signal_value, min_range, max_range)
+        
+        if clamped_value != signal_value:
+            logger.debug(f"Signal value {signal_value} clamped to {clamped_value} (range: [{min_range}, {max_range}])")
+        
+        return float(clamped_value)
+    
+    def validate_signals_complete(self, tickers: List[str], signal_names: List[str], 
+                                target_date: date) -> Tuple[bool, List[str]]:
+        """
+        Validate that all required signals exist for all tickers on a given date.
+        
+        Args:
+            tickers: List of stock ticker symbols
+            signal_names: List of signal names to validate
+            target_date: Date to validate
+            
+        Returns:
+            Tuple of (is_complete, missing_signals_list)
+        """
+        try:
+            # Get existing signals for the target date
+            existing_signals = self.get_signals_raw(tickers, signal_names, target_date, target_date)
+            
+            if existing_signals.empty:
+                missing_signals = [f"{ticker}_{signal}" for ticker in tickers for signal in signal_names]
+                return False, missing_signals
+            
+            # Check for missing combinations
+            required_combinations = {(ticker, signal) for ticker in tickers for signal in signal_names}
+            existing_combinations = set(zip(existing_signals['ticker'], existing_signals['signal_name']))
+            missing_combinations = required_combinations - existing_combinations
+            
+            missing_signals = [f"{ticker}_{signal}" for ticker, signal in missing_combinations]
+            is_complete = len(missing_combinations) == 0
+            
+            if not is_complete:
+                logger.warning(f"Missing {len(missing_combinations)} signal combinations on {target_date}: {missing_signals}")
+            
+            return is_complete, missing_signals
+            
+        except Exception as e:
+            logger.error(f"Error validating signal completeness: {e}")
+            return False, [f"validation_error_{i}" for i in range(len(tickers) * len(signal_names))]
+    
+    def calculate_and_enforce_signals(self, tickers: List[str], signals: List[str], 
+                                     start_date: date, end_date: date,
+                                     store_in_db: bool = True) -> pd.DataFrame:
+        """
+        Calculate signals with automatic range enforcement (-1 to 1).
+        
+        Args:
+            tickers: List of stock ticker symbols
+            signals: List of signal IDs to calculate
+            start_date: Start date for calculation
+            end_date: End date for calculation
+            store_in_db: Whether to store results in database
+            
+        Returns:
+            DataFrame with signal scores clamped to [-1, 1] range
+        """
+        logger.info(f"Calculating signals with range enforcement for {len(tickers)} tickers, {len(signals)} signals from {start_date} to {end_date}")
+        
+        # Calculate signals normally
+        signals_df = self.calculate_signals(tickers, signals, start_date, end_date, store_in_db)
+        
+        if signals_df.empty:
+            return signals_df
+        
+        # Apply range enforcement to all signal values
+        signals_df['value'] = signals_df['value'].apply(lambda x: self._enforce_signal_range(x))
+        
+        logger.info(f"Applied range enforcement to {len(signals_df)} signal values")
+        
+        return signals_df

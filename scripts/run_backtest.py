@@ -78,6 +78,7 @@ def main():
         benchmark_ticker='SPY',
         use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark
         signal_weights=signal_weights,
+        signal_combination_method='equal_weight',  # Method for combining signals
         forward_fill_signals=True  # Use latest available signal scores when missing
     )
     
@@ -97,7 +98,7 @@ def main():
         print("Initializing components...")
         price_fetcher = PriceFetcher()  # This now uses the enhanced real-time fetcher
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher, database_manager)
+        signal_calculator = SignalCalculator(database_manager)
         backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
         
         # Test data fetching and validation

@@ -58,6 +58,9 @@ class BacktestConfig:
     signal_weights: Optional[dict] = None
     """Weights for combining signals (optional)"""
     
+    signal_combination_method: str = 'equal_weight'
+    """Method for combining signals ('equal_weight', 'weighted', 'zscore') (default: equal_weight)"""
+    
     forward_fill_signals: bool = True
     """Whether to forward fill missing signal scores with latest available values (default: True)"""
     
@@ -94,6 +97,11 @@ class BacktestConfig:
         
         if self.evaluation_period not in valid_frequencies:
             raise ValueError(f"Evaluation period must be one of {valid_frequencies}")
+        
+        # Validate signal combination method
+        valid_methods = ['equal_weight', 'weighted', 'zscore']
+        if self.signal_combination_method not in valid_methods:
+            raise ValueError(f"Signal combination method must be one of {valid_methods}")
     
     def get_rebalancing_interval(self) -> timedelta:
         """
@@ -148,6 +156,7 @@ class BacktestConfig:
             'use_equal_weight_benchmark': self.use_equal_weight_benchmark,
             'min_lookback_days': self.min_lookback_days,
             'max_lookback_days': self.max_lookback_days,
+            'signal_combination_method': self.signal_combination_method,
             'forward_fill_signals': self.forward_fill_signals
         }
     

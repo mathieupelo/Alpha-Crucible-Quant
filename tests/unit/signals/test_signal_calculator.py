@@ -27,7 +27,7 @@ class TestSignalCalculator:
         """Setup test data and calculator."""
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.calculator = SignalCalculator(self.price_fetcher, self.database_manager)
+        self.calculator = SignalCalculator(self.database_manager)
         
         # Create comprehensive test data
         self.dates = pd.date_range(start='2023-12-01', end='2024-01-31', freq='D')
@@ -62,9 +62,9 @@ class TestSignalCalculator:
     
     def test_calculator_initialization_custom(self):
         """Test calculator initialization with custom parameters."""
-        calculator = SignalCalculator(self.price_fetcher, self.database_manager)
+        calculator = SignalCalculator(self.database_manager)
         
-        assert calculator.price_fetcher == self.price_fetcher
+        # price_fetcher no longer exists in SignalCalculator
         assert calculator.database_manager == self.database_manager
         assert calculator.registry is not None
     
@@ -440,8 +440,10 @@ class TestSignalCalculator:
         raw_signals_data = pd.DataFrame([
             {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
             {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'MACD', 'value': 0.1},
             {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.2},
             {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.4},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'MACD', 'value': 0.6},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data

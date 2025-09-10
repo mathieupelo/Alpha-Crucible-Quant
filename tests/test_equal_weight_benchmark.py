@@ -46,7 +46,7 @@ def test_equal_weight_benchmark():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher, database_manager)
+        signal_calculator = SignalCalculator(database_manager)
         backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
         
         # Test 1: Equal-weight benchmark

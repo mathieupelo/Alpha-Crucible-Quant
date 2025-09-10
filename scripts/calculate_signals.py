@@ -30,6 +30,7 @@ def main():
     # Date range (last 2 years to match backtest)
     end_date = date.today()
     start_date = end_date - timedelta(days=730)
+    start_date = date(2020, 1, 1)
     
     print(f"Tickers: {', '.join(tickers)}")
     print(f"Signals: {', '.join(signals)}")
@@ -37,10 +38,10 @@ def main():
     print()
     
     try:
-        # Initialize components (no price fetcher needed for SENTIMENT signals)
+        # Initialize components
         print("Initializing components...")
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher=None, database_manager=database_manager)
+        signal_calculator = SignalCalculator(database_manager=database_manager)
         
         # Calculate raw signals
         print("Calculating raw signals...")
@@ -90,36 +91,8 @@ def main():
                 print(f"  Max: {values.max():.3f}")
         
         print()
-        
-        # Combine signals into scores
-        print("COMBINING SIGNALS INTO SCORES...")
-        combined_scores = signal_calculator.combine_signals_to_scores(
-            tickers=tickers,
-            signal_names=signals,
-            start_date=start_date,
-            end_date=end_date,
-            method='equal_weight',
-            store_in_db=True
-        )
-        
-        if not combined_scores.empty:
-            print(f"Combined {len(combined_scores)} scores")
-            
-            # Show sample combined scores
-            print("\nSAMPLE COMBINED SCORES:")
-            print("-" * 50)
-            for ticker in tickers:
-                ticker_scores = combined_scores[combined_scores['ticker'] == ticker]
-                if not ticker_scores.empty:
-                    print(f"\n{ticker}:")
-                    recent_scores = ticker_scores.sort_values('asof_date').tail(3)
-                    for _, row in recent_scores.iterrows():
-                        print(f"  {row['asof_date']}: score = {row['score']:.3f}")
-        else:
-            print("No combined scores calculated")
-        
-        print()
         print("Signal calculation completed successfully!")
+        print("Note: Signal combination will be handled during portfolio creation.")
         
     except Exception as e:
         print(f"Error calculating signals: {e}")

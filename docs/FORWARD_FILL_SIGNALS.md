@@ -54,7 +54,7 @@ signal_scores = db_manager.get_signal_scores_dataframe(
 ```python
 from signals import SignalCalculator
 
-signal_calculator = SignalCalculator(price_fetcher, db_manager)
+signal_calculator = SignalCalculator(db_manager)
 
 # Get signal scores with forward fill
 signal_scores = signal_calculator.get_signal_scores_pivot(

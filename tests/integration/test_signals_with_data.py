@@ -60,7 +60,7 @@ def test_signal_calculator():
     
     # Initialize signal calculator
     data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator(price_fetcher=data_fetcher)
+    signal_calculator = SignalCalculator()
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
@@ -136,7 +136,7 @@ def test_signal_combination():
     
     # Initialize signal calculator
     data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator(price_fetcher=data_fetcher)
+    signal_calculator = SignalCalculator()
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']

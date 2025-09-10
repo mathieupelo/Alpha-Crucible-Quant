@@ -266,7 +266,7 @@ class TestSignalCalculator:
         """Setup test calculator."""
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.calculator = SignalCalculator(self.price_fetcher, self.database_manager)
+        self.calculator = SignalCalculator(self.database_manager)
         
         # Mock price data
         dates = pd.date_range(start='2023-12-01', end='2024-01-15', freq='D')

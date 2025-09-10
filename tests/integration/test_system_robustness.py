@@ -49,7 +49,7 @@ class TestSystemRobustness:
         # Setup components
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.signal_calculator = SignalCalculator(self.price_fetcher, self.database_manager)
+        self.signal_calculator = SignalCalculator(self.database_manager)
         self.portfolio_solver = PortfolioSolver()
         self.backtest_engine = BacktestEngine()
         

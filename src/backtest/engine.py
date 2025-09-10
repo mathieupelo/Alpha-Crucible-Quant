@@ -63,7 +63,7 @@ class BacktestEngine:
             trading_calendar: Trading calendar instance (optional)
         """
         self.price_fetcher = price_fetcher or PriceFetcher()
-        self.signal_calculator = signal_calculator or SignalCalculator(self.price_fetcher)
+        self.signal_calculator = signal_calculator or SignalCalculator()
         self.database_manager = database_manager or DatabaseManager()
         self.portfolio_service = portfolio_service or PortfolioService(
             signal_calculator=self.signal_calculator,
@@ -119,10 +119,21 @@ class BacktestEngine:
             portfolios_created = []
             for rebal_date in rebalancing_dates:
                 try:
-                    portfolio_result = self.portfolio_service.create_portfolio(
-                        tickers, signals, rebal_date, 
-                        method='equal_weight', method_params=None,
-                        run_id=run_id
+                    # Get combined scores for this date
+                    date_scores = signal_scores[signal_scores.index == rebal_date]
+                    if date_scores.empty:
+                        logger.warning(f"No signal scores available for {rebal_date}")
+                        continue
+                    
+                    # Convert to the format expected by portfolio service
+                    combined_scores_df = pd.DataFrame({
+                        'asof_date': rebal_date,
+                        'ticker': date_scores.columns,
+                        'score': date_scores.iloc[0].values
+                    })
+                    
+                    portfolio_result = self.portfolio_service.create_portfolio_from_scores(
+                        combined_scores_df, tickers, rebal_date, run_id=run_id
                     )
                     portfolios_created.append(portfolio_result)
                     logger.info(f"Created portfolio for {rebal_date}")
@@ -250,10 +261,10 @@ class BacktestEngine:
                 logger.warning("No signals calculated")
                 return pd.DataFrame()
             
-            # Combine signals into scores
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
-                tickers, signals, config.start_date, config.end_date,
-                method='equal_weight', store_in_db=True
+            # Combine signals into scores using configured method
+            logger.info(f"Combining signals using method: {config.signal_combination_method}")
+            combined_scores = self._combine_signals_to_scores(
+                signals_df, tickers, signals, config
             )
             
             if combined_scores.empty:
@@ -656,11 +667,9 @@ class BacktestEngine:
                     logger.info(f"Calculated {len(raw_signals)} raw signals")
                     
                     # Combine signals into scores
-                    logger.info("Combining signals into scores...")
-                    signal_scores = self.signal_calculator.combine_signals_to_scores(
-                        tickers, signals, extended_start, config.end_date,
-                        method='equal_weight',
-                        store_in_db=True
+                    logger.info(f"Combining signals using method: {config.signal_combination_method}")
+                    signal_scores = self._combine_signals_to_scores(
+                        raw_signals, tickers, signals, config
                     )
                     
                     if not signal_scores.empty:
@@ -714,10 +723,8 @@ class BacktestEngine:
                                 
                                 if not raw_signals.empty:
                                     # Combine signals for this date
-                                    combined_scores = self.signal_calculator.combine_signals_to_scores(
-                                        tickers, signals, extended_start, missing_date + timedelta(days=1),
-                                        method='equal_weight',
-                                        store_in_db=True
+                                    combined_scores = self._combine_signals_to_scores(
+                                        raw_signals, tickers, signals, config
                                     )
                                     
                                     if not combined_scores.empty:
@@ -1322,3 +1329,84 @@ class BacktestEngine:
             plt.show()
         
         return figures
+    
+    def _combine_signals_to_scores(self, raw_signals: pd.DataFrame, tickers: List[str], 
+                                  signals: List[str], config: BacktestConfig) -> pd.DataFrame:
+        """
+        Combine raw signals into scores using the configured method.
+        
+        Args:
+            raw_signals: DataFrame with raw signal values
+            tickers: List of stock ticker symbols
+            signals: List of signal IDs
+            config: Backtesting configuration
+            
+        Returns:
+            DataFrame with combined scores
+        """
+        try:
+            combined_scores = []
+            
+            for ticker in tickers:
+                ticker_signals = raw_signals[raw_signals['ticker'] == ticker]
+                
+                for asof_date in ticker_signals['asof_date'].unique():
+                    date_signals = ticker_signals[ticker_signals['asof_date'] == asof_date]
+                    
+                    if date_signals.empty:
+                        continue
+                    
+                    # Apply combination method
+                    if config.signal_combination_method == 'equal_weight':
+                        # Only calculate mean if we have all required signals
+                        available_signals = set(date_signals['signal_name'].unique())
+                        required_signals = set(signals)
+                        
+                        if available_signals == required_signals:
+                            combined_score = date_signals['value'].mean()
+                        else:
+                            logger.warning(f"Missing signals for {ticker} on {asof_date}. "
+                                         f"Available: {available_signals}, Required: {required_signals}")
+                            continue
+                            
+                    elif config.signal_combination_method == 'weighted':
+                        weights = config.signal_weights or {}
+                        total_weight = 0
+                        weighted_sum = 0
+                        for _, row in date_signals.iterrows():
+                            weight = weights.get(row['signal_name'], 1.0)
+                            weighted_sum += row['value'] * weight
+                            total_weight += weight
+                        combined_score = weighted_sum / total_weight if total_weight > 0 else 0
+                        
+                    elif config.signal_combination_method == 'zscore':
+                        # Z-score normalization
+                        values = date_signals['value'].values
+                        if len(values) > 1:
+                            mean_val = np.mean(values)
+                            std_val = np.std(values)
+                            combined_score = (values - mean_val) / std_val if std_val > 0 else 0
+                        else:
+                            combined_score = values[0] if len(values) == 1 else 0
+                    else:
+                        logger.warning(f"Unknown combination method: {config.signal_combination_method}")
+                        continue
+                    
+                    if not np.isnan(combined_score):
+                        combined_scores.append({
+                            'asof_date': asof_date,
+                            'ticker': ticker,
+                            'score': combined_score,
+                            'method': config.signal_combination_method,
+                            'params': config.signal_weights
+                        })
+            
+            if combined_scores:
+                return pd.DataFrame(combined_scores)
+            else:
+                logger.warning("No combined scores calculated")
+                return pd.DataFrame()
+                
+        except Exception as e:
+            logger.error(f"Error combining signals: {e}")
+            return pd.DataFrame()

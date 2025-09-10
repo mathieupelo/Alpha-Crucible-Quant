@@ -58,27 +58,24 @@ class PortfolioService:
         self.trading_calendar = trading_calendar or TradingCalendar()
     
     @handle_calculation_errors
-    def create_portfolio(self, tickers: List[str], signals: List[str], 
-                        inference_date: date, method: str = 'equal_weight',
-                        method_params: Optional[Dict[str, Any]] = None,
-                        run_id: Optional[str] = None) -> Dict[str, Any]:
+    def create_portfolio_from_scores(self, combined_scores: pd.DataFrame, 
+                                   tickers: List[str], inference_date: date,
+                                   run_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Create a single portfolio for inference on a specific date.
+        Create a single portfolio for inference on a specific date using pre-combined scores.
         
         Args:
+            combined_scores: DataFrame with combined signal scores
             tickers: List of stock ticker symbols
-            signals: List of signal names to use
             inference_date: Date to create portfolio for
-            method: Method to combine signals ('equal_weight', 'weighted', 'zscore')
-            method_params: Parameters for the combination method
             run_id: Optional run ID to associate with the portfolio
             
         Returns:
             Dictionary containing portfolio information and status
             
         Raises:
-            ValueError: If validation fails or signals are missing
-            RuntimeError: If portfolio creation fails
+            ValueError: If required data is missing
+            RuntimeError: If portfolio optimization fails
         """
         logger.info(f"Creating portfolio for {len(tickers)} tickers on {inference_date}")
         
@@ -88,47 +85,33 @@ class PortfolioService:
             logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # Step 1: Fetch all signal scores for the inference date
-        logger.info(f"Fetching signal scores for {len(signals)} signals on {inference_date}")
-        signal_scores_df = self.signal_calculator.get_signals_raw(
-            tickers, signals, inference_date, inference_date
-        )
+        # Step 1: Validate inputs
+        if not tickers:
+            raise ValueError("Tickers list cannot be empty")
         
-        # Step 2: Validate signal completeness
-        is_complete, missing_signals = self.signal_calculator.validate_signals_complete(
-            tickers, signals, inference_date
-        )
-        
-        if not is_complete:
-            error_msg = f"Missing signals for {len(missing_signals)} combinations on {inference_date}: {missing_signals}"
+        if combined_scores.empty:
+            error_msg = f"No combined scores provided for {inference_date}"
             logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # Step 3: Combine the scores
-        logger.info(f"Combining scores using method: {method}")
-        combined_scores_df = self.signal_calculator.combine_signals_to_scores(
-            tickers, signals, inference_date, inference_date, method, method_params, store_in_db=True
-        )
-        
-        if combined_scores_df.empty:
-            error_msg = f"No combined scores generated for {inference_date}"
+        # Step 2: Filter scores for the inference date
+        date_scores = combined_scores[combined_scores['asof_date'] == inference_date]
+        if date_scores.empty:
+            error_msg = f"No scores available for {inference_date}"
             logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            raise ValueError(error_msg)
         
-        # Step 4: Insert combined scores into database (already done in combine_signals_to_scores)
-        logger.info(f"Combined scores stored in database for {inference_date}")
-        
-        # Step 5: Solve the portfolio
+        # Step 3: Solve the portfolio
         logger.info("Solving portfolio optimization")
-        portfolio_weights = self._solve_portfolio(combined_scores_df, tickers, inference_date)
+        portfolio_weights = self._solve_portfolio(date_scores, tickers, inference_date)
         
         if portfolio_weights is None:
             error_msg = f"Portfolio optimization failed for {inference_date}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
         
-        # Step 6: Insert the solved portfolio in the database
-        portfolio_id = self._store_portfolio(tickers, portfolio_weights, inference_date, method, method_params, run_id)
+        # Step 4: Insert the solved portfolio in the database
+        portfolio_id = self._store_portfolio(tickers, portfolio_weights, inference_date, 'combined_scores', None, run_id)
         
         logger.info(f"Portfolio created successfully with ID: {portfolio_id}")
         
@@ -136,9 +119,8 @@ class PortfolioService:
             'portfolio_id': portfolio_id,
             'inference_date': inference_date,
             'tickers': tickers,
-            'signals': signals,
-            'method': method,
-            'method_params': method_params,
+            'method': 'combined_scores',
+            'method_params': None,
             'weights': dict(zip(tickers, portfolio_weights)),
             'status': 'success'
         }

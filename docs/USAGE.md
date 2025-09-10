@@ -120,7 +120,7 @@ from src.utils import PriceFetcher
 # Initialize components
 price_fetcher = PriceFetcher()
 database_manager = DatabaseManager()
-calculator = SignalCalculator(price_fetcher, database_manager)
+calculator = SignalCalculator(database_manager)
 
 # Calculate signals
 tickers = ['AAPL', 'MSFT', 'GOOGL']

@@ -121,7 +121,7 @@ def main():
         rebalancing_frequency='monthly',
         evaluation_period='monthly',
         transaction_costs=0.001,
-        max_weight=0.3,
+        max_weight=0.4,
         risk_aversion=1.0,
         benchmark_ticker='SPY',
         use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark

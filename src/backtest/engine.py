@@ -139,7 +139,8 @@ class BacktestEngine:
                     })
                     
                     portfolio_result = self.portfolio_service.create_portfolio_from_scores(
-                        combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id
+                        combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id,
+                        max_weight=config.max_weight
                     )
                     portfolios_created.append(portfolio_result)
                     logger.info(f"Created portfolio for {rebal_date}")

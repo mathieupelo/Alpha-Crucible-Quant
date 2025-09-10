@@ -63,7 +63,8 @@ class PortfolioService:
     @handle_calculation_errors
     def create_portfolio_from_scores(self, combined_scores: pd.DataFrame, 
                                    tickers: List[str], inference_date: date,
-                                   universe_id: int, run_id: Optional[str] = None) -> Dict[str, Any]:
+                                   universe_id: int, run_id: Optional[str] = None,
+                                   max_weight: Optional[float] = None) -> Dict[str, Any]:
         """
         Create a single portfolio for inference on a specific date using pre-combined scores.
         
@@ -71,7 +72,9 @@ class PortfolioService:
             combined_scores: DataFrame with combined signal scores
             tickers: List of stock ticker symbols
             inference_date: Date to create portfolio for
+            universe_id: ID of the universe
             run_id: Optional run ID to associate with the portfolio
+            max_weight: Optional maximum weight for any single stock (default: 0.3)
             
         Returns:
             Dictionary containing portfolio information and status
@@ -106,7 +109,7 @@ class PortfolioService:
         
         # Step 3: Solve the portfolio
         logger.info("Solving portfolio optimization")
-        portfolio_weights = self._solve_portfolio(date_scores, tickers, inference_date)
+        portfolio_weights = self._solve_portfolio(date_scores, tickers, inference_date, max_weight)
         
         if portfolio_weights is None:
             error_msg = f"Portfolio optimization failed for {inference_date}"
@@ -128,7 +131,7 @@ class PortfolioService:
             'status': 'success'
         }
     
-    def _solve_portfolio(self, combined_scores_df: pd.DataFrame, tickers: List[str], inference_date: date) -> Optional[np.ndarray]:
+    def _solve_portfolio(self, combined_scores_df: pd.DataFrame, tickers: List[str], inference_date: date, max_weight: Optional[float] = None) -> Optional[np.ndarray]:
         """
         Solve portfolio optimization using combined scores.
         
@@ -136,6 +139,7 @@ class PortfolioService:
             combined_scores_df: DataFrame with combined scores
             tickers: List of ticker symbols
             inference_date: Date for portfolio creation
+            max_weight: Optional maximum weight for any single stock (default: 0.3)
             
         Returns:
             Array of portfolio weights or None if optimization fails
@@ -153,9 +157,11 @@ class PortfolioService:
             from solver.config import SolverConfig
             
             # Configure solver for score-based allocation
+            # Use provided max_weight or default to 0.3
+            effective_max_weight = max_weight if max_weight is not None else 0.3
             solver_config = SolverConfig(
                 allocation_method="score_based",
-                max_weight=0.3,  # Allow up to 20% per stock
+                max_weight=effective_max_weight,
                 min_weight=0.0   # No minimum weight
             )
             self.portfolio_solver.config = solver_config

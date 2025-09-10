@@ -265,60 +265,80 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             Signal Scores
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Signal scores for each stock at this portfolio date. Values range from -1 to 1.
+            Signal scores for each stock at this portfolio date. Values typically range from -1 to 1 (depending on the signal).
           </Alert>
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Ticker</TableCell>
-                  <TableCell align="right">RSI</TableCell>
-                  <TableCell align="right">SMA</TableCell>
-                  <TableCell align="right">MACD</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {signalLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      <Skeleton variant="text" width="100%" />
-                    </TableCell>
-                  </TableRow>
-                ) : signalError ? (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      <Typography variant="body2" color="error">
-                        Error loading signal data
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : signalData?.signals && signalData.signals.length > 0 ? (
-                  signalData.signals.map((signal: any, index: number) => (
-                    <TableRow key={index}>
-                      <TableCell>{signal.ticker}</TableCell>
-                      <TableCell align="right">
-                        {signal.rsi !== null ? signal.rsi.toFixed(4) : 'N/A'}
-                      </TableCell>
-                      <TableCell align="right">
-                        {signal.sma !== null ? signal.sma.toFixed(4) : 'N/A'}
-                      </TableCell>
-                      <TableCell align="right">
-                        {signal.macd !== null ? signal.macd.toFixed(4) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        No signal data available for this portfolio
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          {signalLoading ? (
+            <Box>
+              <Skeleton variant="rectangular" height={200} />
+            </Box>
+          ) : signalError ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Failed to load signal data. Please try again.
+            </Alert>
+          ) : signalData?.signals && signalData.signals.length > 0 ? (
+            (() => {
+              // Get available signals from the first signal data entry
+              const availableSignals = signalData.signals[0]?.available_signals || [];
+              
+              // Handle case where no signals are available
+              if (availableSignals.length === 0) {
+                return (
+                  <Alert severity="info">
+                    This portfolio has no signal scores.
+                  </Alert>
+                );
+              }
+              
+              // Remove duplicates and sort signals
+              const uniqueSignals = [...new Set(availableSignals)];
+              const sortedSignals = uniqueSignals.sort();
+              
+              // Log warning if duplicates were found
+              if (uniqueSignals.length !== availableSignals.length) {
+                console.warn('Duplicate signal names found in portfolio data');
+              }
+              
+              return (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Ticker</TableCell>
+                        {sortedSignals.map((signalName) => (
+                          <TableCell key={signalName} align="right">
+                            {signalName}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {signalData.signals.map((signal: any, index: number) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {signal.ticker}
+                            </Typography>
+                          </TableCell>
+                          {sortedSignals.map((signalName) => (
+                            <TableCell key={signalName} align="right">
+                              {signal[signalName] !== null && signal[signalName] !== undefined 
+                                ? Number(signal[signalName]).toFixed(4) 
+                                : '—'
+                              }
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              );
+            })()
+          ) : (
+            <Alert severity="info">
+              This portfolio has no signal scores.
+            </Alert>
+          )}
         </TabPanel>
 
         {/* Combined Scores Tab */}

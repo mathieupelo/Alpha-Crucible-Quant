@@ -208,26 +208,29 @@ class DatabaseService:
             tickers = positions_df['ticker'].tolist()
             
             # Get signal scores for the portfolio date and tickers
-            signals_df = self.db_manager.get_signal_scores(
-                portfolio.asof_date, portfolio.asof_date, tickers
+            signals_df = self.db_manager.get_signals_raw(
+                tickers=tickers,
+                start_date=portfolio.asof_date,
+                end_date=portfolio.asof_date
             )
             
             signals = []
             if not signals_df.empty:
+                # Get all unique signal names from the data
+                available_signals = signals_df['signal_name'].unique().tolist()
+                
                 # Group by ticker and create signal score objects
                 for ticker in signals_df['ticker'].unique():
                     ticker_signals = signals_df[signals_df['ticker'] == ticker]
                     signal_data = {
                         'ticker': ticker,
-                        'rsi': None,
-                        'sma': None,
-                        'macd': None
+                        'available_signals': available_signals
                     }
                     
+                    # Add each signal value to the data
                     for _, row in ticker_signals.iterrows():
-                        signal_name = row['signal_name'].lower()
-                        if signal_name in signal_data:
-                            signal_data[signal_name] = row['value']
+                        signal_name = row['signal_name']
+                        signal_data[signal_name] = row['value']
                     
                     signals.append(signal_data)
             

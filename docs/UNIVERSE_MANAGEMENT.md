@@ -109,9 +109,9 @@ CREATE TABLE universe_tickers (
 
 ### Setting Up the Database
 
-1. Run the database setup script:
+1. Run the database setup script (includes universe tables):
 ```bash
-python scripts/setup_universe_tables.py
+python scripts/setup_database.py
 ```
 
 2. Install additional dependencies:

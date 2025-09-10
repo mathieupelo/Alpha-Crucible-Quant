@@ -1402,7 +1402,29 @@ class BacktestEngine:
                         })
             
             if combined_scores:
-                return pd.DataFrame(combined_scores)
+                df = pd.DataFrame(combined_scores)
+                
+                # Store combined scores in database
+                try:
+                    from database import ScoreCombined
+                    score_objects = []
+                    for _, row in df.iterrows():
+                        score_obj = ScoreCombined(
+                            asof_date=row['asof_date'],
+                            ticker=row['ticker'],
+                            score=row['score'],
+                            method=row['method'],
+                            params=row.get('params'),
+                            created_at=datetime.now()
+                        )
+                        score_objects.append(score_obj)
+                    
+                    self.database_manager.store_scores_combined(score_objects)
+                    logger.info(f"Stored {len(score_objects)} combined scores in database")
+                except Exception as e:
+                    logger.error(f"Error storing combined scores in database: {e}")
+                
+                return df
             else:
                 logger.warning("No combined scores calculated")
                 return pd.DataFrame()

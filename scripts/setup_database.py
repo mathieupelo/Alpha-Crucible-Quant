@@ -192,6 +192,34 @@ def create_tables():
         """)
         logger.info("Created backtest_nav table")
         
+        # Universes table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS universes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_name (name)
+            )
+        """)
+        logger.info("Created universes table")
+        
+        # Universe tickers table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS universe_tickers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                universe_id INT NOT NULL,
+                ticker VARCHAR(50) NOT NULL,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_universe_ticker (universe_id, ticker),
+                INDEX idx_universe_id (universe_id),
+                INDEX idx_ticker (ticker),
+                FOREIGN KEY (universe_id) REFERENCES universes(id) ON DELETE CASCADE
+            )
+        """)
+        logger.info("Created universe_tickers table")
+        
         connection.commit()
         cursor.close()
         connection.close()
@@ -214,12 +242,13 @@ def main():
         logger.error("Failed to create database")
         return False
     
-    # Create tables
+    # Create tables (including universe tables)
     if not create_tables():
         logger.error("Failed to create tables")
         return False
     
     logger.info("Database setup completed successfully!")
+    logger.info("Created tables: signals_raw, scores_combined, backtests, portfolios, portfolio_positions, backtest_nav, universes, universe_tickers")
     return True
 
 

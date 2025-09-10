@@ -59,10 +59,14 @@ class DatabaseService:
             # Convert to list of dictionaries
             backtests = backtests_df.to_dict('records')
             
-            # Parse JSON fields for each backtest
+            # Parse JSON fields and add universe information for each backtest
             for backtest in backtests:
                 backtest['universe'] = self._parse_json_field(backtest.get('universe'))
                 backtest['params'] = self._parse_json_field(backtest.get('params'))
+                
+                # Get universe information
+                universe = self.db_manager.get_universe_by_id(backtest.get('universe_id'))
+                backtest['universe_name'] = universe.name if universe else "Unknown Universe"
             
             # Apply pagination
             start_idx = (page - 1) * size
@@ -87,12 +91,18 @@ class DatabaseService:
             if backtest is None:
                 return None
             
+            # Get universe information
+            universe = self.db_manager.get_universe_by_id(backtest.universe_id)
+            universe_name = universe.name if universe else "Unknown Universe"
+            
             return {
                 "id": backtest.id,
                 "run_id": backtest.run_id,
                 "start_date": backtest.start_date,
                 "end_date": backtest.end_date,
                 "frequency": backtest.frequency,
+                "universe_id": backtest.universe_id,
+                "universe_name": universe_name,
                 "universe": self._parse_json_field(backtest.universe),
                 "benchmark": backtest.benchmark,
                 "params": self._parse_json_field(backtest.params),
@@ -140,12 +150,16 @@ class DatabaseService:
             
             portfolios = portfolios_df.to_dict('records')
             
-            # Parse JSON fields and add position count for each portfolio
+            # Parse JSON fields and add position count and universe information for each portfolio
             for portfolio in portfolios:
                 portfolio['params'] = self._parse_json_field(portfolio.get('params'))
                 positions_df = self.db_manager.get_portfolio_positions(portfolio['id'])
                 portfolio['position_count'] = len(positions_df)
                 portfolio['total_value'] = 0.0  # Will be calculated from NAV data
+                
+                # Get universe information
+                universe = self.db_manager.get_universe_by_id(portfolio.get('universe_id'))
+                portfolio['universe_name'] = universe.name if universe else "Unknown Universe"
             
             return portfolios
             
@@ -175,9 +189,15 @@ class DatabaseService:
                     )
                     positions.append(position)
             
+            # Get universe information
+            universe = self.db_manager.get_universe_by_id(portfolio.universe_id)
+            universe_name = universe.name if universe else "Unknown Universe"
+            
             return {
                 "id": portfolio.id,
                 "run_id": portfolio.run_id,
+                "universe_id": portfolio.universe_id,
+                "universe_name": universe_name,
                 "asof_date": portfolio.asof_date,
                 "method": portfolio.method,
                 "params": self._parse_json_field(portfolio.params),

@@ -237,6 +237,9 @@ const Dashboard: React.FC = () => {
                       <Typography variant="body2" color="text.secondary" gutterBottom>
                         {backtest.start_date} to {backtest.end_date}
                       </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Universe: {backtest.universe_name || 'Unknown'}
+                      </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Created: {new Date(backtest.created_at).toLocaleDateString()}
                       </Typography>

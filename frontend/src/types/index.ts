@@ -8,7 +8,9 @@ export interface Backtest {
   start_date: string;
   end_date: string;
   frequency: string;
+  universe_id: number;
   universe?: Record<string, any>;
+  universe_name?: string;
   benchmark?: string;
   params?: Record<string, any>;
   created_at: string;
@@ -43,6 +45,8 @@ export interface BacktestMetrics {
 export interface Portfolio {
   id: number;
   run_id: string;
+  universe_id: number;
+  universe_name?: string;
   asof_date: string;
   method: string;
   params?: Record<string, any>;

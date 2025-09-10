@@ -74,8 +74,19 @@ class DatabaseManager:
     def execute_query(self, query: str, params: Optional[tuple] = None) -> pd.DataFrame:
         """Execute a SELECT query and return results as DataFrame."""
         self.ensure_connection()
-        df = pd.read_sql(query, self._connection, params=params)
-        return df
+        try:
+            cursor = self._connection.cursor(dictionary=True)
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            cursor.close()
+            
+            if not results:
+                return pd.DataFrame()
+            
+            return pd.DataFrame(results)
+        except Exception as e:
+            logger.error(f"Database error in execute_query: {e}")
+            return pd.DataFrame()
     
     def execute_insert(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute an INSERT query and return the last insert ID."""
@@ -260,9 +271,10 @@ class DatabaseManager:
     def store_portfolio(self, portfolio: Portfolio) -> int:
         """Store a portfolio in the database."""
         query = """
-        INSERT INTO portfolios (run_id, asof_date, method, params, cash, notes, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO portfolios (run_id, universe_id, asof_date, method, params, cash, notes, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
+            universe_id = VALUES(universe_id),
             method = VALUES(method),
             params = VALUES(params),
             cash = VALUES(cash),
@@ -277,6 +289,7 @@ class DatabaseManager:
         
         params = (
             portfolio.run_id,
+            portfolio.universe_id,
             portfolio.asof_date,
             portfolio.method,
             params_json,
@@ -330,6 +343,7 @@ class DatabaseManager:
         return Portfolio(
             id=row['id'],
             run_id=row['run_id'],
+            universe_id=row['universe_id'],
             asof_date=row['asof_date'],
             method=row['method'],
             params=params,
@@ -390,12 +404,13 @@ class DatabaseManager:
     def store_backtest(self, backtest: Backtest) -> int:
         """Store a backtest configuration in the database."""
         query = """
-        INSERT INTO backtests (run_id, start_date, end_date, frequency, universe, benchmark, params, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO backtests (run_id, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             start_date = VALUES(start_date),
             end_date = VALUES(end_date),
             frequency = VALUES(frequency),
+            universe_id = VALUES(universe_id),
             universe = VALUES(universe),
             benchmark = VALUES(benchmark),
             params = VALUES(params),
@@ -417,6 +432,7 @@ class DatabaseManager:
             backtest.start_date,
             backtest.end_date,
             backtest.frequency,
+            backtest.universe_id,
             universe_json,
             backtest.benchmark,
             params_json,
@@ -479,6 +495,7 @@ class DatabaseManager:
             start_date=row['start_date'],
             end_date=row['end_date'],
             frequency=row['frequency'],
+            universe_id=row['universe_id'],
             universe=universe,
             benchmark=row.get('benchmark'),
             params=params,
@@ -565,7 +582,7 @@ class DatabaseManager:
     def get_universe_by_id(self, universe_id: int) -> Optional[Universe]:
         """Get a specific universe by ID."""
         query = "SELECT * FROM universes WHERE id = %s"
-        df = self.execute_query(query, (universe_id,))
+        df = self.execute_query(query, (int(universe_id),))
         
         if df.empty:
             return None

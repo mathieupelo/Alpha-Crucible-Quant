@@ -40,11 +40,29 @@ This system replaces the previous Signal Forge multi-repository architecture wit
    ```bash
    python scripts/setup_database.py
    ```
+   
+   This will create the database schema and automatically seed a default universe named "NA Gaming Starter (5)" with 5 tickers (EA, TTWO, RBLX, MSFT, NVDA) if no universes exist.
 
 4. **Run Tests**:
    ```bash
    pytest tests/
    ```
+
+## Bootstrap Database
+
+If you need to reset the database or ensure the default universe exists, you can run the bootstrap script:
+
+```bash
+python scripts/bootstrap_database.py
+```
+
+This script will:
+- Check if any universes exist in the database
+- If no universes exist, create the default "NA Gaming Starter (5)" universe with 5 tickers
+- If universes already exist, validate their ticker counts and skip creation
+- Provide detailed logging of the process
+
+The script is idempotent and safe to run multiple times.
 
 ## Usage
 

@@ -162,9 +162,14 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
     <Dialog open={true} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6">
-            Portfolio Details - {portfolio.asof_date}
-          </Typography>
+          <Box>
+            <Typography variant="h6">
+              Portfolio Details - {portfolio.asof_date}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Universe: {portfolio.universe_name || 'Unknown'}
+            </Typography>
+          </Box>
           <Button
             startIcon={<CloseIcon />}
             onClick={onClose}

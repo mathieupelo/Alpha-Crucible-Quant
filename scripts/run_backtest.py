@@ -7,6 +7,7 @@ This script demonstrates how to use the unified system to run a backtest.
 
 import sys
 import os
+import argparse
 from pathlib import Path
 from datetime import date, timedelta
 
@@ -21,16 +22,59 @@ from data import RealTimeDataFetcher, DataValidator
 
 
 def main():
-    """Run a sample backtest with real market data."""
+    """Run a sample backtest with real market data using universe system."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Run a backtest using the universe system')
+    parser.add_argument('--universe-id', type=int, default=1, 
+                       help='Universe ID to use for backtest (default: 1)')
+    parser.add_argument('--list-universes', action='store_true',
+                       help='List available universes and exit')
+    args = parser.parse_args()
+    
     print("Alpha Crucible Quant - Real-Time Backtest Example")
     print("=" * 60)
     
-    # Initialize real-time data fetcher and validator
+    # Initialize components
     data_fetcher = RealTimeDataFetcher()
     data_validator = DataValidator()
+    database_manager = DatabaseManager()
+    
+    if not database_manager.connect():
+        print("❌ Failed to connect to database. Please run setup_database.py first.")
+        return 1
+    
+    # List universes if requested
+    if args.list_universes:
+        print("Available universes:")
+        universes_df = database_manager.get_universes()
+        if universes_df.empty:
+            print("  No universes found. Run setup_database.py to create the default universe.")
+        else:
+            for _, universe_row in universes_df.iterrows():
+                tickers_df = database_manager.get_universe_tickers(universe_row['id'])
+                ticker_count = len(tickers_df)
+                print(f"  ID {universe_row['id']}: {universe_row['name']} ({ticker_count} tickers)")
+        return 0
+    
+    # Get universe information
+    universe_id = args.universe_id
+    universe = database_manager.get_universe_by_id(universe_id)
+    if not universe:
+        print(f"❌ Universe with ID {universe_id} not found. Please run setup_database.py first.")
+        return 1
+    
+    # Get tickers from universe
+    tickers_df = database_manager.get_universe_tickers(universe_id)
+    if tickers_df.empty:
+        print(f"❌ Universe '{universe.name}' has no tickers. Please add tickers to the universe.")
+        return 1
+    
+    tickers = tickers_df['ticker'].tolist()
+    print(f"Using universe: {universe.name}")
+    print(f"Universe description: {universe.description}")
+    print(f"Tickers in universe: {', '.join(tickers)}")
     
     # Configuration
-    tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
     signals = ['SENTIMENT']
     signal_weights = {'SENTIMENT': 1.0}
     
@@ -38,7 +82,6 @@ def main():
     start_date = date(2023, 9, 5)
     end_date = date(2024, 12, 31)  # More recent end date for real data
     
-    print(f"Using real market data for {len(tickers)} tickers")
     print(f"Date range: {start_date} to {end_date}")
     
     # Validate tickers
@@ -53,7 +96,11 @@ def main():
     
     if not valid_tickers:
         print("No valid tickers found. Exiting.")
-        return
+        return 1
+    
+    if len(valid_tickers) < 5:
+        print(f"❌ Universe has only {len(valid_tickers)} valid tickers. Minimum required: 5")
+        return 1
     
     tickers = valid_tickers
     print(f"Using {len(tickers)} valid tickers: {', '.join(tickers)}")
@@ -69,6 +116,7 @@ def main():
     config = BacktestConfig(
         start_date=start_date,
         end_date=end_date,
+        universe_id=universe_id,  # Use the universe we loaded
         initial_capital=10000.0,
         rebalancing_frequency='monthly',
         evaluation_period='monthly',
@@ -97,7 +145,6 @@ def main():
         # Initialize components
         print("Initializing components...")
         price_fetcher = PriceFetcher()  # This now uses the enhanced real-time fetcher
-        database_manager = DatabaseManager()
         signal_calculator = SignalCalculator(database_manager)
         backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
         

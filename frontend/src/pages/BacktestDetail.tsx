@@ -155,6 +155,9 @@ const BacktestDetail: React.FC = () => {
             <Typography variant="body1" color="text.secondary">
               {backtest.start_date} to {backtest.end_date}
             </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Universe: {backtest.universe_name || 'Unknown'}
+            </Typography>
           </Box>
           <Chip 
             label={backtest.frequency} 

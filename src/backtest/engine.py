@@ -94,6 +94,11 @@ class BacktestEngine:
         logger.info(f"Starting backtest for {len(tickers)} tickers, {len(signals)} signals from {config.start_date} to {config.end_date}")
         
         try:
+            # Validate universe requirements before proceeding
+            logger.info("Validating universe requirements...")
+            config.validate_universe_requirements(self.database_manager)
+            logger.info("Universe validation passed")
+            
             # Initialize backtest
             run_id, result = self._initialize_backtest(tickers, signals, config)
             
@@ -133,7 +138,7 @@ class BacktestEngine:
                     })
                     
                     portfolio_result = self.portfolio_service.create_portfolio_from_scores(
-                        combined_scores_df, tickers, rebal_date, run_id=run_id
+                        combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id
                     )
                     portfolios_created.append(portfolio_result)
                     logger.info(f"Created portfolio for {rebal_date}")
@@ -193,6 +198,7 @@ class BacktestEngine:
             start_date=config.start_date,
             end_date=config.end_date,
             frequency=config.rebalancing_frequency,
+            universe_id=config.universe_id,
             universe={'tickers': tickers, 'signals': signals},
             benchmark=config.benchmark_ticker,
             params={
@@ -557,7 +563,7 @@ class BacktestEngine:
         
         # Store portfolio data in database
         try:
-            self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
+            self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date, config)
             logger.info("Stored portfolio data in database")
         except Exception as e:
             logger.error(f"Error storing portfolio data: {e}")
@@ -1140,7 +1146,7 @@ class BacktestEngine:
         return np.max(max_weights) if max_weights else 0.0
     
     def _store_portfolio_data(self, result: BacktestResult, portfolio_values: pd.Series, 
-                            benchmark_values: pd.Series, weights_history: pd.DataFrame, first_rebalance_date: date):
+                            benchmark_values: pd.Series, weights_history: pd.DataFrame, first_rebalance_date: date, config: BacktestConfig):
         """Store portfolio data in the database."""
         try:
             # Store backtest NAV data
@@ -1184,6 +1190,7 @@ class BacktestEngine:
                 # Create portfolio
                 portfolio = Portfolio(
                     run_id=result.backtest_id,
+                    universe_id=config.universe_id,
                     asof_date=date,
                     method='optimization',
                     params={'risk_aversion': result.signal_weights},

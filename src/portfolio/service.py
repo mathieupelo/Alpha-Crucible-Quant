@@ -60,7 +60,7 @@ class PortfolioService:
     @handle_calculation_errors
     def create_portfolio_from_scores(self, combined_scores: pd.DataFrame, 
                                    tickers: List[str], inference_date: date,
-                                   run_id: Optional[str] = None) -> Dict[str, Any]:
+                                   universe_id: int, run_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a single portfolio for inference on a specific date using pre-combined scores.
         
@@ -111,7 +111,7 @@ class PortfolioService:
             raise RuntimeError(error_msg)
         
         # Step 4: Insert the solved portfolio in the database
-        portfolio_id = self._store_portfolio(tickers, portfolio_weights, inference_date, 'combined_scores', None, run_id)
+        portfolio_id = self._store_portfolio(tickers, portfolio_weights, inference_date, 'combined_scores', None, universe_id, run_id)
         
         logger.info(f"Portfolio created successfully with ID: {portfolio_id}")
         
@@ -216,7 +216,7 @@ class PortfolioService:
     def _store_portfolio(self, tickers: List[str], weights: np.ndarray, 
                         inference_date: date, method: str, 
                         method_params: Optional[Dict[str, Any]],
-                        run_id: Optional[str] = None) -> str:
+                        universe_id: int, run_id: Optional[str] = None) -> str:
         """
         Store portfolio in the database.
         
@@ -236,6 +236,7 @@ class PortfolioService:
             portfolio_run_id = run_id or f"portfolio_{inference_date}_{method}"
             portfolio = Portfolio(
                 run_id=portfolio_run_id,
+                universe_id=universe_id,
                 asof_date=inference_date,
                 method=method,
                 params=method_params or {},

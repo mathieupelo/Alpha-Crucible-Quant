@@ -31,6 +31,8 @@ class BacktestResponse(BaseModel):
     start_date: date = Field(..., description="Backtest start date")
     end_date: date = Field(..., description="Backtest end date")
     frequency: str = Field(..., description="Rebalancing frequency")
+    universe_id: int = Field(..., description="Universe ID")
+    universe_name: str = Field(..., description="Universe name")
     universe: Optional[Dict[str, Any]] = Field(None, description="Universe configuration")
     benchmark: Optional[str] = Field(None, description="Benchmark ticker")
     params: Optional[Dict[str, Any]] = Field(None, description="Backtest parameters")
@@ -45,6 +47,28 @@ class BacktestListResponse(BaseModel):
     total: int = Field(..., description="Total number of backtests")
     page: int = Field(1, description="Current page number")
     size: int = Field(50, description="Page size")
+
+
+class BacktestCreateRequest(BaseModel):
+    """Backtest creation request model."""
+    start_date: date = Field(..., description="Backtest start date")
+    end_date: date = Field(..., description="Backtest end date")
+    universe_id: int = Field(..., description="Universe ID to use for backtesting")
+    signals: List[str] = Field(..., description="List of signal IDs to use")
+    initial_capital: float = Field(10000.0, ge=0, description="Initial capital for backtesting")
+    rebalancing_frequency: str = Field("monthly", description="Rebalancing frequency")
+    evaluation_period: str = Field("monthly", description="Evaluation period for returns calculation")
+    transaction_costs: float = Field(0.001, ge=0, le=1, description="Transaction costs as percentage")
+    max_weight: float = Field(0.1, ge=0, le=1, description="Maximum weight for any single stock")
+    min_weight: float = Field(0.0, ge=0, description="Minimum weight for any single stock")
+    risk_aversion: float = Field(0.5, ge=0, le=1, description="Risk aversion parameter")
+    benchmark_ticker: str = Field("SPY", description="Benchmark ticker for comparison")
+    use_equal_weight_benchmark: bool = Field(True, description="Use equal-weight portfolio as benchmark")
+    min_lookback_days: int = Field(252, ge=1, description="Minimum lookback period for price data")
+    max_lookback_days: int = Field(756, ge=1, description="Maximum lookback period for price data")
+    signal_weights: Optional[Dict[str, float]] = Field(None, description="Weights for combining signals")
+    signal_combination_method: str = Field("equal_weight", description="Method for combining signals")
+    forward_fill_signals: bool = Field(True, description="Forward fill missing signal scores")
 
 
 class PositionResponse(BaseModel):

@@ -37,6 +37,7 @@ class ScoreCombined:
 class Portfolio:
     """Represents a portfolio with metadata."""
     run_id: str
+    universe_id: int
     asof_date: date
     method: str
     params: Optional[Dict[str, Any]] = None
@@ -64,6 +65,7 @@ class Backtest:
     start_date: date
     end_date: date
     frequency: str
+    universe_id: int
     universe: Optional[Dict[str, Any]] = None
     benchmark: Optional[str] = None
     params: Optional[Dict[str, Any]] = None

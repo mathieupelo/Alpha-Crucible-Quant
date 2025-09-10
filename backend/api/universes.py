@@ -22,7 +22,11 @@ router = APIRouter()
 
 # Initialize services
 db_service = DatabaseService()
-ticker_validator = TickerValidationService()
+ticker_validator = TickerValidationService(
+    timeout=15,  # Increased timeout
+    max_retries=3,  # Retry failed requests
+    base_delay=2.0  # Base delay between retries
+)
 
 
 @router.get("/universes", response_model=UniverseListResponse)
@@ -192,8 +196,8 @@ async def validate_tickers(tickers: List[str]):
         if not clean_tickers:
             return []
         
-        # Validate tickers
-        results = ticker_validator.validate_tickers_batch(clean_tickers)
+        # Validate tickers with small batch size to avoid rate limiting
+        results = ticker_validator.validate_tickers_batch(clean_tickers, batch_size=2)
         
         return [TickerValidationResponse(**result) for result in results]
     except Exception as e:

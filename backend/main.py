@@ -15,7 +15,7 @@ import logging
 # Add src to path to import existing modules
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from api import backtests, portfolios, signals, nav
+from api import backtests, portfolios, signals, nav, universes
 from models import ErrorResponse
 
 # Configure logging
@@ -45,6 +45,7 @@ app.include_router(backtests.router, prefix="/api", tags=["backtests"])
 app.include_router(portfolios.router, prefix="/api", tags=["portfolios"])
 app.include_router(signals.router, prefix="/api", tags=["signals"])
 app.include_router(nav.router, prefix="/api", tags=["nav"])
+app.include_router(universes.router, prefix="/api", tags=["universes"])
 
 @app.get("/")
 async def root():

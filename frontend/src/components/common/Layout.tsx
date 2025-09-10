@@ -12,18 +12,38 @@ import {
   Container,
   IconButton,
   Tooltip,
+  Button,
 } from '@mui/material';
 import {
+  Home as HomeIcon,
   Dashboard as DashboardIcon,
+  Group as GroupIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const navigationItems = [
+    { path: '/', label: 'Home', icon: <HomeIcon /> },
+    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
+    { path: '/universes', label: 'Universes', icon: <GroupIcon /> },
+  ];
+
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Header */}
@@ -46,7 +66,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 fontWeight: 700,
                 color: 'text.primary',
                 letterSpacing: '-0.025em',
+                cursor: 'pointer',
               }}
+              onClick={() => navigate('/')}
             >
               Alpha Crucible Quant
             </Typography>
@@ -63,11 +85,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tooltip title="Dashboard">
-              <IconButton color="inherit" size="small">
-                <DashboardIcon />
-              </IconButton>
-            </Tooltip>
+            {navigationItems.map((item) => (
+              <Tooltip key={item.path} title={item.label}>
+                <Button
+                  color="inherit"
+                  startIcon={item.icon}
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    color: isActive(item.path) ? 'primary.main' : 'text.secondary',
+                    fontWeight: isActive(item.path) ? 600 : 400,
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  {item.label}
+                </Button>
+              </Tooltip>
+            ))}
             <Tooltip title="Settings">
               <IconButton color="inherit" size="small">
                 <SettingsIcon />

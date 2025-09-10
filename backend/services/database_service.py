@@ -17,7 +17,7 @@ import logging
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 from database import DatabaseManager
-from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined
+from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse
@@ -403,6 +403,230 @@ class DatabaseService:
             
         except Exception as e:
             logger.error(f"Error calculating metrics for {run_id}: {e}")
+            raise
+    
+    def get_all_universes(self) -> List[Dict[str, Any]]:
+        """Get all universes with ticker counts."""
+        try:
+            universes_df = self.db_manager.get_universes()
+            
+            if universes_df.empty:
+                return []
+            
+            universes = []
+            for _, row in universes_df.iterrows():
+                # Get ticker count for each universe
+                tickers_df = self.db_manager.get_universe_tickers(row['id'])
+                ticker_count = len(tickers_df)
+                
+                universe_data = {
+                    "id": row['id'],
+                    "name": row['name'],
+                    "description": row.get('description'),
+                    "created_at": row['created_at'],
+                    "updated_at": row['updated_at'],
+                    "ticker_count": ticker_count
+                }
+                universes.append(universe_data)
+            
+            return universes
+            
+        except Exception as e:
+            logger.error(f"Error getting universes: {e}")
+            raise
+    
+    def get_universe_by_id(self, universe_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific universe by ID."""
+        try:
+            universe = self.db_manager.get_universe_by_id(universe_id)
+            if universe is None:
+                return None
+            
+            # Get ticker count
+            tickers_df = self.db_manager.get_universe_tickers(universe_id)
+            ticker_count = len(tickers_df)
+            
+            return {
+                "id": universe.id,
+                "name": universe.name,
+                "description": universe.description,
+                "created_at": universe.created_at,
+                "updated_at": universe.updated_at,
+                "ticker_count": ticker_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting universe {universe_id}: {e}")
+            raise
+    
+    def create_universe(self, name: str, description: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new universe."""
+        try:
+            # Check if universe already exists
+            existing = self.db_manager.get_universe_by_name(name)
+            if existing:
+                raise ValueError(f"Universe '{name}' already exists")
+            
+            universe = Universe(
+                name=name,
+                description=description,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            universe_id = self.db_manager.store_universe(universe)
+            
+            return {
+                "id": universe_id,
+                "name": name,
+                "description": description,
+                "created_at": universe.created_at,
+                "updated_at": universe.updated_at,
+                "ticker_count": 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating universe: {e}")
+            raise
+    
+    def update_universe(self, universe_id: int, name: Optional[str] = None, 
+                       description: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Update an existing universe."""
+        try:
+            universe = self.db_manager.get_universe_by_id(universe_id)
+            if universe is None:
+                return None
+            
+            # Check if new name conflicts with existing universe
+            if name and name != universe.name:
+                existing = self.db_manager.get_universe_by_name(name)
+                if existing:
+                    raise ValueError(f"Universe '{name}' already exists")
+            
+            # Update fields
+            if name:
+                universe.name = name
+            if description is not None:
+                universe.description = description
+            
+            universe.updated_at = datetime.now()
+            
+            # Store updated universe
+            self.db_manager.store_universe(universe)
+            
+            # Get ticker count
+            tickers_df = self.db_manager.get_universe_tickers(universe_id)
+            ticker_count = len(tickers_df)
+            
+            return {
+                "id": universe.id,
+                "name": universe.name,
+                "description": universe.description,
+                "created_at": universe.created_at,
+                "updated_at": universe.updated_at,
+                "ticker_count": ticker_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error updating universe {universe_id}: {e}")
+            raise
+    
+    def delete_universe(self, universe_id: int) -> bool:
+        """Delete a universe and all its tickers."""
+        try:
+            return self.db_manager.delete_universe(universe_id)
+        except Exception as e:
+            logger.error(f"Error deleting universe {universe_id}: {e}")
+            raise
+    
+    def get_universe_tickers(self, universe_id: int) -> List[Dict[str, Any]]:
+        """Get all tickers for a universe."""
+        try:
+            tickers_df = self.db_manager.get_universe_tickers(universe_id)
+            
+            if tickers_df.empty:
+                return []
+            
+            tickers = []
+            for _, row in tickers_df.iterrows():
+                ticker_data = {
+                    "id": row['id'],
+                    "universe_id": row['universe_id'],
+                    "ticker": row['ticker'],
+                    "added_at": row['added_at']
+                }
+                tickers.append(ticker_data)
+            
+            return tickers
+            
+        except Exception as e:
+            logger.error(f"Error getting tickers for universe {universe_id}: {e}")
+            raise
+    
+    def update_universe_tickers(self, universe_id: int, tickers: List[str]) -> List[Dict[str, Any]]:
+        """Update all tickers for a universe."""
+        try:
+            # Check if universe exists
+            universe = self.db_manager.get_universe_by_id(universe_id)
+            if universe is None:
+                raise ValueError(f"Universe {universe_id} not found")
+            
+            # Remove all existing tickers
+            self.db_manager.delete_all_universe_tickers(universe_id)
+            
+            # Add new tickers
+            if tickers:
+                universe_tickers = []
+                for ticker in tickers:
+                    universe_ticker = UniverseTicker(
+                        universe_id=universe_id,
+                        ticker=ticker.strip().upper(),
+                        added_at=datetime.now()
+                    )
+                    universe_tickers.append(universe_ticker)
+                
+                self.db_manager.store_universe_tickers(universe_tickers)
+            
+            # Return updated ticker list
+            return self.get_universe_tickers(universe_id)
+            
+        except Exception as e:
+            logger.error(f"Error updating tickers for universe {universe_id}: {e}")
+            raise
+    
+    def add_universe_ticker(self, universe_id: int, ticker: str) -> Dict[str, Any]:
+        """Add a single ticker to a universe."""
+        try:
+            # Check if universe exists
+            universe = self.db_manager.get_universe_by_id(universe_id)
+            if universe is None:
+                raise ValueError(f"Universe {universe_id} not found")
+            
+            universe_ticker = UniverseTicker(
+                universe_id=universe_id,
+                ticker=ticker.strip().upper(),
+                added_at=datetime.now()
+            )
+            
+            ticker_id = self.db_manager.store_universe_ticker(universe_ticker)
+            
+            return {
+                "id": ticker_id,
+                "universe_id": universe_id,
+                "ticker": ticker.strip().upper(),
+                "added_at": universe_ticker.added_at
+            }
+            
+        except Exception as e:
+            logger.error(f"Error adding ticker {ticker} to universe {universe_id}: {e}")
+            raise
+    
+    def remove_universe_ticker(self, universe_id: int, ticker: str) -> bool:
+        """Remove a ticker from a universe."""
+        try:
+            return self.db_manager.delete_universe_ticker(universe_id, ticker.strip().upper())
+        except Exception as e:
+            logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
             raise
     
     def close(self):

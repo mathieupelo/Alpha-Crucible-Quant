@@ -141,3 +141,40 @@ export interface FilterOptions {
   methods?: string[];
 }
 
+export interface Universe {
+  id: number;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  ticker_count: number;
+}
+
+export interface UniverseTicker {
+  id: number;
+  universe_id: number;
+  ticker: string;
+  added_at: string;
+}
+
+export interface TickerValidation {
+  ticker: string;
+  is_valid: boolean;
+  company_name?: string;
+  error_message?: string;
+}
+
+export interface UniverseCreateRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UniverseUpdateRequest {
+  name?: string;
+  description?: string;
+}
+
+export interface UniverseTickerUpdateRequest {
+  tickers: string[];
+}
+

@@ -13,7 +13,7 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 
-from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, DataFrameConverter
+from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, Universe, UniverseTicker, DataFrameConverter
 from utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
@@ -536,6 +536,153 @@ class DatabaseManager:
         
         return self.execute_query(query, tuple(params) if params else None)
     
+    # Universe Operations
+    
+    def store_universe(self, universe: Universe) -> int:
+        """Store a universe in the database."""
+        query = """
+        INSERT INTO universes (name, description, created_at, updated_at)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            description = VALUES(description),
+            updated_at = VALUES(updated_at)
+        """
+        
+        params = (
+            universe.name,
+            universe.description,
+            universe.created_at or datetime.now(),
+            universe.updated_at or datetime.now()
+        )
+        
+        return self.execute_insert(query, params)
+    
+    def get_universes(self) -> pd.DataFrame:
+        """Retrieve all universes from the database."""
+        query = "SELECT * FROM universes ORDER BY created_at DESC"
+        return self.execute_query(query)
+    
+    def get_universe_by_id(self, universe_id: int) -> Optional[Universe]:
+        """Get a specific universe by ID."""
+        query = "SELECT * FROM universes WHERE id = %s"
+        df = self.execute_query(query, (universe_id,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        return Universe(
+            id=row['id'],
+            name=row['name'],
+            description=row.get('description'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def get_universe_by_name(self, name: str) -> Optional[Universe]:
+        """Get a specific universe by name."""
+        query = "SELECT * FROM universes WHERE name = %s"
+        df = self.execute_query(query, (name,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        return Universe(
+            id=row['id'],
+            name=row['name'],
+            description=row.get('description'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def delete_universe(self, universe_id: int) -> bool:
+        """Delete a universe and all its tickers."""
+        query = "DELETE FROM universes WHERE id = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id,))
+            return cursor.rowcount > 0
+        except Error as e:
+            logger.error(f"Error deleting universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
+    
+    # Universe Ticker Operations
+    
+    def store_universe_ticker(self, ticker: UniverseTicker) -> int:
+        """Store a ticker in a universe."""
+        query = """
+        INSERT INTO universe_tickers (universe_id, ticker, added_at)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            added_at = VALUES(added_at)
+        """
+        
+        params = (
+            ticker.universe_id,
+            ticker.ticker,
+            ticker.added_at or datetime.now()
+        )
+        
+        return self.execute_insert(query, params)
+    
+    def store_universe_tickers(self, tickers: List[UniverseTicker]) -> int:
+        """Store multiple tickers in a universe."""
+        if not tickers:
+            return 0
+        
+        query = """
+        INSERT INTO universe_tickers (universe_id, ticker, added_at)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            added_at = VALUES(added_at)
+        """
+        
+        params_list = []
+        for ticker in tickers:
+            params_list.append((
+                ticker.universe_id,
+                ticker.ticker,
+                ticker.added_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_universe_tickers(self, universe_id: int) -> pd.DataFrame:
+        """Get all tickers for a universe."""
+        query = "SELECT * FROM universe_tickers WHERE universe_id = %s ORDER BY ticker"
+        return self.execute_query(query, (universe_id,))
+    
+    def delete_universe_ticker(self, universe_id: int, ticker: str) -> bool:
+        """Delete a ticker from a universe."""
+        query = "DELETE FROM universe_tickers WHERE universe_id = %s AND ticker = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id, ticker))
+            return cursor.rowcount > 0
+        except Error as e:
+            logger.error(f"Error deleting ticker {ticker} from universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
+    
+    def delete_all_universe_tickers(self, universe_id: int) -> int:
+        """Delete all tickers from a universe."""
+        query = "DELETE FROM universe_tickers WHERE universe_id = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id,))
+            return cursor.rowcount
+        except Error as e:
+            logger.error(f"Error deleting all tickers from universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
     
     # Utility Methods
     

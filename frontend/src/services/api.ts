@@ -13,7 +13,13 @@ import {
   NavListResponse,
   Signal,
   Score,
-  FilterOptions
+  FilterOptions,
+  Universe,
+  UniverseTicker,
+  TickerValidation,
+  UniverseCreateRequest,
+  UniverseUpdateRequest,
+  UniverseTickerUpdateRequest
 } from '@/types';
 
 // Create axios instance with base configuration
@@ -163,6 +169,71 @@ export const signalApi = {
         end_date: filters?.endDate
       }
     });
+    return response.data;
+  }
+};
+
+// Universe API calls
+export const universeApi = {
+  // Get all universes
+  getUniverses: async (): Promise<{ universes: Universe[]; total: number }> => {
+    const response = await api.get('/universes');
+    return response.data;
+  },
+
+  // Get specific universe by ID
+  getUniverse: async (universeId: number): Promise<Universe> => {
+    const response = await api.get(`/universes/${universeId}`);
+    return response.data;
+  },
+
+  // Create new universe
+  createUniverse: async (request: UniverseCreateRequest): Promise<Universe> => {
+    const response = await api.post('/universes', request);
+    return response.data;
+  },
+
+  // Update universe
+  updateUniverse: async (universeId: number, request: UniverseUpdateRequest): Promise<Universe> => {
+    const response = await api.put(`/universes/${universeId}`, request);
+    return response.data;
+  },
+
+  // Delete universe
+  deleteUniverse: async (universeId: number): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/universes/${universeId}`);
+    return response.data;
+  },
+
+  // Get universe tickers
+  getUniverseTickers: async (universeId: number): Promise<{ tickers: UniverseTicker[]; total: number; universe_id: number }> => {
+    const response = await api.get(`/universes/${universeId}/tickers`);
+    return response.data;
+  },
+
+  // Update universe tickers
+  updateUniverseTickers: async (universeId: number, request: UniverseTickerUpdateRequest): Promise<{ tickers: UniverseTicker[]; total: number; universe_id: number }> => {
+    const response = await api.put(`/universes/${universeId}/tickers`, request);
+    return response.data;
+  },
+
+  // Add single ticker to universe
+  addUniverseTicker: async (universeId: number, ticker: string): Promise<UniverseTicker> => {
+    const response = await api.post(`/universes/${universeId}/tickers`, null, {
+      params: { ticker }
+    });
+    return response.data;
+  },
+
+  // Remove ticker from universe
+  removeUniverseTicker: async (universeId: number, ticker: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/universes/${universeId}/tickers/${ticker}`);
+    return response.data;
+  },
+
+  // Validate tickers
+  validateTickers: async (tickers: string[]): Promise<TickerValidation[]> => {
+    const response = await api.post('/tickers/validate', tickers);
     return response.data;
   }
 };

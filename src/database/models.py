@@ -81,6 +81,25 @@ class BacktestNav:
     pnl: Optional[float] = None
 
 
+@dataclass
+class Universe:
+    """Represents a universe of tickers."""
+    name: str
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class UniverseTicker:
+    """Represents a ticker within a universe."""
+    universe_id: int
+    ticker: str
+    added_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
 class DataFrameConverter:
     """Utility class to convert between DataFrames and model objects."""
     
@@ -300,3 +319,55 @@ class DataFrameConverter:
                 pnl=row.get('pnl')
             ))
         return nav_data
+    
+    @staticmethod
+    def universes_to_dataframe(universes: List[Universe]) -> pd.DataFrame:
+        """Convert list of Universe objects to DataFrame."""
+        data = []
+        for universe in universes:
+            data.append({
+                'name': universe.name,
+                'description': universe.description,
+                'created_at': universe.created_at,
+                'updated_at': universe.updated_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_universes(df: pd.DataFrame) -> List[Universe]:
+        """Convert DataFrame to list of Universe objects."""
+        universes = []
+        for _, row in df.iterrows():
+            universes.append(Universe(
+                id=row.get('id'),
+                name=row['name'],
+                description=row.get('description'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at')
+            ))
+        return universes
+    
+    @staticmethod
+    def universe_tickers_to_dataframe(tickers: List[UniverseTicker]) -> pd.DataFrame:
+        """Convert list of UniverseTicker objects to DataFrame."""
+        data = []
+        for ticker in tickers:
+            data.append({
+                'universe_id': ticker.universe_id,
+                'ticker': ticker.ticker,
+                'added_at': ticker.added_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_universe_tickers(df: pd.DataFrame) -> List[UniverseTicker]:
+        """Convert DataFrame to list of UniverseTicker objects."""
+        tickers = []
+        for _, row in df.iterrows():
+            tickers.append(UniverseTicker(
+                id=row.get('id'),
+                universe_id=row['universe_id'],
+                ticker=row['ticker'],
+                added_at=row.get('added_at')
+            ))
+        return tickers

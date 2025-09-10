@@ -9,8 +9,11 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
 
+import Home from '@/pages/Home';
 import Dashboard from '@/pages/Dashboard';
 import BacktestDetail from '@/pages/BacktestDetail';
+import UniverseManager from '@/pages/UniverseManager';
+import UniverseDetail from '@/pages/UniverseDetail';
 import Layout from '@/components/common/Layout';
 
 // Create React Query client
@@ -116,8 +119,11 @@ const App: React.FC = () => {
           <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Home />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/backtest/:runId" element={<BacktestDetail />} />
+                <Route path="/universes" element={<UniverseManager />} />
+                <Route path="/universes/:id" element={<UniverseDetail />} />
               </Routes>
             </Layout>
           </Box>

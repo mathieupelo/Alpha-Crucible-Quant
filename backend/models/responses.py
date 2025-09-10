@@ -147,3 +147,62 @@ class BacktestMetricsResponse(BaseModel):
     max_concentration: float = Field(..., description="Maximum concentration")
     execution_time_seconds: float = Field(..., description="Execution time in seconds")
 
+
+class UniverseResponse(BaseModel):
+    """Universe response model."""
+    id: int = Field(..., description="Universe ID")
+    name: str = Field(..., description="Universe name")
+    description: Optional[str] = Field(None, description="Universe description")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    ticker_count: int = Field(0, description="Number of tickers in universe")
+    
+    model_config = {"from_attributes": True}
+
+
+class UniverseListResponse(BaseModel):
+    """Universe list response model."""
+    universes: List[UniverseResponse] = Field(..., description="List of universes")
+    total: int = Field(..., description="Total number of universes")
+
+
+class UniverseTickerResponse(BaseModel):
+    """Universe ticker response model."""
+    id: int = Field(..., description="Ticker ID")
+    universe_id: int = Field(..., description="Associated universe ID")
+    ticker: str = Field(..., description="Stock ticker")
+    added_at: datetime = Field(..., description="Addition timestamp")
+    
+    model_config = {"from_attributes": True}
+
+
+class UniverseTickerListResponse(BaseModel):
+    """Universe ticker list response model."""
+    tickers: List[UniverseTickerResponse] = Field(..., description="List of tickers")
+    total: int = Field(..., description="Total number of tickers")
+    universe_id: int = Field(..., description="Associated universe ID")
+
+
+class TickerValidationResponse(BaseModel):
+    """Ticker validation response model."""
+    ticker: str = Field(..., description="Ticker symbol")
+    is_valid: bool = Field(..., description="Whether ticker is valid")
+    company_name: Optional[str] = Field(None, description="Company name if valid")
+    error_message: Optional[str] = Field(None, description="Error message if invalid")
+
+
+class UniverseCreateRequest(BaseModel):
+    """Universe creation request model."""
+    name: str = Field(..., description="Universe name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Universe description", max_length=1000)
+
+
+class UniverseUpdateRequest(BaseModel):
+    """Universe update request model."""
+    name: Optional[str] = Field(None, description="Universe name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Universe description", max_length=1000)
+
+
+class UniverseTickerUpdateRequest(BaseModel):
+    """Universe ticker update request model."""
+    tickers: List[str] = Field(..., description="List of tickers to add/update")

@@ -95,11 +95,23 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
     data: scoreData,
     isLoading: scoreLoading,
     error: scoreError,
+    refetch: refetchScores,
   } = useQuery(
     ['portfolio-scores', portfolio.id],
-    () => portfolioApi.getPortfolioScores(portfolio.id),
+    () => {
+      console.log(`Fetching combined scores for portfolio ${portfolio.id}`);
+      return portfolioApi.getPortfolioScores(portfolio.id);
+    },
     {
       enabled: !!portfolio.id,
+      retry: 2,
+      retryDelay: 1000,
+      onSuccess: (data) => {
+        console.log('Combined scores loaded successfully:', data);
+      },
+      onError: (error) => {
+        console.error('Error loading combined scores:', error);
+      },
     }
   );
 
@@ -368,27 +380,52 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                 ) : scoreError ? (
                   <TableRow>
                     <TableCell colSpan={3} align="center">
-                      <Typography variant="body2" color="error">
-                        Error loading score data
-                      </Typography>
+                      <Box sx={{ py: 2 }}>
+                        <Typography variant="body2" color="error" gutterBottom>
+                          Error loading score data
+                        </Typography>
+                        <Button 
+                          variant="outlined" 
+                          size="small" 
+                          onClick={() => refetchScores()}
+                          sx={{ mt: 1 }}
+                        >
+                          Retry
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ) : scoreData?.scores && scoreData.scores.length > 0 ? (
                   scoreData.scores.map((score: any, index: number) => (
                     <TableRow key={index}>
-                      <TableCell>{score.ticker}</TableCell>
-                      <TableCell align="right">
-                        {score.combined_score !== null ? score.combined_score.toFixed(4) : 'N/A'}
+                      <TableCell>
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {score.ticker}
+                        </Typography>
                       </TableCell>
-                      <TableCell align="right">{score.method}</TableCell>
+                      <TableCell align="right">
+                        {score.combined_score !== null && score.combined_score !== undefined 
+                          ? Number(score.combined_score).toFixed(4) 
+                          : '—'
+                        }
+                      </TableCell>
+                      <TableCell align="right">
+                        <Chip 
+                          label={score.method || 'unknown'} 
+                          size="small" 
+                          variant="outlined"
+                        />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        No combined score data available for this portfolio
-                      </Typography>
+                      <Box sx={{ py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No combined scores for this portfolio/date.
+                        </Typography>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 )}

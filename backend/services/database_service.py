@@ -257,8 +257,10 @@ class DatabaseService:
             tickers = positions_df['ticker'].tolist()
             
             # Get combined scores for the portfolio date and tickers
-            scores_df = self.db_manager.get_combined_scores(
-                portfolio.asof_date, portfolio.asof_date, tickers
+            scores_df = self.db_manager.get_scores_combined(
+                tickers=tickers,
+                start_date=portfolio.asof_date,
+                end_date=portfolio.asof_date
             )
             
             scores = []

@@ -183,3 +183,4 @@ class TickerValidationService:
                 time.sleep(delay)
         
         return all_results
+

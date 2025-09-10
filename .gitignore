@@ -49,3 +49,9 @@ src/solver/__pycache__/solver.cpython-313.pyc
 src/utils/__pycache__/__init__.cpython-313.pyc
 src/utils/__pycache__/date_utils.cpython-313.pyc
 src/utils/__pycache__/price_fetcher.cpython-313.pyc
+src/utils/__pycache__/price_fetcher.cpython-313.pyc
+src/utils/__pycache__/date_utils.cpython-313.pyc
+src/utils/__pycache__/__init__.cpython-313.pyc
+src/database/__pycache__/models.cpython-313.pyc
+src/database/__pycache__/manager.cpython-313.pyc
+src/database/__pycache__/__init__.cpython-313.pyc

@@ -42,7 +42,8 @@ class PortfolioService:
     def __init__(self, signal_calculator: Optional[SignalCalculator] = None,
                  portfolio_solver: Optional[PortfolioSolver] = None,
                  database_manager: Optional[DatabaseManager] = None,
-                 trading_calendar: Optional[TradingCalendar] = None):
+                 trading_calendar: Optional[TradingCalendar] = None,
+                 price_fetcher: Optional[Any] = None):
         """
         Initialize portfolio service.
         
@@ -51,11 +52,13 @@ class PortfolioService:
             portfolio_solver: Portfolio solver instance (optional)
             database_manager: Database manager instance (optional)
             trading_calendar: Trading calendar instance (optional)
+            price_fetcher: Price fetcher instance (optional)
         """
         self.signal_calculator = signal_calculator or SignalCalculator()
         self.portfolio_solver = portfolio_solver or PortfolioSolver()
         self.database_manager = database_manager or DatabaseManager()
         self.trading_calendar = trading_calendar or TradingCalendar()
+        self.price_fetcher = price_fetcher
     
     @handle_calculation_errors
     def create_portfolio_from_scores(self, combined_scores: pd.DataFrame, 
@@ -152,7 +155,7 @@ class PortfolioService:
             # Configure solver for score-based allocation
             solver_config = SolverConfig(
                 allocation_method="score_based",
-                max_weight=0.2,  # Allow up to 20% per stock
+                max_weight=0.3,  # Allow up to 20% per stock
                 min_weight=0.0   # No minimum weight
             )
             self.portfolio_solver.config = solver_config
@@ -247,15 +250,23 @@ class PortfolioService:
             # Store in database
             portfolio_id = self.database_manager.store_portfolio(portfolio)
             
-            # Store portfolio positions
+            # Store portfolio positions with actual close prices
             positions = []
             for ticker, weight in zip(tickers, weights):
                 if weight > 0:  # Only store positions with non-zero weights
+                    # Get actual close price for the portfolio date
+                    if not self.price_fetcher:
+                        raise ValueError(f"No price fetcher available. Cannot fetch close price for {ticker}")
+                    
+                    close_price = self.price_fetcher.get_price(ticker, inference_date)
+                    if close_price is None:
+                        raise ValueError(f"Could not fetch close price for {ticker} on {inference_date}. Price data is required for portfolio creation.")
+                    
                     position = PortfolioPosition(
                         portfolio_id=portfolio_id,
                         ticker=ticker,
                         weight=float(weight),
-                        price_used=100.0,  # Dummy price for now
+                        price_used=float(close_price),
                         created_at=pd.Timestamp.now()
                     )
                     positions.append(position)

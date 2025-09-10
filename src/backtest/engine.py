@@ -67,7 +67,8 @@ class BacktestEngine:
         self.database_manager = database_manager or DatabaseManager()
         self.portfolio_service = portfolio_service or PortfolioService(
             signal_calculator=self.signal_calculator,
-            database_manager=self.database_manager
+            database_manager=self.database_manager,
+            price_fetcher=self.price_fetcher
         )
         self.trading_calendar = trading_calendar or TradingCalendar()
         

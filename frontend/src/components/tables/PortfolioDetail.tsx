@@ -119,6 +119,23 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
     setTabValue(newValue);
   };
 
+  // Get all unique tickers from portfolio positions for consistency across tabs
+  const portfolioTickers = portfolioDetails?.positions?.map((pos: Position) => pos.ticker) || [];
+  
+  // Get all tickers from combined scores data (includes all tickers from backtest universe)
+  const scoreTickers = scoreData?.scores?.map((score: any) => score.ticker) || [];
+  
+  // Get all tickers from signal data
+  const signalTickers = signalData?.signals?.map((signal: any) => signal.ticker) || [];
+  
+  // Combine all sources and get unique tickers, prioritizing combined scores as the source of truth
+  const allTickers = [...new Set([...scoreTickers, ...signalTickers, ...portfolioTickers])];
+  const uniqueTickers = allTickers.sort();
+  
+  // Note: The current implementation only shows tickers that have data in at least one source
+  // This is because the backtest engine only calculates combined scores for tickers that make it into the portfolio
+  // In a full implementation, this would show all tickers from the backtest universe
+
   const getWeightColor = (weight: number): 'success' | 'error' | 'default' => {
     if (weight > 0.1) return 'success';
     if (weight < 0.01) return 'error';
@@ -243,28 +260,33 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {portfolioDetails?.positions?.map((position: Position) => (
-                    <TableRow key={position.id}>
-                      <TableCell>
-                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                          {position.ticker}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          label={`${(position.weight * 100).toFixed(1)}%`}
-                          color={getWeightColor(position.weight)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        ${position.price_used.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        ${(position.weight * 10000).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {uniqueTickers.map((ticker) => {
+                    // Find position data for this ticker
+                    const position = portfolioDetails?.positions?.find((pos: Position) => pos.ticker === ticker);
+                    
+                    return (
+                      <TableRow key={ticker}>
+                        <TableCell>
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                            {ticker}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip
+                            label={position ? `${(position.weight * 100).toFixed(1)}%` : '0.0%'}
+                            color={position ? getWeightColor(position.weight) : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          {position ? `$${position.price_used.toFixed(2)}` : '—'}
+                        </TableCell>
+                        <TableCell align="right">
+                          {position ? `$${(position.weight * 10000).toFixed(2)}` : '$0.00'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -278,6 +300,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
             Signal scores for each stock at this portfolio date. Values typically range from -1 to 1 (depending on the signal).
+            Only tickers with available signal data are shown.
           </Alert>
           {signalLoading ? (
             <Box>
@@ -290,7 +313,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
           ) : signalData?.signals && signalData.signals.length > 0 ? (
             (() => {
               // Get available signals from the first signal data entry
-              const availableSignals = signalData.signals[0]?.available_signals || [];
+              const availableSignals = (signalData.signals[0]?.available_signals || []) as string[];
               
               // Handle case where no signals are available
               if (availableSignals.length === 0) {
@@ -324,32 +347,59 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {signalData.signals.map((signal: any, index: number) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {signal.ticker}
-                            </Typography>
-                          </TableCell>
-                          {sortedSignals.map((signalName) => (
-                            <TableCell key={signalName} align="right">
-                              {signal[signalName] !== null && signal[signalName] !== undefined 
-                                ? Number(signal[signalName]).toFixed(4) 
-                                : '—'
-                              }
+                      {uniqueTickers.map((ticker) => {
+                        // Find signal data for this ticker
+                        const tickerSignalData = signalData.signals.find((signal: any) => signal.ticker === ticker);
+                        
+                        return (
+                          <TableRow key={ticker}>
+                            <TableCell>
+                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                {ticker}
+                              </Typography>
                             </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
+                            {sortedSignals.map((signalName) => (
+                              <TableCell key={signalName} align="right">
+                                {tickerSignalData && (tickerSignalData as any)[signalName] !== null && (tickerSignalData as any)[signalName] !== undefined 
+                                  ? Number((tickerSignalData as any)[signalName]).toFixed(4) 
+                                  : '—'
+                                }
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
               );
             })()
           ) : (
-            <Alert severity="info">
-              This portfolio has no signal scores.
-            </Alert>
+            // Show all portfolio tickers even if no signal data
+            <TableContainer component={Paper} variant="outlined">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Ticker</TableCell>
+                    <TableCell align="right">Signal Scores</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {uniqueTickers.map((ticker) => (
+                    <TableRow key={ticker}>
+                      <TableCell>
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {ticker}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        —
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
         </TabPanel>
 
@@ -359,7 +409,8 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             Combined Scores
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Combined signal scores for each stock using the equal-weight method.
+            Combined signal scores for each stock using the equal-weight method. 
+            Only tickers with non-zero portfolio weights are shown due to current implementation limitations.
           </Alert>
           <TableContainer component={Paper} variant="outlined">
             <Table>
@@ -396,38 +447,54 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                     </TableCell>
                   </TableRow>
                 ) : scoreData?.scores && scoreData.scores.length > 0 ? (
-                  scoreData.scores.map((score: any, index: number) => (
-                    <TableRow key={index}>
+                  uniqueTickers.map((ticker) => {
+                    // Find combined score data for this ticker
+                    const tickerScoreData = scoreData.scores.find((score: any) => score.ticker === ticker);
+                    
+                    return (
+                      <TableRow key={ticker}>
+                        <TableCell>
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                            {ticker}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          {tickerScoreData && tickerScoreData.combined_score !== null && tickerScoreData.combined_score !== undefined 
+                            ? Number(tickerScoreData.combined_score).toFixed(4) 
+                            : '—'
+                          }
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip 
+                            label={tickerScoreData?.method || '—'} 
+                            size="small" 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  // Show all portfolio tickers even if no score data
+                  uniqueTickers.map((ticker) => (
+                    <TableRow key={ticker}>
                       <TableCell>
                         <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                          {score.ticker}
+                          {ticker}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        {score.combined_score !== null && score.combined_score !== undefined 
-                          ? Number(score.combined_score).toFixed(4) 
-                          : '—'
-                        }
+                        —
                       </TableCell>
                       <TableCell align="right">
                         <Chip 
-                          label={score.method || 'unknown'} 
+                          label="—" 
                           size="small" 
                           variant="outlined"
                         />
                       </TableCell>
                     </TableRow>
                   ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3} align="center">
-                      <Box sx={{ py: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No combined scores for this portfolio/date.
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
                 )}
               </TableBody>
             </Table>

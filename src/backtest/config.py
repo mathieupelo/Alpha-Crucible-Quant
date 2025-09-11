@@ -22,6 +22,9 @@ class BacktestConfig:
     universe_id: int
     """ID of the universe to use for backtesting"""
     
+    name: Optional[str] = None
+    """Name for the backtest (optional)"""
+    
     initial_capital: float = 10000.0
     """Initial capital for backtesting (default: $10,000)"""
     

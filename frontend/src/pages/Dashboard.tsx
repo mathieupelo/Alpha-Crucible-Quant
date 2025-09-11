@@ -112,7 +112,7 @@ const Dashboard: React.FC = () => {
                 <MenuItem key={backtest.run_id} value={backtest.run_id}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <Box>
-                      <Typography variant="body1">{backtest.run_id}</Typography>
+                      <Typography variant="body1">{backtest.name || backtest.run_id}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         {backtest.start_date} to {backtest.end_date}
                       </Typography>
@@ -225,7 +225,7 @@ const Dashboard: React.FC = () => {
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-                          {backtest.run_id}
+                          {backtest.name || backtest.run_id}
                         </Typography>
                         <Chip 
                           label={backtest.frequency} 

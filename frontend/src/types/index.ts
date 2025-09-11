@@ -5,6 +5,7 @@
 export interface Backtest {
   id: number;
   run_id: string;
+  name?: string;
   start_date: string;
   end_date: string;
   frequency: string;
@@ -180,5 +181,27 @@ export interface UniverseUpdateRequest {
 
 export interface UniverseTickerUpdateRequest {
   tickers: string[];
+}
+
+export interface BacktestCreateRequest {
+  start_date: string;
+  end_date: string;
+  universe_id: number;
+  signals: string[];
+  name?: string;
+  initial_capital?: number;
+  rebalancing_frequency?: string;
+  evaluation_period?: string;
+  transaction_costs?: number;
+  max_weight?: number;
+  min_weight?: number;
+  risk_aversion?: number;
+  benchmark_ticker?: string;
+  use_equal_weight_benchmark?: boolean;
+  min_lookback_days?: number;
+  max_lookback_days?: number;
+  signal_weights?: Record<string, number>;
+  signal_combination_method?: string;
+  forward_fill_signals?: boolean;
 }
 

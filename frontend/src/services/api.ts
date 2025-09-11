@@ -19,7 +19,8 @@ import {
   TickerValidation,
   UniverseCreateRequest,
   UniverseUpdateRequest,
-  UniverseTickerUpdateRequest
+  UniverseTickerUpdateRequest,
+  BacktestCreateRequest
 } from '@/types';
 
 // Create axios instance with base configuration
@@ -100,6 +101,12 @@ export const backtestApi = {
       }
     });
     return response.data;
+  },
+
+  // Create new backtest
+  createBacktest: async (request: BacktestCreateRequest): Promise<Backtest> => {
+    const response: AxiosResponse<Backtest> = await api.post('/backtests', request);
+    return response.data;
   }
 };
 
@@ -156,6 +163,12 @@ export const signalApi = {
         end_date: filters?.endDate
       }
     });
+    return response.data;
+  },
+
+  // Get available signal types
+  getSignalTypes: async (): Promise<{ signal_types: Array<{signal_id: string; name: string; parameters: any; min_lookback: number; max_lookback: number}>; total: number }> => {
+    const response = await api.get('/signal-types');
     return response.data;
   },
 

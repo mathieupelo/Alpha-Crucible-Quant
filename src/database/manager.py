@@ -404,9 +404,10 @@ class DatabaseManager:
     def store_backtest(self, backtest: Backtest) -> int:
         """Store a backtest configuration in the database."""
         query = """
-        INSERT INTO backtests (run_id, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO backtests (run_id, name, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
             start_date = VALUES(start_date),
             end_date = VALUES(end_date),
             frequency = VALUES(frequency),
@@ -429,6 +430,7 @@ class DatabaseManager:
         
         params = (
             backtest.run_id,
+            backtest.name,
             backtest.start_date,
             backtest.end_date,
             backtest.frequency,
@@ -496,6 +498,7 @@ class DatabaseManager:
             end_date=row['end_date'],
             frequency=row['frequency'],
             universe_id=row['universe_id'],
+            name=row.get('name'),
             universe=universe,
             benchmark=row.get('benchmark'),
             params=params,

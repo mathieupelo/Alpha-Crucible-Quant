@@ -150,7 +150,7 @@ const BacktestDetail: React.FC = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box>
             <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-              {backtest.run_id}
+              {backtest.name || backtest.run_id}
             </Typography>
             <Typography variant="body1" color="text.secondary">
               {backtest.start_date} to {backtest.end_date}

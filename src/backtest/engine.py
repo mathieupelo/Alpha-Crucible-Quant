@@ -197,6 +197,7 @@ class BacktestEngine:
         # Store backtest configuration
         backtest_config = Backtest(
             run_id=run_id,
+            name=config.name,
             start_date=config.start_date,
             end_date=config.end_date,
             frequency=config.rebalancing_frequency,

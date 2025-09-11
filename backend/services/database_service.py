@@ -98,6 +98,7 @@ class DatabaseService:
             return {
                 "id": backtest.id,
                 "run_id": backtest.run_id,
+                "name": backtest.name,
                 "start_date": backtest.start_date,
                 "end_date": backtest.end_date,
                 "frequency": backtest.frequency,
@@ -652,6 +653,42 @@ class DatabaseService:
             return self.db_manager.delete_universe_ticker(universe_id, ticker.strip().upper())
         except Exception as e:
             logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
+            raise
+    
+    def get_signals_raw(self, tickers: Optional[List[str]] = None, 
+                       signal_names: Optional[List[str]] = None,
+                       start_date: Optional[date] = None, 
+                       end_date: Optional[date] = None) -> List[Dict[str, Any]]:
+        """Get raw signals with optional filtering."""
+        try:
+            signals_df = self.db_manager.get_signals_raw(
+                tickers=tickers,
+                signal_names=signal_names,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            if signals_df.empty:
+                return []
+            
+            # Convert DataFrame to list of dictionaries
+            signals = []
+            for _, row in signals_df.iterrows():
+                signal_data = {
+                    "id": row.get('id'),
+                    "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
+                    "ticker": row['ticker'],
+                    "signal_name": row['signal_name'],
+                    "value": float(row['value']) if pd.notna(row['value']) else None,
+                    "metadata": self._parse_json_field(row.get('metadata')),
+                    "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None
+                }
+                signals.append(signal_data)
+            
+            return signals
+            
+        except Exception as e:
+            logger.error(f"Error getting raw signals: {e}")
             raise
     
     def close(self):

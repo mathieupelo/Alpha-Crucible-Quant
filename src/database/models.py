@@ -66,6 +66,7 @@ class Backtest:
     end_date: date
     frequency: str
     universe_id: int
+    name: Optional[str] = None
     universe: Optional[Dict[str, Any]] = None
     benchmark: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
@@ -253,9 +254,11 @@ class DataFrameConverter:
         for backtest in backtests:
             data.append({
                 'run_id': backtest.run_id,
+                'name': backtest.name,
                 'start_date': backtest.start_date,
                 'end_date': backtest.end_date,
                 'frequency': backtest.frequency,
+                'universe_id': backtest.universe_id,
                 'universe': json.dumps(backtest.universe) if backtest.universe else None,
                 'benchmark': backtest.benchmark,
                 'params': json.dumps(backtest.params) if backtest.params else None,
@@ -284,9 +287,11 @@ class DataFrameConverter:
             
             backtests.append(Backtest(
                 run_id=row['run_id'],
+                name=row.get('name'),
                 start_date=row['start_date'],
                 end_date=row['end_date'],
                 frequency=row['frequency'],
+                universe_id=row.get('universe_id'),
                 universe=universe,
                 benchmark=row.get('benchmark'),
                 params=params,

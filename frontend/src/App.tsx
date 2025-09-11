@@ -14,6 +14,7 @@ import Dashboard from '@/pages/Dashboard';
 import BacktestDetail from '@/pages/BacktestDetail';
 import UniverseManager from '@/pages/UniverseManager';
 import UniverseDetail from '@/pages/UniverseDetail';
+import RunBacktest from '@/pages/RunBacktest';
 import Layout from '@/components/common/Layout';
 
 // Create React Query client
@@ -122,6 +123,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/backtest/:runId" element={<BacktestDetail />} />
+                <Route path="/run-backtest" element={<RunBacktest />} />
                 <Route path="/universes" element={<UniverseManager />} />
                 <Route path="/universes/:id" element={<UniverseDetail />} />
               </Routes>

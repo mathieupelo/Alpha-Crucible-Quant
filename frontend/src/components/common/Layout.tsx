@@ -19,6 +19,7 @@ import {
   Dashboard as DashboardIcon,
   Group as GroupIcon,
   Analytics as AnalyticsIcon,
+  PlayArrow as PlayArrowIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -34,6 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigationItems = [
     { path: '/', label: 'Home', icon: <HomeIcon /> },
     { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
+    { path: '/run-backtest', label: 'Run Backtest', icon: <PlayArrowIcon /> },
     { path: '/universes', label: 'Universes', icon: <GroupIcon /> },
   ];
 

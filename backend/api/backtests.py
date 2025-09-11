@@ -42,11 +42,19 @@ async def create_backtest(request: BacktestCreateRequest):
             )
         
         # Create backtest configuration
-        from src.backtest.config import BacktestConfig
+        import sys
+        from pathlib import Path
+        
+        # Add src to path
+        src_path = Path(__file__).parent.parent.parent / 'src'
+        sys.path.insert(0, str(src_path))
+        
+        from backtest.config import BacktestConfig
         config = BacktestConfig(
             start_date=request.start_date,
             end_date=request.end_date,
             universe_id=request.universe_id,
+            name=request.name,
             initial_capital=request.initial_capital,
             rebalancing_frequency=request.rebalancing_frequency,
             evaluation_period=request.evaluation_period,
@@ -64,7 +72,7 @@ async def create_backtest(request: BacktestCreateRequest):
         )
         
         # Run the backtest
-        from src.backtest.engine import BacktestEngine
+        from backtest.engine import BacktestEngine
         engine = BacktestEngine()
         
         # Get universe tickers
@@ -78,7 +86,7 @@ async def create_backtest(request: BacktestCreateRequest):
         )
         
         # Get the created backtest from database
-        backtest = db_service.get_backtest_by_run_id(result.run_id)
+        backtest = db_service.get_backtest_by_run_id(result.backtest_id)
         if backtest is None:
             raise HTTPException(status_code=500, detail="Failed to retrieve created backtest")
         

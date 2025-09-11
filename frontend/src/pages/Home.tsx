@@ -43,12 +43,12 @@ const Home: React.FC = () => {
       features: ['Create Universes', 'Ticker Management', 'Validation Tools']
     },
     {
-      title: 'Backtest Explorer',
-      description: 'Explore detailed backtest results and performance',
+      title: 'Run Backtest',
+      description: 'Configure and execute new quantitative trading strategies',
       icon: <TrendingUpIcon sx={{ fontSize: 48, color: 'success.main' }} />,
-      path: '/backtest',
+      path: '/run-backtest',
       color: 'success' as const,
-      features: ['Historical Analysis', 'Signal Evaluation', 'Portfolio Optimization']
+      features: ['Strategy Configuration', 'Preflight Validation', 'Real-time Execution']
     },
     {
       title: 'Strategy Analysis',

@@ -28,6 +28,7 @@ class BacktestResponse(BaseModel):
     """Backtest response model."""
     id: int = Field(..., description="Backtest ID")
     run_id: str = Field(..., description="Unique run identifier")
+    name: Optional[str] = Field(None, description="Backtest name")
     start_date: date = Field(..., description="Backtest start date")
     end_date: date = Field(..., description="Backtest end date")
     frequency: str = Field(..., description="Rebalancing frequency")
@@ -55,6 +56,7 @@ class BacktestCreateRequest(BaseModel):
     end_date: date = Field(..., description="Backtest end date")
     universe_id: int = Field(..., description="Universe ID to use for backtesting")
     signals: List[str] = Field(..., description="List of signal IDs to use")
+    name: Optional[str] = Field(None, description="Backtest name")
     initial_capital: float = Field(10000.0, ge=0, description="Initial capital for backtesting")
     rebalancing_frequency: str = Field("monthly", description="Rebalancing frequency")
     evaluation_period: str = Field("monthly", description="Evaluation period for returns calculation")

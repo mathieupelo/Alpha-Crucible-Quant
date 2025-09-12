@@ -341,14 +341,14 @@ class DatabaseManager:
                 params = None
         
         return Portfolio(
-            id=row['id'],
-            run_id=row['run_id'],
-            universe_id=row['universe_id'],
+            id=int(row['id']),
+            run_id=str(row['run_id']),
+            universe_id=int(row['universe_id']),
             asof_date=row['asof_date'],
-            method=row['method'],
+            method=str(row['method']),
             params=params,
-            cash=row.get('cash', 0.0),
-            notes=row.get('notes'),
+            cash=float(row.get('cash', 0.0)),
+            notes=str(row.get('notes')) if pd.notna(row.get('notes')) else None,
             created_at=row.get('created_at')
         )
     

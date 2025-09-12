@@ -115,26 +115,30 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
     }
   );
 
+  // Fetch universe tickers data
+  const {
+    data: universeTickersData,
+    isLoading: universeTickersLoading,
+  } = useQuery(
+    ['portfolio-universe-tickers', portfolio.id],
+    () => portfolioApi.getPortfolioUniverseTickers(portfolio.id),
+    {
+      enabled: !!portfolio.id,
+    }
+  );
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Get all unique tickers from portfolio positions for consistency across tabs
-  const portfolioTickers = portfolioDetails?.positions?.map((pos: Position) => pos.ticker) || [];
+  // Use universe tickers as the master list for all tabs
+  const universeTickers = universeTickersData?.tickers || [];
   
-  // Get all tickers from combined scores data (includes all tickers from backtest universe)
-  const scoreTickers = scoreData?.scores?.map((score: any) => score.ticker) || [];
+  // Sort the universe tickers for consistent display
+  const allTickers = universeTickers.sort();
   
-  // Get all tickers from signal data
-  const signalTickers = signalData?.signals?.map((signal: any) => signal.ticker) || [];
-  
-  // Combine all sources and get unique tickers, prioritizing combined scores as the source of truth
-  const allTickers = [...new Set([...scoreTickers, ...signalTickers, ...portfolioTickers])];
-  const uniqueTickers = allTickers.sort();
-  
-  // Note: The current implementation only shows tickers that have data in at least one source
-  // This is because the backtest engine only calculates combined scores for tickers that make it into the portfolio
-  // In a full implementation, this would show all tickers from the backtest universe
+  // Note: Now we show ALL tickers from the universe, not just those with positions
+  // This allows users to see the complete universe context
 
   const getWeightColor = (weight: number): 'success' | 'error' | 'default' => {
     if (weight > 0.1) return 'success';
@@ -236,26 +240,29 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
         {/* Tabs for different views */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Positions" />
+            <Tab label="Weights" />
             <Tab label="Signal Scores" />
             <Tab label="Combined Scores" />
           </Tabs>
         </Box>
 
-        {/* Positions Tab */}
+        {/* Weights Tab */}
         <TabPanel value={tabValue} index={0}>
           <Typography variant="h6" gutterBottom>
-            Portfolio Positions
+            Portfolio Weights
           </Typography>
-          {portfolioLoading ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Portfolio weights for all tickers in the universe. Tickers without allocations show 0% weight.
+          </Alert>
+          {portfolioLoading || universeTickersLoading ? (
             <Box>
               {[...Array(5)].map((_, index) => (
                 <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1 }} />
               ))}
             </Box>
           ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>Ticker</TableCell>
@@ -265,7 +272,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {uniqueTickers.map((ticker) => {
+                  {allTickers.map((ticker) => {
                     // Find position data for this ticker
                     const position = portfolioDetails?.positions?.find((pos: Position) => pos.ticker === ticker);
                     
@@ -304,10 +311,10 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             Signal Scores
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Signal scores for each stock at this portfolio date. Values typically range from -1 to 1 (depending on the signal).
-            Only tickers with available signal data are shown.
+            Signal scores for all tickers in the universe. Values typically range from -1 to 1 (depending on the signal).
+            Missing scores are shown as —.
           </Alert>
-          {signalLoading ? (
+          {signalLoading || universeTickersLoading ? (
             <Box>
               <Skeleton variant="rectangular" height={200} />
             </Box>
@@ -323,9 +330,30 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
               // Handle case where no signals are available
               if (availableSignals.length === 0) {
                 return (
-                  <Alert severity="info">
-                    This portfolio has no signal scores.
-                  </Alert>
+                  <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    <Table stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Ticker</TableCell>
+                          <TableCell align="right">Signal Scores</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {allTickers.map((ticker) => (
+                          <TableRow key={ticker}>
+                            <TableCell>
+                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                {ticker}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              —
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 );
               }
               
@@ -339,8 +367,8 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
               }
               
               return (
-                <TableContainer component={Paper} variant="outlined">
-                  <Table>
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  <Table stickyHeader>
                     <TableHead>
                       <TableRow>
                         <TableCell>Ticker</TableCell>
@@ -352,7 +380,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {uniqueTickers.map((ticker) => {
+                      {allTickers.map((ticker) => {
                         // Find signal data for this ticker
                         const tickerSignalData = signalData.signals.find((signal: any) => signal.ticker === ticker);
                         
@@ -380,9 +408,9 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
               );
             })()
           ) : (
-            // Show all portfolio tickers even if no signal data
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
+            // Show all universe tickers even if no signal data
+            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>Ticker</TableCell>
@@ -390,7 +418,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {uniqueTickers.map((ticker) => (
+                  {allTickers.map((ticker) => (
                     <TableRow key={ticker}>
                       <TableCell>
                         <Typography variant="body1" sx={{ fontWeight: 500 }}>
@@ -414,11 +442,11 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             Combined Scores
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Combined signal scores for each stock using the equal-weight method. 
-            Only tickers with non-zero portfolio weights are shown due to current implementation limitations.
+            Combined signal scores for all tickers in the universe using the equal-weight method. 
+            Missing scores are shown as —.
           </Alert>
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
+          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+            <Table stickyHeader>
               <TableHead>
                 <TableRow>
                   <TableCell>Ticker</TableCell>
@@ -427,7 +455,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                 </TableRow>
               </TableHead>
               <TableBody>
-                {scoreLoading ? (
+                {scoreLoading || universeTickersLoading ? (
                   <TableRow>
                     <TableCell colSpan={3} align="center">
                       <Skeleton variant="text" width="100%" />
@@ -452,7 +480,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                     </TableCell>
                   </TableRow>
                 ) : scoreData?.scores && scoreData.scores.length > 0 ? (
-                  uniqueTickers.map((ticker) => {
+                  allTickers.map((ticker) => {
                     // Find combined score data for this ticker
                     const tickerScoreData = scoreData.scores.find((score: any) => score.ticker === ticker);
                     
@@ -480,8 +508,8 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                     );
                   })
                 ) : (
-                  // Show all portfolio tickers even if no score data
-                  uniqueTickers.map((ticker) => (
+                  // Show all universe tickers even if no score data
+                  allTickers.map((ticker) => (
                     <TableRow key={ticker}>
                       <TableCell>
                         <Typography variant="body1" sx={{ fontWeight: 500 }}>

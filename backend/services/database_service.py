@@ -181,11 +181,11 @@ class DatabaseService:
             if not positions_df.empty:
                 for _, row in positions_df.iterrows():
                     position = PositionResponse(
-                        id=row['id'],
-                        portfolio_id=row['portfolio_id'],
-                        ticker=row['ticker'],
-                        weight=row['weight'],
-                        price_used=row['price_used'],
+                        id=int(row['id']),
+                        portfolio_id=int(row['portfolio_id']),
+                        ticker=str(row['ticker']),
+                        weight=float(row['weight']),
+                        price_used=float(row['price_used']),
                         created_at=row['created_at']
                     )
                     positions.append(position)
@@ -215,20 +215,20 @@ class DatabaseService:
     def get_portfolio_signals(self, portfolio_id: int) -> List[Dict[str, Any]]:
         """Get signal scores for a specific portfolio."""
         try:
-            # Get portfolio details to get the date
+            # Get portfolio details to get the date and universe
             portfolio = self.db_manager.get_portfolio_by_id(portfolio_id)
             if portfolio is None:
                 return []
             
-            # Get portfolio positions to get the tickers
-            positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
-            if positions_df.empty:
+            # Get all universe tickers instead of just portfolio positions
+            universe_tickers_df = self.db_manager.get_universe_tickers(portfolio.universe_id)
+            if universe_tickers_df.empty:
                 return []
             
-            # Get the tickers from positions
-            tickers = positions_df['ticker'].tolist()
+            # Get the tickers from universe
+            tickers = universe_tickers_df['ticker'].tolist()
             
-            # Get signal scores for the portfolio date and tickers
+            # Get signal scores for the portfolio date and all universe tickers
             signals_df = self.db_manager.get_signals_raw(
                 tickers=tickers,
                 start_date=portfolio.asof_date,
@@ -239,21 +239,24 @@ class DatabaseService:
             if not signals_df.empty:
                 # Get all unique signal names from the data
                 available_signals = signals_df['signal_name'].unique().tolist()
+            else:
+                available_signals = []
+            
+            # Create signal data for ALL universe tickers, not just those with data
+            for ticker in tickers:
+                signal_data = {
+                    'ticker': str(ticker),
+                    'available_signals': [str(signal) for signal in available_signals]
+                }
                 
-                # Group by ticker and create signal score objects
-                for ticker in signals_df['ticker'].unique():
+                # Add signal values if they exist for this ticker
+                if not signals_df.empty:
                     ticker_signals = signals_df[signals_df['ticker'] == ticker]
-                    signal_data = {
-                        'ticker': ticker,
-                        'available_signals': available_signals
-                    }
-                    
-                    # Add each signal value to the data
                     for _, row in ticker_signals.iterrows():
-                        signal_name = row['signal_name']
-                        signal_data[signal_name] = row['value']
-                    
-                    signals.append(signal_data)
+                        signal_name = str(row['signal_name'])
+                        signal_data[signal_name] = float(row['value']) if pd.notna(row['value']) else None
+                
+                signals.append(signal_data)
             
             return signals
             
@@ -264,20 +267,20 @@ class DatabaseService:
     def get_portfolio_scores(self, portfolio_id: int) -> List[Dict[str, Any]]:
         """Get combined scores for a specific portfolio."""
         try:
-            # Get portfolio details to get the date and positions
+            # Get portfolio details to get the date and universe
             portfolio = self.db_manager.get_portfolio_by_id(portfolio_id)
             if portfolio is None:
                 return []
             
-            # Get portfolio positions to get the tickers
-            positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
-            if positions_df.empty:
+            # Get all universe tickers instead of just portfolio positions
+            universe_tickers_df = self.db_manager.get_universe_tickers(portfolio.universe_id)
+            if universe_tickers_df.empty:
                 return []
             
-            # Get the tickers from positions
-            tickers = positions_df['ticker'].tolist()
+            # Get the tickers from universe
+            tickers = universe_tickers_df['ticker'].tolist()
             
-            # Get combined scores for the portfolio date and tickers
+            # Get combined scores for the portfolio date and all universe tickers
             scores_df = self.db_manager.get_scores_combined(
                 tickers=tickers,
                 start_date=portfolio.asof_date,
@@ -285,14 +288,24 @@ class DatabaseService:
             )
             
             scores = []
-            if not scores_df.empty:
-                for _, row in scores_df.iterrows():
-                    score_data = {
-                        'ticker': row['ticker'],
-                        'combined_score': row['score'],
-                        'method': row['method']
-                    }
-                    scores.append(score_data)
+            
+            # Create score data for ALL universe tickers, not just those with data
+            for ticker in tickers:
+                score_data = {
+                    'ticker': str(ticker),
+                    'combined_score': None,
+                    'method': None
+                }
+                
+                # Add score data if it exists for this ticker
+                if not scores_df.empty:
+                    ticker_scores = scores_df[scores_df['ticker'] == ticker]
+                    if not ticker_scores.empty:
+                        row = ticker_scores.iloc[0]
+                        score_data['combined_score'] = float(row['score']) if pd.notna(row['score']) else None
+                        score_data['method'] = str(row['method'])
+                
+                scores.append(score_data)
             
             return scores
             
@@ -442,15 +455,15 @@ class DatabaseService:
             universes = []
             for _, row in universes_df.iterrows():
                 # Get ticker count for each universe
-                tickers_df = self.db_manager.get_universe_tickers(row['id'])
+                tickers_df = self.db_manager.get_universe_tickers(int(row['id']))
                 ticker_count = len(tickers_df)
                 
                 universe_data = {
-                    "id": row['id'],
-                    "name": row['name'],
-                    "description": row.get('description'),
-                    "created_at": row['created_at'],
-                    "updated_at": row['updated_at'],
+                    "id": int(row['id']),
+                    "name": str(row['name']),
+                    "description": str(row.get('description')) if pd.notna(row.get('description')) else None,
+                    "created_at": row['created_at'].isoformat() if pd.notna(row['created_at']) else None,
+                    "updated_at": row['updated_at'].isoformat() if pd.notna(row['updated_at']) else None,
                     "ticker_count": ticker_count
                 }
                 universes.append(universe_data)
@@ -576,10 +589,10 @@ class DatabaseService:
             tickers = []
             for _, row in tickers_df.iterrows():
                 ticker_data = {
-                    "id": row['id'],
-                    "universe_id": row['universe_id'],
-                    "ticker": row['ticker'],
-                    "added_at": row['added_at']
+                    "id": int(row['id']),
+                    "universe_id": int(row['universe_id']),
+                    "ticker": str(row['ticker']),
+                    "added_at": row['added_at'].isoformat() if pd.notna(row['added_at']) else None
                 }
                 tickers.append(ticker_data)
             
@@ -675,10 +688,10 @@ class DatabaseService:
             signals = []
             for _, row in signals_df.iterrows():
                 signal_data = {
-                    "id": row.get('id'),
+                    "id": int(row.get('id')) if pd.notna(row.get('id')) else None,
                     "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
-                    "ticker": row['ticker'],
-                    "signal_name": row['signal_name'],
+                    "ticker": str(row['ticker']),
+                    "signal_name": str(row['signal_name']),
                     "value": float(row['value']) if pd.notna(row['value']) else None,
                     "metadata": self._parse_json_field(row.get('metadata')),
                     "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None

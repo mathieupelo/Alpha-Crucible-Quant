@@ -134,6 +134,12 @@ export const portfolioApi = {
   getPortfolioScores: async (portfolioId: number): Promise<{ scores: any[]; total: number; portfolio_id: number }> => {
     const response = await api.get(`/portfolios/${portfolioId}/scores`);
     return response.data;
+  },
+
+  // Get portfolio universe tickers
+  getPortfolioUniverseTickers: async (portfolioId: number): Promise<{ tickers: string[]; total: number; portfolio_id: number; universe_id: number }> => {
+    const response = await api.get(`/portfolios/${portfolioId}/universe-tickers`);
+    return response.data;
   }
 };
 

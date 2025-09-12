@@ -14,7 +14,8 @@ import uuid
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from database import DatabaseManager, PortfolioValue, PortfolioWeight
+from database import DatabaseManager
+from database.models import Portfolio, PortfolioPosition
 
 
 def test_portfolio_storage():

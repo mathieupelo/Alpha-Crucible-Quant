@@ -47,7 +47,7 @@ class TestSignalCalculator:
         }, index=self.dates.date)
         
         self.tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
-        self.signals = ['RSI', 'SMA', 'MACD']
+        self.signals = ['SENTIMENT']
         self.start_date = date(2024, 1, 1)
         self.end_date = date(2024, 1, 31)
     
@@ -299,7 +299,7 @@ class TestSignalCalculator:
     
     def test_calculate_signals_invalid_signal_names(self):
         """Test signal calculation with invalid signal names."""
-        invalid_signals = ['INVALID1', 'INVALID2', 'RSI']
+        invalid_signals = ['INVALID1', 'INVALID2', 'SENTIMENT']
         self.price_fetcher.get_price_history.return_value = self.price_data
         
         result = self.calculator.calculate_signals(
@@ -311,7 +311,7 @@ class TestSignalCalculator:
     
     def test_calculate_signals_mixed_valid_invalid_signals(self):
         """Test signal calculation with mixed valid and invalid signals."""
-        mixed_signals = ['RSI', 'INVALID', 'SMA', 'INVALID2', 'MACD']
+        mixed_signals = ['SENTIMENT', 'INVALID', 'SENTIMENT', 'INVALID2', 'SENTIMENT']
         self.price_fetcher.get_price_history.return_value = self.price_data
         
         result = self.calculator.calculate_signals(
@@ -362,7 +362,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = self.price_data
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', self.start_date
+            'AAPL', 'SENTIMENT', self.start_date
         )
         
         assert result is not None
@@ -375,7 +375,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = None
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', self.start_date
+            'AAPL', 'SENTIMENT', self.start_date
         )
         
         assert result is None
@@ -385,7 +385,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = pd.DataFrame()
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', self.start_date
+            'AAPL', 'SENTIMENT', self.start_date
         )
         
         assert result is None
@@ -406,7 +406,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = short_data
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', self.start_date
+            'AAPL', 'SENTIMENT', self.start_date
         )
         
         assert result is None
@@ -417,7 +417,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = self.price_data
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', future_date
+            'AAPL', 'SENTIMENT', future_date
         )
         
         assert result is None
@@ -428,7 +428,7 @@ class TestSignalCalculator:
         self.price_fetcher.get_price_history.return_value = self.price_data
         
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', past_date
+            'AAPL', 'SENTIMENT', past_date
         )
         
         # Should handle past dates gracefully
@@ -438,12 +438,12 @@ class TestSignalCalculator:
         """Test signal combination with equal weight method."""
         # Mock raw signals data
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'MACD', 'value': 0.1},
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.2},
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.4},
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'MACD', 'value': 0.6},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.1},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.2},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.4},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.6},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -465,13 +465,13 @@ class TestSignalCalculator:
         """Test signal combination with weighted method."""
         # Mock raw signals data
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
         
-        method_params = {'weights': {'RSI': 0.6, 'SMA': 0.4}}
+        method_params = {'weights': {'SENTIMENT': 0.6, 'SENTIMENT': 0.4}}
         
         result = self.calculator.combine_signals_to_scores(
             self.tickers, self.signals, self.start_date, self.end_date, 
@@ -488,8 +488,8 @@ class TestSignalCalculator:
         """Test signal combination with z-score method."""
         # Mock raw signals data
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -504,7 +504,7 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_invalid_method(self):
         """Test signal combination with invalid method."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -531,10 +531,10 @@ class TestSignalCalculator:
         """Test signal combination with missing signals."""
         # Mock raw signals data with missing signals
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            # Missing SMA signal for AAPL
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.2},
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.4},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            # Missing SENTIMENT signal for AAPL
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.2},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.4},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -549,8 +549,8 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_nan_values(self):
         """Test signal combination with NaN values."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': np.nan},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': np.nan},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -565,8 +565,8 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_inf_values(self):
         """Test signal combination with infinite values."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': np.inf},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': np.inf},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -581,13 +581,13 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_zero_weights(self):
         """Test signal combination with zero weights."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
         
-        method_params = {'weights': {'RSI': 0.0, 'SMA': 0.0}}
+        method_params = {'weights': {'SENTIMENT': 0.0, 'SENTIMENT': 0.0}}
         
         result = self.calculator.combine_signals_to_scores(
             self.tickers, self.signals, self.start_date, self.end_date, 
@@ -600,13 +600,13 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_negative_weights(self):
         """Test signal combination with negative weights."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
         
-        method_params = {'weights': {'RSI': 0.6, 'SMA': -0.4}}
+        method_params = {'weights': {'SENTIMENT': 0.6, 'SENTIMENT': -0.4}}
         
         result = self.calculator.combine_signals_to_scores(
             self.tickers, self.signals, self.start_date, self.end_date, 
@@ -619,13 +619,13 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_single_signal(self):
         """Test signal combination with single signal."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
         
         result = self.calculator.combine_signals_to_scores(
-            self.tickers, ['RSI'], self.start_date, self.end_date, method='equal_weight'
+            self.tickers, ['SENTIMENT'], self.start_date, self.end_date, method='equal_weight'
         )
         
         assert isinstance(result, pd.DataFrame)
@@ -636,8 +636,8 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_store_in_db_true(self):
         """Test signal combination with database storage enabled."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -654,8 +654,8 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_store_in_db_false(self):
         """Test signal combination with database storage disabled."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -672,8 +672,8 @@ class TestSignalCalculator:
     def test_combine_signals_to_scores_database_error(self):
         """Test signal combination with database error."""
         raw_signals_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.3},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.3},
         ])
         
         self.database_manager.get_signals_raw.return_value = raw_signals_data
@@ -690,7 +690,7 @@ class TestSignalCalculator:
     def test_get_signals_raw(self):
         """Test getting raw signals from database."""
         mock_data = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
         ])
         
         self.database_manager.get_signals_raw.return_value = mock_data
@@ -775,10 +775,10 @@ class TestSignalCalculator:
         """Test getting missing signals."""
         # Mock existing signals
         existing_signals = pd.DataFrame([
-            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.5},
-            # Missing SMA for AAPL
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'RSI', 'value': 0.2},
-            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SMA', 'value': 0.4},
+            {'ticker': 'AAPL', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.5},
+            # Missing SENTIMENT for AAPL
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.2},
+            {'ticker': 'MSFT', 'asof_date': self.start_date, 'signal_name': 'SENTIMENT', 'value': 0.4},
         ])
         
         self.database_manager.get_signals_raw.return_value = existing_signals
@@ -816,8 +816,8 @@ class TestSignalCalculator:
         """Test calculating missing signals."""
         # Mock missing signals
         missing_signals = [
-            ('AAPL', 'RSI', self.start_date),
-            ('AAPL', 'SMA', self.start_date),
+            ('AAPL', 'SENTIMENT', self.start_date),
+            ('AAPL', 'SENTIMENT', self.start_date),
         ]
         
         self.calculator.get_missing_signals = Mock(return_value=missing_signals)
@@ -843,7 +843,7 @@ class TestSignalCalculator:
     
     def test_calculate_missing_signals_database_error(self):
         """Test calculating missing signals with database error."""
-        missing_signals = [('AAPL', 'RSI', self.start_date)]
+        missing_signals = [('AAPL', 'SENTIMENT', self.start_date)]
         self.calculator.get_missing_signals = Mock(return_value=missing_signals)
         self.price_fetcher.get_price_history.return_value = self.price_data
         self.database_manager.store_signals_raw.side_effect = Exception("Database error")
@@ -861,7 +861,7 @@ class TestSignalCalculator:
         
         # Create large dataset
         large_tickers = [f'TICKER_{i:03d}' for i in range(100)]
-        large_signals = ['RSI', 'SMA', 'MACD']
+        large_signals = ['SENTIMENT', 'SENTIMENT', 'SENTIMENT']
         
         self.price_fetcher.get_price_history.return_value = self.price_data
         
@@ -879,7 +879,7 @@ class TestSignalCalculator:
         """Test calculator memory efficiency."""
         # Create large dataset
         large_tickers = [f'TICKER_{i:03d}' for i in range(1000)]
-        large_signals = ['RSI', 'SMA', 'MACD']
+        large_signals = ['SENTIMENT', 'SENTIMENT', 'SENTIMENT']
         
         self.price_fetcher.get_price_history.return_value = self.price_data
         

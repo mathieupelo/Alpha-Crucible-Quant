@@ -14,38 +14,39 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from database import DatabaseManager, SignalScore, SignalDefinition
+from database import DatabaseManager
+from database.models import SignalRaw, ScoreCombined
 from database.models import DataFrameConverter
 from solver import Portfolio
 from backtest import BacktestResult
 
 
-class TestSignalScore:
-    """Test SignalScore model."""
+class TestScoreCombined:
+    """Test ScoreCombined model."""
     
-    def test_signal_score_creation(self):
-        """Test SignalScore creation."""
-        score = SignalScore(
+    def test_score_combined_creation(self):
+        """Test ScoreCombined creation."""
+        score = ScoreCombined(
+            asof_date=date(2024, 1, 15),
             ticker='AAPL',
-            signal_id='RSI',
-            date=date(2024, 1, 15),
-            score=0.5
+            score=0.5,
+            method='equal_weight'
         )
         
         assert score.ticker == 'AAPL'
-        assert score.signal_id == 'RSI'
-        assert score.date == date(2024, 1, 15)
+        assert score.method == 'equal_weight'
+        assert score.asof_date == date(2024, 1, 15)
         assert score.score == 0.5
         assert score.created_at is None
     
-    def test_signal_score_with_created_at(self):
-        """Test SignalScore with created_at timestamp."""
+    def test_score_combined_with_created_at(self):
+        """Test ScoreCombined with created_at timestamp."""
         created_at = datetime.now()
-        score = SignalScore(
+        score = ScoreCombined(
+            asof_date=date(2024, 1, 15),
             ticker='AAPL',
-            signal_id='RSI',
-            date=date(2024, 1, 15),
             score=0.5,
+            method='equal_weight',
             created_at=created_at
         )
         
@@ -262,8 +263,8 @@ class TestDataFrameConverter:
     def test_signal_scores_to_dataframe(self):
         """Test converting signal scores to DataFrame."""
         scores = [
-            SignalScore('AAPL', 'RSI', date(2024, 1, 15), 0.5),
-            SignalScore('MSFT', 'RSI', date(2024, 1, 15), 0.3)
+            SignalScore('AAPL', 'SENTIMENT', date(2024, 1, 15), 0.5),
+            SignalScore('MSFT', 'SENTIMENT', date(2024, 1, 15), 0.3)
         ]
         
         df = DataFrameConverter.signal_scores_to_dataframe(scores)
@@ -276,14 +277,14 @@ class TestDataFrameConverter:
     def test_dataframe_to_signal_scores(self):
         """Test converting DataFrame to signal scores."""
         df = pd.DataFrame([
-            {'ticker': 'AAPL', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.5},
-            {'ticker': 'MSFT', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.3}
+            {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.5},
+            {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.3}
         ])
         
         scores = DataFrameConverter.dataframe_to_signal_scores(df)
         assert len(scores) == 2
         assert scores[0].ticker == 'AAPL'
-        assert scores[0].signal_id == 'RSI'
+        assert scores[0].signal_id == 'SENTIMENT'
         assert scores[0].score == 0.5
     
     def test_portfolios_to_dataframe(self):
@@ -423,8 +424,8 @@ class TestDatabaseManager:
         self.db_manager._connection = mock_conn
         
         scores = [
-            SignalScore('AAPL', 'RSI', date(2024, 1, 15), 0.5),
-            SignalScore('MSFT', 'RSI', date(2024, 1, 15), 0.3)
+            SignalScore('AAPL', 'SENTIMENT', date(2024, 1, 15), 0.5),
+            SignalScore('MSFT', 'SENTIMENT', date(2024, 1, 15), 0.3)
         ]
         
         result = self.db_manager.store_signal_scores(scores)
@@ -447,12 +448,12 @@ class TestDatabaseManager:
         # Mock pandas.read_sql
         with patch('pandas.read_sql') as mock_read_sql:
             mock_df = pd.DataFrame([
-                {'ticker': 'AAPL', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.5},
-                {'ticker': 'MSFT', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.3}
+                {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.5},
+                {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.3}
             ])
             mock_read_sql.return_value = mock_df
             
-            result = self.db_manager.get_signal_scores(['AAPL', 'MSFT'], ['RSI'])
+            result = self.db_manager.get_signal_scores(['AAPL', 'MSFT'], ['SENTIMENT'])
             assert isinstance(result, pd.DataFrame)
             assert len(result) == 2
     
@@ -465,12 +466,12 @@ class TestDatabaseManager:
         # Mock pandas.read_sql
         with patch('pandas.read_sql') as mock_read_sql:
             mock_df = pd.DataFrame([
-                {'ticker': 'AAPL', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.5},
-                {'ticker': 'MSFT', 'signal_id': 'RSI', 'date': date(2024, 1, 15), 'score': 0.3}
+                {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.5},
+                {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'date': date(2024, 1, 15), 'score': 0.3}
             ])
             mock_read_sql.return_value = mock_df
             
-            result = self.db_manager.get_signal_scores_dataframe(['AAPL', 'MSFT'], ['RSI'], 
+            result = self.db_manager.get_signal_scores_dataframe(['AAPL', 'MSFT'], ['SENTIMENT'], 
                                                                date(2024, 1, 1), date(2024, 1, 31))
             assert isinstance(result, pd.DataFrame)
     

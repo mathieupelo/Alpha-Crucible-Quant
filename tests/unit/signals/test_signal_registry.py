@@ -14,9 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / 'src'))
 
 from signals.registry import SignalRegistry
 from signals.base import SignalBase
-from signals.rsi import RSISignal
-from signals.sma import SMASignal
-from signals.macd import MACDSignal
+from signals.sentiment import SentimentSignal
 
 
 class TestSignal:
@@ -48,9 +46,7 @@ class TestSignalRegistry:
         """Test registry initialization."""
         assert isinstance(self.registry, SignalRegistry)
         assert len(self.registry) > 0
-        assert 'RSI' in self.registry
-        assert 'SMA' in self.registry
-        assert 'MACD' in self.registry
+        assert 'SENTIMENT' in self.registry
     
     def test_register_signal_valid(self):
         """Test registering a valid signal."""

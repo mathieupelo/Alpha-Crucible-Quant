@@ -14,20 +14,20 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from signals import RSISignal, SMASignal, MACDSignal, SignalCalculator
+from signals import SentimentSignal, SignalCalculator
 from signals.registry import SignalRegistry
 
 
-class TestRSISignal:
-    """Test RSI signal implementation."""
+class TestSentimentSignal:
+    """Test Sentiment signal implementation."""
     
     def setup_method(self):
         """Setup test data."""
-        self.signal = RSISignal(period=14)
+        self.signal = SentimentSignal()
         self.ticker = 'AAPL'
         self.target_date = date(2024, 1, 15)
         
-        # Create mock price data
+        # Create mock price data (sentiment doesn't need price data)
         dates = pd.date_range(start='2023-12-01', end='2024-01-15', freq='D')
         np.random.seed(42)
         prices = 100 + np.cumsum(np.random.randn(len(dates)) * 0.02)
@@ -36,49 +36,52 @@ class TestRSISignal:
             'Close': prices
         }, index=dates.date)
     
-    def test_rsi_initialization(self):
-        """Test RSI signal initialization."""
-        assert self.signal.signal_id == 'RSI'
-        assert self.signal.name == 'Relative Strength Index'
-        assert self.signal.period == 14
-        assert self.signal.get_min_lookback_period() == 24  # 14 + 10
-        assert self.signal.get_max_lookback_period() == 42  # 14 * 3
+    def test_sentiment_initialization(self):
+        """Test Sentiment signal initialization."""
+        assert self.signal.signal_id == 'SENTIMENT'
+        assert self.signal.name == 'Sentiment Signal'
+        assert self.signal.get_min_lookback_period() == 0  # Sentiment doesn't need price data
+        assert self.signal.get_max_lookback_period() == 0  # Sentiment doesn't need price data
     
-    def test_rsi_calculation_valid_data(self):
-        """Test RSI calculation with valid data."""
+    def test_sentiment_calculation_valid_data(self):
+        """Test Sentiment calculation with valid data."""
         result = self.signal.calculate(self.price_data, self.ticker, self.target_date)
         
         assert not np.isnan(result)
         assert -1.0 <= result <= 1.0
     
-    def test_rsi_calculation_insufficient_data(self):
-        """Test RSI calculation with insufficient data."""
+    def test_sentiment_calculation_insufficient_data(self):
+        """Test Sentiment calculation with insufficient data."""
         # Create price data with only 10 days
         short_data = self.price_data.tail(10)
         result = self.signal.calculate(short_data, self.ticker, self.target_date)
         
-        assert np.isnan(result)
+        # Sentiment signal should still work with insufficient data
+        assert not np.isnan(result)
+        assert -1.0 <= result <= 1.0
     
-    def test_rsi_calculation_missing_date(self):
-        """Test RSI calculation with missing target date."""
+    def test_sentiment_calculation_missing_date(self):
+        """Test Sentiment calculation with missing target date."""
         # Remove target date from data
         data_without_date = self.price_data[self.price_data.index != self.target_date]
         result = self.signal.calculate(data_without_date, self.ticker, self.target_date)
         
         assert np.isnan(result)
     
-    def test_rsi_calculation_empty_data(self):
-        """Test RSI calculation with empty data."""
+    def test_sentiment_calculation_empty_data(self):
+        """Test Sentiment calculation with empty data."""
         empty_data = pd.DataFrame()
         result = self.signal.calculate(empty_data, self.ticker, self.target_date)
         
         assert np.isnan(result)
     
-    def test_rsi_calculation_none_data(self):
-        """Test RSI calculation with None data."""
+    def test_sentiment_calculation_none_data(self):
+        """Test Sentiment calculation with None data."""
         result = self.signal.calculate(None, self.ticker, self.target_date)
         
-        assert np.isnan(result)
+        # Sentiment signal should work even with None data
+        assert not np.isnan(result)
+        assert -1.0 <= result <= 1.0
     
     def test_rsi_validation(self):
         """Test RSI data validation."""
@@ -100,110 +103,6 @@ class TestRSISignal:
         expected_start = self.target_date - timedelta(days=42)
         assert start_date == expected_start
         assert end_date == self.target_date
-
-
-class TestSMASignal:
-    """Test SMA signal implementation."""
-    
-    def setup_method(self):
-        """Setup test data."""
-        self.signal = SMASignal(short_period=50, long_period=200)
-        self.ticker = 'MSFT'
-        self.target_date = date(2024, 1, 15)
-        
-        # Create mock price data
-        dates = pd.date_range(start='2023-06-01', end='2024-01-15', freq='D')
-        np.random.seed(42)
-        prices = 200 + np.cumsum(np.random.randn(len(dates)) * 0.01)
-        
-        self.price_data = pd.DataFrame({
-            'Close': prices
-        }, index=dates.date)
-    
-    def test_sma_initialization(self):
-        """Test SMA signal initialization."""
-        assert self.signal.signal_id == 'SMA'
-        assert self.signal.name == 'Simple Moving Average'
-        assert self.signal.short_period == 50
-        assert self.signal.long_period == 200
-        assert self.signal.get_min_lookback_period() == 210  # 200 + 10
-        assert self.signal.get_max_lookback_period() == 400  # 200 * 2
-    
-    def test_sma_calculation_valid_data(self):
-        """Test SMA calculation with valid data."""
-        result = self.signal.calculate(self.price_data, self.ticker, self.target_date)
-        
-        assert not np.isnan(result)
-        assert -1.0 <= result <= 1.0
-    
-    def test_sma_calculation_insufficient_data(self):
-        """Test SMA calculation with insufficient data."""
-        # Create price data with only 100 days
-        short_data = self.price_data.tail(100)
-        result = self.signal.calculate(short_data, self.ticker, self.target_date)
-        
-        assert np.isnan(result)
-    
-    def test_sma_get_sma_values(self):
-        """Test SMA raw values calculation."""
-        short_sma, long_sma = self.signal.get_sma_values(self.price_data, self.target_date)
-        
-        assert not np.isnan(short_sma)
-        assert not np.isnan(long_sma)
-        assert short_sma > 0
-        assert long_sma > 0
-
-
-class TestMACDSignal:
-    """Test MACD signal implementation."""
-    
-    def setup_method(self):
-        """Setup test data."""
-        self.signal = MACDSignal(fast_period=12, slow_period=26, signal_period=9)
-        self.ticker = 'GOOGL'
-        self.target_date = date(2024, 1, 15)
-        
-        # Create mock price data
-        dates = pd.date_range(start='2023-06-01', end='2024-01-15', freq='D')
-        np.random.seed(42)
-        prices = 150 + np.cumsum(np.random.randn(len(dates)) * 0.015)
-        
-        self.price_data = pd.DataFrame({
-            'Close': prices
-        }, index=dates.date)
-    
-    def test_macd_initialization(self):
-        """Test MACD signal initialization."""
-        assert self.signal.signal_id == 'MACD'
-        assert self.signal.name == 'Moving Average Convergence Divergence'
-        assert self.signal.fast_period == 12
-        assert self.signal.slow_period == 26
-        assert self.signal.signal_period == 9
-        assert self.signal.get_min_lookback_period() == 45  # 26 + 9 + 10
-        assert self.signal.get_max_lookback_period() == 78  # 26 * 3
-    
-    def test_macd_calculation_valid_data(self):
-        """Test MACD calculation with valid data."""
-        result = self.signal.calculate(self.price_data, self.ticker, self.target_date)
-        
-        assert not np.isnan(result)
-        assert -1.0 <= result <= 1.0
-    
-    def test_macd_calculation_insufficient_data(self):
-        """Test MACD calculation with insufficient data."""
-        # Create price data with only 30 days
-        short_data = self.price_data.tail(30)
-        result = self.signal.calculate(short_data, self.ticker, self.target_date)
-        
-        assert np.isnan(result)
-    
-    def test_macd_get_macd_values(self):
-        """Test MACD raw values calculation."""
-        macd_line, signal_line, histogram = self.signal.get_macd_values(self.price_data, self.target_date)
-        
-        assert not np.isnan(macd_line)
-        assert not np.isnan(signal_line)
-        assert not np.isnan(histogram)
 
 
 class TestSignalRegistry:

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 from signals.calculator import SignalCalculator
 from solver.solver import PortfolioSolver
 from solver.config import SolverConfig
+from solver.models import Portfolio
 from backtest.engine import BacktestEngine
 from backtest.config import BacktestConfig
 from database.manager import DatabaseManager
@@ -35,35 +36,59 @@ class TestEndToEndWorkflow:
         
         # Generate realistic price data for multiple tickers
         self.tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+        # Extend date range to provide more data for optimization
+        extended_dates = pd.date_range(start='2023-01-01', end='2024-01-31', freq='D')
         self.price_history = pd.DataFrame()
         
         for ticker in self.tickers:
             base_price = 100.0 if ticker == 'AAPL' else 200.0
-            returns = np.random.randn(len(self.dates)) * 0.02
+            returns = np.random.randn(len(extended_dates)) * 0.02
             prices = base_price * np.exp(np.cumsum(returns))
             self.price_history[ticker] = prices
         
-        self.price_history.index = self.dates.date
+        self.price_history.index = extended_dates.date
         
         # Setup components
         self.price_fetcher = Mock()
         self.database_manager = Mock()
         self.signal_calculator = SignalCalculator(self.database_manager)
-        self.portfolio_solver = PortfolioSolver()
+        
+        # Configure portfolio solver for testing
+        from solver.config import SolverConfig
+        solver_config = SolverConfig()
+        solver_config.allocation_method = "score_based"
+        solver_config.max_weight = 0.5  # Allow up to 50% per stock for testing
+        self.portfolio_solver = PortfolioSolver(solver_config)
         self.backtest_engine = BacktestEngine()
         
         # Mock price fetcher
         self.price_fetcher.get_price_history.return_value = self.price_history
+        
+        # Mock database manager to store and retrieve signals
+        self.stored_signals = []
+        self.database_manager.store_signals_raw.side_effect = lambda signals: self.stored_signals.extend(signals)
+        self.database_manager.get_signals_raw.side_effect = lambda tickers, signal_names, start_date, end_date: pd.DataFrame([
+            {
+                'asof_date': signal.asof_date,
+                'ticker': signal.ticker,
+                'signal_name': signal.signal_name,
+                'value': signal.value,
+                'metadata': signal.metadata,
+                'created_at': signal.created_at
+            } for signal in self.stored_signals
+            if signal.ticker in tickers and signal.signal_name in signal_names
+            and start_date <= signal.asof_date <= end_date
+        ])
     
     def test_complete_workflow_signal_calculation_to_portfolio(self):
         """Test complete workflow from signal calculation to portfolio creation."""
         # Step 1: Calculate signals
-        signals = ['RSI', 'SMA', 'MACD']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         
         signal_results = self.signal_calculator.calculate_signals(
-            self.tickers, signals, start_date, end_date, store_in_db=False
+            self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
         assert isinstance(signal_results, pd.DataFrame)
@@ -109,7 +134,7 @@ class TestEndToEndWorkflow:
     def test_complete_workflow_with_backtesting(self):
         """Test complete workflow including backtesting."""
         # Step 1: Calculate signals for backtesting period
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2023, 1, 1)
         end_date = date(2024, 1, 31)
         
@@ -156,7 +181,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_with_different_solver_configs(self):
         """Test workflow with different solver configurations."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -201,7 +226,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_with_different_signal_combinations(self):
         """Test workflow with different signal combination methods."""
-        signals = ['RSI', 'SMA', 'MACD']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -214,7 +239,7 @@ class TestEndToEndWorkflow:
         # Test different combination methods
         methods = [
             ('equal_weight', None),
-            ('weighted', {'weights': {'RSI': 0.5, 'SMA': 0.3, 'MACD': 0.2}}),
+            ('weighted', {'weights': {'SENTIMENT': 1.0}}),
             ('zscore', None),
         ]
         
@@ -248,7 +273,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_with_missing_data(self):
         """Test workflow with missing data scenarios."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -295,7 +320,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_with_extreme_data(self):
         """Test workflow with extreme data scenarios."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -344,7 +369,7 @@ class TestEndToEndWorkflow:
     def test_workflow_with_unicode_tickers(self):
         """Test workflow with unicode tickers."""
         unicode_tickers = ['AAPL', '测试', 'MSFT', 'GOOGL']
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -393,7 +418,7 @@ class TestEndToEndWorkflow:
         """Test workflow with large dataset."""
         # Create large dataset
         large_tickers = [f'TICKER_{i:03d}' for i in range(100)]
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -445,7 +470,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_with_database_errors(self):
         """Test workflow with database errors."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -492,7 +517,7 @@ class TestEndToEndWorkflow:
         """Test workflow performance."""
         import time
         
-        signals = ['RSI', 'SMA', 'MACD']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -533,7 +558,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_deterministic(self):
         """Test workflow is deterministic with same inputs."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -584,7 +609,7 @@ class TestEndToEndWorkflow:
         import threading
         import time
         
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -636,7 +661,7 @@ class TestEndToEndWorkflow:
         """Test workflow memory efficiency."""
         # Create large dataset
         large_tickers = [f'TICKER_{i:03d}' for i in range(1000)]
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -680,7 +705,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_error_handling(self):
         """Test workflow error handling."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -713,7 +738,7 @@ class TestEndToEndWorkflow:
         # Set up logging capture
         logger = logging.getLogger('signals.calculator')
         with patch.object(logger, 'info') as mock_info:
-            signals = ['RSI', 'SMA']
+            signals = ['SENTIMENT']
             start_date = date(2024, 1, 1)
             end_date = date(2024, 1, 31)
             
@@ -727,7 +752,7 @@ class TestEndToEndWorkflow:
     
     def test_workflow_validation(self):
         """Test workflow validation."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)

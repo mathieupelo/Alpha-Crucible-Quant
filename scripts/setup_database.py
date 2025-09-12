@@ -151,6 +151,7 @@ def create_tables():
             CREATE TABLE IF NOT EXISTS backtests (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 run_id VARCHAR(100) UNIQUE NOT NULL,
+                name VARCHAR(255),
                 start_date DATE NOT NULL,
                 end_date DATE NOT NULL,
                 frequency ENUM('daily', 'weekly', 'monthly', 'quarterly') NOT NULL,
@@ -160,6 +161,7 @@ def create_tables():
                 params JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_run_id (run_id),
+                INDEX idx_name (name),
                 INDEX idx_start_date (start_date),
                 INDEX idx_end_date (end_date),
                 INDEX idx_created_at (created_at),

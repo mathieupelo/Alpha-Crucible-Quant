@@ -79,6 +79,15 @@ class TestEndToEndWorkflow:
             if signal.ticker in tickers and signal.signal_name in signal_names
             and start_date <= signal.asof_date <= end_date
         ])
+        
+        # Mock database manager for backtest engine
+        self.database_manager.connect.return_value = True
+        self.database_manager.disconnect.return_value = None
+        self.database_manager.get_universes.return_value = pd.DataFrame([{'id': 1, 'name': 'Test Universe'}])
+        self.database_manager.get_universe_tickers.return_value = pd.DataFrame([{'ticker': ticker} for ticker in self.tickers])
+        
+        # Set the database manager for the backtest engine
+        self.backtest_engine.database_manager = self.database_manager
     
     def test_complete_workflow_signal_calculation_to_portfolio(self):
         """Test complete workflow from signal calculation to portfolio creation."""
@@ -139,7 +148,7 @@ class TestEndToEndWorkflow:
         end_date = date(2024, 1, 31)
         
         signal_results = self.signal_calculator.calculate_signals(
-            self.tickers, signals, start_date, end_date, store_in_db=False
+            self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
         assert isinstance(signal_results, pd.DataFrame)
@@ -156,6 +165,7 @@ class TestEndToEndWorkflow:
         
         # Step 3: Create backtest configuration
         backtest_config = BacktestConfig(
+            universe_id=1,
             start_date=start_date,
             end_date=end_date,
             initial_capital=100000.0,
@@ -169,7 +179,7 @@ class TestEndToEndWorkflow:
         
         # Step 4: Run backtest
         backtest_result = self.backtest_engine.run_backtest(
-            self.tickers, signals, backtest_config, self.price_history
+            self.tickers, signals, backtest_config
         )
         
         assert backtest_result is not None

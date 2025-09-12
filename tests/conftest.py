@@ -56,7 +56,7 @@ def sample_tickers():
 @pytest.fixture
 def sample_signals():
     """Create sample signal list."""
-    return ['RSI', 'SMA', 'MACD']
+    return ['SENTIMENT']
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def sample_date_range():
 def sample_signal_scores():
     """Create sample signal scores."""
     tickers = ['AAPL', 'MSFT', 'GOOGL']
-    signals = ['RSI', 'SMA']
+    signals = ['SENTIMENT']
     dates = pd.date_range(start='2024-01-01', end='2024-01-31', freq='D')
     
     data = []
@@ -168,7 +168,7 @@ def sample_backtest_result():
         start_date=date(2024, 1, 1),
         end_date=date(2024, 12, 31),
         tickers=['AAPL', 'MSFT', 'GOOGL'],
-        signals=['RSI', 'SMA'],
+        signals=['SENTIMENT'],
         total_return=0.15,
         annualized_return=0.12,
         volatility=0.18,

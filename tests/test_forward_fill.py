@@ -38,7 +38,7 @@ def test_forward_fill():
         
         # Test parameters
         tickers = ['AAPL', 'MSFT', 'GOOGL']
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date.today() - timedelta(days=30)
         end_date = date.today()
         

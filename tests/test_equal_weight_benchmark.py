@@ -30,8 +30,8 @@ def test_equal_weight_benchmark():
     try:
         # Test parameters
         tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
-        signals = ['RSI', 'SMA']
-        signal_weights = {'RSI': 0.5, 'SMA': 0.5}
+        signals = ['SENTIMENT']
+        signal_weights = {'SENTIMENT': 1.0}
         
         # Date range (last 6 months)
         end_date = date.today()

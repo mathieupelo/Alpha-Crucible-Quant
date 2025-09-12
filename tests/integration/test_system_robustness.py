@@ -58,7 +58,7 @@ class TestSystemRobustness:
     
     def test_system_with_corrupted_data(self):
         """Test system behavior with corrupted data."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -108,7 +108,7 @@ class TestSystemRobustness:
     
     def test_system_with_missing_columns(self):
         """Test system behavior with missing price data columns."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -154,7 +154,7 @@ class TestSystemRobustness:
     
     def test_system_with_duplicate_dates(self):
         """Test system behavior with duplicate dates in price data."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -201,7 +201,7 @@ class TestSystemRobustness:
     
     def test_system_with_non_trading_days(self):
         """Test system behavior with non-trading days."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 13)  # Saturday
@@ -247,7 +247,7 @@ class TestSystemRobustness:
     
     def test_system_with_holidays(self):
         """Test system behavior with holidays."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 1)  # New Year's Day
@@ -293,7 +293,7 @@ class TestSystemRobustness:
     
     def test_system_with_market_crashes(self):
         """Test system behavior with market crashes."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -340,7 +340,7 @@ class TestSystemRobustness:
     
     def test_system_with_market_bubbles(self):
         """Test system behavior with market bubbles."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -387,7 +387,7 @@ class TestSystemRobustness:
     
     def test_system_with_high_frequency_data(self):
         """Test system behavior with high frequency data."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -441,7 +441,7 @@ class TestSystemRobustness:
     
     def test_system_with_low_frequency_data(self):
         """Test system behavior with low frequency data."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -495,7 +495,7 @@ class TestSystemRobustness:
     
     def test_system_with_mixed_frequencies(self):
         """Test system behavior with mixed frequency data."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -553,7 +553,7 @@ class TestSystemRobustness:
     
     def test_system_with_concurrent_access(self):
         """Test system behavior with concurrent access."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -602,7 +602,7 @@ class TestSystemRobustness:
     
     def test_system_with_memory_pressure(self):
         """Test system behavior under memory pressure."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -656,7 +656,7 @@ class TestSystemRobustness:
     
     def test_system_with_cpu_pressure(self):
         """Test system behavior under CPU pressure."""
-        signals = ['RSI', 'SMA', 'MACD']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -711,7 +711,7 @@ class TestSystemRobustness:
     
     def test_system_with_network_failures(self):
         """Test system behavior with network failures."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -730,7 +730,7 @@ class TestSystemRobustness:
     
     def test_system_with_database_failures(self):
         """Test system behavior with database failures."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -757,7 +757,7 @@ class TestSystemRobustness:
     
     def test_system_with_invalid_configurations(self):
         """Test system behavior with invalid configurations."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -777,7 +777,7 @@ class TestSystemRobustness:
     
     def test_system_with_edge_case_dates(self):
         """Test system behavior with edge case dates."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         
@@ -826,7 +826,7 @@ class TestSystemRobustness:
     
     def test_system_with_extreme_values(self):
         """Test system behavior with extreme values."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)
@@ -876,7 +876,7 @@ class TestSystemRobustness:
     
     def test_system_recovery_after_failures(self):
         """Test system recovery after failures."""
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         target_date = date(2024, 1, 15)

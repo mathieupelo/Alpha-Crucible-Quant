@@ -9,6 +9,7 @@ import logging
 
 from .base import SignalBase
 from .sentiment import SentimentSignal
+from .sentiment_yt import SentimentSignalYT
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class SignalRegistry:
     def _register_default_signals(self):
         """Register default signal implementations."""
         self.register_signal(SentimentSignal)
+        self.register_signal(SentimentSignalYT)
         logger.info("Registered default signals: SENTIMENT")
     
     def register_signal(self, signal_class: Type[SignalBase]):

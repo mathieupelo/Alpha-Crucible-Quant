@@ -7,7 +7,7 @@ Implements comprehensive backtesting with portfolio optimization and performance
 import logging
 import time
 from datetime import date, datetime, timedelta
-from typing import List, Dict, Optional, Tuple, Union, Any
+from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
 
@@ -121,34 +121,12 @@ class BacktestEngine:
                 result.error_message = error_msg
                 return result
             
-            # Step 4: For each portfolio creation date, create portfolio
-            portfolios_created = []
-            for rebal_date in rebalancing_dates:
-                try:
-                    # Get combined scores for this date
-                    date_scores = signal_scores[signal_scores.index == rebal_date]
-                    if date_scores.empty:
-                        logger.warning(f"No signal scores available for {rebal_date}")
-                        continue
-                    
-                    # Convert to the format expected by portfolio service
-                    combined_scores_df = pd.DataFrame({
-                        'asof_date': rebal_date,
-                        'ticker': date_scores.columns,
-                        'score': date_scores.iloc[0].values
-                    })
-                    
-                    portfolio_result = self.portfolio_service.create_portfolio_from_scores(
-                        combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id,
-                        max_weight=config.max_weight
-                    )
-                    portfolios_created.append(portfolio_result)
-                    logger.info(f"Created portfolio for {rebal_date}")
-                except Exception as e:
-                    error_msg = f"Failed to create portfolio for {rebal_date}: {e}"
-                    logger.error(error_msg)
-                    result.error_message = error_msg
-                    return result
+            # Step 4: Create portfolios for all rebalancing dates
+            portfolios_created = self._create_portfolios_for_dates(
+                signal_scores, rebalancing_dates, tickers, config, run_id, result
+            )
+            if portfolios_created is None:  # Error occurred
+                return result
             
             # Step 5: Run simulation using created portfolios
             portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation_with_portfolios(
@@ -233,6 +211,54 @@ class BacktestEngine:
         )
         
         return run_id, result
+    
+    def _create_portfolios_for_dates(self, signal_scores: pd.DataFrame, 
+                                   rebalancing_dates: List[date], tickers: List[str], 
+                                   config: BacktestConfig, run_id: str, 
+                                   result: BacktestResult) -> Optional[List]:
+        """
+        Create portfolios for all rebalancing dates.
+        
+        Args:
+            signal_scores: DataFrame with signal scores for all dates
+            rebalancing_dates: List of rebalancing dates
+            tickers: List of stock ticker symbols
+            config: Backtesting configuration
+            run_id: Unique backtest run identifier
+            result: BacktestResult object to update on error
+            
+        Returns:
+            List of created portfolios or None if error occurred
+        """
+        portfolios_created = []
+        for rebal_date in rebalancing_dates:
+            try:
+                # Get combined scores for this date
+                date_scores = signal_scores[signal_scores.index == rebal_date]
+                if date_scores.empty:
+                    logger.warning(f"No signal scores available for {rebal_date}")
+                    continue
+                
+                # Convert to the format expected by portfolio service
+                combined_scores_df = pd.DataFrame({
+                    'asof_date': rebal_date,
+                    'ticker': date_scores.columns,
+                    'score': date_scores.iloc[0].values
+                })
+                
+                portfolio_result = self.portfolio_service.create_portfolio_from_scores(
+                    combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id,
+                    max_weight=config.max_weight
+                )
+                portfolios_created.append(portfolio_result)
+                logger.info(f"Created portfolio for {rebal_date}")
+            except Exception as e:
+                error_msg = f"Failed to create portfolio for {rebal_date}: {e}"
+                logger.error(error_msg)
+                result.error_message = error_msg
+                return None
+        
+        return portfolios_created
     
     def _get_rebalancing_dates(self, config: BacktestConfig) -> List[date]:
         """

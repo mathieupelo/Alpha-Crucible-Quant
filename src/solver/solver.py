@@ -39,6 +39,9 @@ class PortfolioSolver:
         config: Solver configuration with optimization parameters
     """
     
+    # Constants
+    MIN_WEIGHT_THRESHOLD = 1e-6  # Minimum weight to consider a position meaningful
+    
     def __init__(self, config: Optional[SolverConfig] = None):
         """
         Initialize portfolio solver.
@@ -119,7 +122,7 @@ class PortfolioSolver:
             
             # Add positions
             for i, ticker in enumerate(common_tickers):
-                if weights[i] > 1e-6:  # Only add positions with meaningful weights
+                if weights[i] > self.MIN_WEIGHT_THRESHOLD:  # Only add positions with meaningful weights
                     portfolio.add_position(
                         ticker=ticker,
                         weight=weights[i],

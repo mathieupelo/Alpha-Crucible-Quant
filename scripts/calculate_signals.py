@@ -23,8 +23,26 @@ def main():
     print("Quant Project - Signal Calculation Example")
     print("=" * 50)
     
-    # Configuration (match backtest tickers)
-    tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+    # Initialize database manager first
+    database_manager = DatabaseManager()
+    if not database_manager.connect():
+        print("Error: Failed to connect to database")
+        return 1
+    
+    # Get tickers from universe (default universe ID 1)
+    try:
+        universe_tickers_df = database_manager.get_universe_tickers(1)  # Default universe
+        if universe_tickers_df.empty:
+            print("Error: No tickers found in universe 1. Please run setup_database.py first.")
+            return 1
+        
+        tickers = universe_tickers_df['ticker'].tolist()
+        print(f"Retrieved {len(tickers)} tickers from universe 1: {', '.join(tickers)}")
+    except Exception as e:
+        print(f"Error retrieving tickers from database: {e}")
+        print("Falling back to hardcoded tickers...")
+        tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+    
     signals = ['SENTIMENT']
     
     # Date range (last 2 years to match backtest)
@@ -38,9 +56,8 @@ def main():
     print()
     
     try:
-        # Initialize components
-        print("Initializing components...")
-        database_manager = DatabaseManager()
+        # Initialize signal calculator (database_manager already initialized)
+        print("Initializing signal calculator...")
         signal_calculator = SignalCalculator(database_manager=database_manager)
         
         # Calculate raw signals

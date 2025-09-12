@@ -27,13 +27,20 @@ class PriceFetcher:
     and maintains backward compatibility with existing code.
     """
     
+    # Configuration constants
+    DEFAULT_FALLBACK_DAYS = 5
+    
     def __init__(self, timeout: Optional[int] = None, retries: Optional[int] = None):
         """Initialize price fetcher with configuration."""
         # Import here to avoid circular imports
         from data import RealTimeDataFetcher
         
-        self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', '10'))
-        self.retries = retries or int(os.getenv('YFINANCE_RETRIES', '3'))
+        # Configuration constants
+        DEFAULT_TIMEOUT_SECONDS = 10
+        DEFAULT_RETRY_ATTEMPTS = 3
+        
+        self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', str(DEFAULT_TIMEOUT_SECONDS)))
+        self.retries = retries or int(os.getenv('YFINANCE_RETRIES', str(DEFAULT_RETRY_ATTEMPTS)))
         
         # Use the enhanced real-time data fetcher
         self._real_fetcher = RealTimeDataFetcher(
@@ -159,7 +166,8 @@ class PriceFetcher:
                 
                 # Wait before retry
                 import time
-                time.sleep(1)
+                RETRY_DELAY_SECONDS = 1
+                time.sleep(RETRY_DELAY_SECONDS)
         
         return None
     
@@ -188,7 +196,8 @@ class PriceFetcher:
             current_date = start_date
             
             while current_date <= end_date:
-                if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+                WEEKDAY_FRIDAY = 4  # Friday is weekday 4
+                if current_date.weekday() < WEEKDAY_FRIDAY + 1:  # Monday = 0, Friday = 4
                     trading_days.append(current_date)
                 current_date += timedelta(days=1)
             
@@ -201,7 +210,8 @@ class PriceFetcher:
             current_date = start_date
             
             while current_date <= end_date:
-                if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+                WEEKDAY_FRIDAY = 4  # Friday is weekday 4
+                if current_date.weekday() < WEEKDAY_FRIDAY + 1:  # Monday = 0, Friday = 4
                     trading_days.append(current_date)
                 current_date += timedelta(days=1)
             
@@ -237,7 +247,7 @@ class PriceFetcherWithFallback(PriceFetcher):
         # Maintain backward compatibility
         self._cache = self._real_fetcher._cache
     
-    def get_price(self, ticker: str, target_date: date, fallback_days: int = 5) -> Optional[float]:
+    def get_price(self, ticker: str, target_date: date, fallback_days: int = PriceFetcher.DEFAULT_FALLBACK_DAYS) -> Optional[float]:
         """
         Get price with fallback to previous trading days.
         

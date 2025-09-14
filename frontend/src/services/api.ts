@@ -26,7 +26,7 @@ import {
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: 'http://localhost:8000/api',
-  timeout: 10000,
+  timeout: 60000, // Increased to 30 seconds for ticker validation
   headers: {
     'Content-Type': 'application/json',
   },

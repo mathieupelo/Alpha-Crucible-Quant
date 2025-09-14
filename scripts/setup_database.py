@@ -268,8 +268,8 @@ def bootstrap_default_universe():
         logger.info("No universes found, creating default universe...")
         
         universe = Universe(
-            name='NA Gaming Starter (5)',
-            description='Starter universe for demo/testing: five liquid NA gaming-related tickers.',
+            name='GameCore-12 (GC-12)',
+            description='A curated 12-stock universe spanning the video-game value chain—pure-play developers, platforms, and media giants with meaningful gaming exposure—built for signal research on trailers, sentiment, and engagement.',
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
@@ -278,7 +278,9 @@ def bootstrap_default_universe():
         logger.info(f"Created default universe with ID: {universe_id}")
         
         # Add default tickers
-        default_tickers = ['EA', 'TTWO', 'RBLX', 'MSFT', 'NVDA']
+        #default_tickers = ['EA', 'TTWO', 'RBLX', 'MSFT', 'NVDA']
+        default_tickers = ['OTGLF', 'SNAL', 'GRVY', 'GDEV', 'NCBDY', 'RBLX', 'WBD', 'NTES', 'TTWO', 'MSFT', 'EA', 'SONY']
+
         universe_tickers = []
         for ticker in default_tickers:
             universe_ticker = UniverseTicker(

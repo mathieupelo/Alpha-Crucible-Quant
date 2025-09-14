@@ -320,7 +320,7 @@ def main():
     
     logger.info("Database setup completed successfully!")
     logger.info("Created tables: signals_raw, scores_combined, backtests, portfolios, portfolio_positions, backtest_nav, universes, universe_tickers")
-    logger.info("Default universe 'NA Gaming Starter (5)' created with 5 tickers")
+    logger.info("Default universe 'GameCore-12 (GC-12)' created with 12 tickers")
     return True
 
 

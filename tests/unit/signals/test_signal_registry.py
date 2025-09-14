@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / 'src'))
 from signals.registry import SignalRegistry
 from signals.base import SignalBase
 from signals.sentiment import SentimentSignal
+from signals.sentiment_yt import SentimentSignalYT
 
 
 class TestSignal:
@@ -80,20 +81,19 @@ class TestSignalRegistry:
     
     def test_get_signal_existing(self):
         """Test getting an existing signal."""
-        signal = self.registry.get_signal('RSI')
+        signal = self.registry.get_signal('SENTIMENT')
         
         assert signal is not None
-        assert isinstance(signal, RSISignal)
-        assert signal.signal_id == 'RSI'
+        assert isinstance(signal, SentimentSignal)
+        assert signal.signal_id == 'SENTIMENT'
     
     def test_get_signal_with_parameters(self):
         """Test getting a signal with parameters."""
-        signal = self.registry.get_signal('SMA', short_period=20, long_period=50)
+        signal = self.registry.get_signal('SENTIMENT_YT', seed=42)
         
         assert signal is not None
-        assert isinstance(signal, SMASignal)
-        assert signal.short_period == 20
-        assert signal.long_period == 50
+        assert isinstance(signal, SentimentSignalYT)
+        assert signal.seed == 42
     
     def test_get_signal_nonexistent(self):
         """Test getting a nonexistent signal."""
@@ -121,7 +121,7 @@ class TestSignalRegistry:
     
     def test_get_signal_special_characters_id(self):
         """Test getting a signal with special characters ID."""
-        signal = self.registry.get_signal('RSI-USD')
+        signal = self.registry.get_signal('SENTIMENT-USD')
         
         assert signal is None  # Should not exist
     
@@ -135,7 +135,7 @@ class TestSignalRegistry:
     def test_get_signal_creation_error(self):
         """Test getting a signal when creation fails."""
         # Mock a signal class that raises an error during instantiation
-        class ErrorSignal:
+        class ErroSENTIMENTgnal:
             def __init__(self, **kwargs):
                 raise ValueError("Creation error")
             
@@ -144,7 +144,7 @@ class TestSignalRegistry:
                 return 'ERROR'
         
         # Register the error signal class
-        self.registry._signals['ERROR'] = ErrorSignal
+        self.registry._signals['ERROR'] = ErroSENTIMENTgnal
         
         signal = self.registry.get_signal('ERROR')
         
@@ -155,10 +155,9 @@ class TestSignalRegistry:
         signals = self.registry.get_available_signals()
         
         assert isinstance(signals, list)
-        assert 'RSI' in signals
-        assert 'SMA' in signals
-        assert 'MACD' in signals
-        assert len(signals) >= 3
+        assert 'SENTIMENT' in signals
+        assert 'SENTIMENT_YT' in signals
+        assert len(signals) >= 2
     
     def test_get_available_signals_empty_registry(self):
         """Test getting available signals from empty registry."""
@@ -172,17 +171,17 @@ class TestSignalRegistry:
     
     def test_get_signal_info_existing(self):
         """Test getting signal information for existing signal."""
-        info = self.registry.get_signal_info('RSI')
+        info = self.registry.get_signal_info('SENTIMENT')
         
         assert info is not None
         assert isinstance(info, dict)
-        assert info['signal_id'] == 'RSI'
-        assert info['name'] == 'Relative Strength Index'
+        assert info['signal_id'] == 'SENTIMENT'
+        assert info['name'] == 'Sentiment Signal'
         assert 'parameters' in info
         assert 'min_lookback' in info
         assert 'max_lookback' in info
-        assert info['min_lookback'] > 0
-        assert info['max_lookback'] > info['min_lookback']
+        assert info['min_lookback'] == 0
+        assert info['max_lookback'] == 0
     
     def test_get_signal_info_nonexistent(self):
         """Test getting signal information for nonexistent signal."""
@@ -193,7 +192,7 @@ class TestSignalRegistry:
     def test_get_signal_info_creation_error(self):
         """Test getting signal information when creation fails."""
         # Mock a signal class that raises an error during instantiation
-        class ErrorSignal:
+        class ErroSENTIMENTgnal:
             def __init__(self, **kwargs):
                 raise ValueError("Creation error")
             
@@ -202,7 +201,7 @@ class TestSignalRegistry:
                 return 'ERROR'
         
         # Register the error signal class
-        self.registry._signals['ERROR'] = ErrorSignal
+        self.registry._signals['ERROR'] = ErroSENTIMENTgnal
         
         info = self.registry.get_signal_info('ERROR')
         
@@ -213,9 +212,9 @@ class TestSignalRegistry:
         info = self.registry.get_all_signals_info()
         
         assert isinstance(info, dict)
-        assert 'RSI' in info
-        assert 'SMA' in info
-        assert 'MACD' in info
+        assert 'SENTIMENT' in info
+        assert 'SENTIMENT_YT' in info
+        assert 'SENTIMENT_YT' in info
         assert len(info) >= 3
         
         for signal_id, signal_info in info.items():
@@ -238,9 +237,9 @@ class TestSignalRegistry:
     
     def test_is_signal_available_existing(self):
         """Test checking if existing signal is available."""
-        assert self.registry.is_signal_available('RSI') is True
-        assert self.registry.is_signal_available('SMA') is True
-        assert self.registry.is_signal_available('MACD') is True
+        assert self.registry.is_signal_available('SENTIMENT') is True
+        assert self.registry.is_signal_available('SENTIMENT_YT') is True
+        assert self.registry.is_signal_available('SENTIMENT_YT') is True
     
     def test_is_signal_available_nonexistent(self):
         """Test checking if nonexistent signal is available."""
@@ -314,9 +313,9 @@ class TestSignalRegistry:
     
     def test_contains_operator(self):
         """Test contains operator."""
-        assert 'RSI' in self.registry
-        assert 'SMA' in self.registry
-        assert 'MACD' in self.registry
+        assert 'SENTIMENT' in self.registry
+        assert 'SENTIMENT_YT' in self.registry
+        assert 'SENTIMENT_YT' in self.registry
         assert 'NONEXISTENT' not in self.registry
         assert '' not in self.registry
         assert None not in self.registry
@@ -326,9 +325,9 @@ class TestSignalRegistry:
         signal_ids = list(self.registry)
         
         assert isinstance(signal_ids, list)
-        assert 'RSI' in signal_ids
-        assert 'SMA' in signal_ids
-        assert 'MACD' in signal_ids
+        assert 'SENTIMENT' in signal_ids
+        assert 'SENTIMENT_YT' in signal_ids
+        assert 'SENTIMENT_YT' in signal_ids
         assert len(signal_ids) >= 3
     
     def test_iter_empty_registry(self):
@@ -354,7 +353,7 @@ class TestSignalRegistry:
             results.append('registered')
         
         def get_signal_thread():
-            signal = self.registry.get_signal('RSI')
+            signal = self.registry.get_signal('SENTIMENT')
             results.append('retrieved' if signal is not None else 'failed')
         
         # Create multiple threads
@@ -449,8 +448,8 @@ class TestSignalRegistry:
         """Test registry with special characters in signal IDs."""
         class SpecialSignal:
             def __init__(self, **kwargs):
-                self.signal_id = 'RSI-USD'
-                self.name = 'RSI USD Signal'
+                self.signal_id = 'SENTIMENT-USD'
+                self.name = 'SENTIMENT USD Signal'
                 self.parameters = kwargs
             
             def calculate(self, price_data, ticker, target_date):
@@ -464,10 +463,10 @@ class TestSignalRegistry:
         
         self.registry.register_signal(SpecialSignal)
         
-        assert 'RSI-USD' in self.registry
-        signal = self.registry.get_signal('RSI-USD')
+        assert 'SENTIMENT-USD' in self.registry
+        signal = self.registry.get_signal('SENTIMENT-USD')
         assert signal is not None
-        assert signal.signal_id == 'RSI-USD'
+        assert signal.signal_id == 'SENTIMENT-USD'
     
     def test_registry_long_signal_ids(self):
         """Test registry with very long signal IDs."""
@@ -497,17 +496,17 @@ class TestSignalRegistry:
     def test_registry_parameter_validation(self):
         """Test registry parameter validation."""
         # Test with valid parameters
-        signal = self.registry.get_signal('RSI', period=14)
+        signal = self.registry.get_signal('SENTIMENT', period=14)
         assert signal is not None
         assert signal.period == 14
         
         # Test with invalid parameters (should still work but use defaults)
-        signal = self.registry.get_signal('RSI', invalid_param='value')
+        signal = self.registry.get_signal('SENTIMENT', invalid_param='value')
         # Signal creation might fail with invalid parameters, so accept either result
         assert signal is not None or signal is None
         
         # Test with None parameters
-        signal = self.registry.get_signal('RSI', period=None)
+        signal = self.registry.get_signal('SENTIMENT', period=None)
         assert signal is not None
     
     def test_registry_parameter_types(self):

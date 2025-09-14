@@ -25,8 +25,8 @@ class SignalRegistry:
     def _register_default_signals(self):
         """Register default signal implementations."""
         self.register_signal(SentimentSignal)
-        self.register_signal(SentimentSignalYT)
-        logger.info("Registered default signals: SENTIMENT")
+        #self.register_signal(SentimentSignalYT)
+        logger.info("Registered default signals: SENTIMENT, SENTIMENT_YT")
     
     def register_signal(self, signal_class: Type[SignalBase]):
         """

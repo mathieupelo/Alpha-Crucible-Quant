@@ -6,7 +6,7 @@ Defines the interface that all signals must implement.
 
 from abc import ABC, abstractmethod
 from datetime import date
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import pandas as pd
 
 
@@ -29,12 +29,12 @@ class SignalBase(ABC):
         self.price_fetcher = price_fetcher
     
     @abstractmethod
-    def calculate(self, price_data: pd.DataFrame, ticker: str, target_date: date) -> float:
+    def calculate(self, price_data: Optional[pd.DataFrame], ticker: str, target_date: date) -> float:
         """
         Calculate the signal value for a given ticker on a specific date.
         
         Args:
-            price_data: DataFrame with OHLCV data, indexed by date
+            price_data: DataFrame with OHLCV data, indexed by date (can be None for signals that don't need price data)
             ticker: Stock ticker symbol
             target_date: Date to calculate signal for
             

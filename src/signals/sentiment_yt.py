@@ -51,7 +51,7 @@ class SentimentSignalYT(SignalBase):
         if seed is not None:
             np.random.seed(seed)
     
-    def calculate(self, price_data: pd.DataFrame, ticker: str, target_date: date) -> float:
+    def calculate(self, price_data: Optional[pd.DataFrame], ticker: str, target_date: date) -> float:
         """
         Calculate YouTube sentiment signal value for a ticker on a specific date.
         
@@ -159,35 +159,19 @@ class SentimentSignalYT(SignalBase):
         Raises:
             NotImplementedError: SENTIMENT signal doesn't need price data
         """
-        raise NotImplementedError("SENTIMENT signal doesn't require price data")
+        raise NotImplementedError("SENTIMENT_YT signal doesn't require price data")
     
-    def validate_price_data(self, price_data: pd.DataFrame, target_date: date) -> bool:
+    def validate_price_data(self, price_data: Optional[pd.DataFrame], target_date: date) -> bool:
         """
-        Validate that price data is available for the target date.
+        Validate price data - always returns True since sentiment signals don't use price data.
         
         Args:
-            price_data: DataFrame with price data
-            target_date: Date to validate
+            price_data: DataFrame with price data (ignored)
+            target_date: Date to validate (ignored)
             
         Returns:
-            True if data is valid, False otherwise
+            Always True since sentiment signals don't require price data
         """
-        if price_data is None or price_data.empty:
-            return False
-        
-        if target_date not in price_data.index:
-            return False
-        
-        # Check if we have the required columns
-        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-        if not all(col in price_data.columns for col in required_columns):
-            return False
-        
-        # Check if the data for target_date is valid
-        target_row = price_data.loc[target_date]
-        if target_row.isnull().any():
-            return False
-        
         return True
     
     # Helper methods

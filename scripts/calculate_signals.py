@@ -41,14 +41,16 @@ def main():
     except Exception as e:
         print(f"Error retrieving tickers from database: {e}")
         print("Falling back to hardcoded tickers...")
-        tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+        tickers = ['EA', 'TTWO', 'RBLX', 'MSFT', 'SONY', 'NTES', 'WBD', 'NCBDY', 'GDEV', 'OTGLF']
+        tickers = ['EA', 'TTWO', 'NTES']
     
-    signals = ['SENTIMENT']
+    signals = ['SENTIMENT', 'SENTIMENT_YT']
+    tickers = ['EA', 'TTWO', 'NTES']
     
     # Date range (last 2 years to match backtest)
     end_date = date.today()
-    start_date = end_date - timedelta(days=730)
-    start_date = date(2020, 1, 1)
+    start_date = end_date - timedelta(days=365)
+    #start_date = date(2020, 1, 1)
     
     print(f"Tickers: {', '.join(tickers)}")
     print(f"Signals: {', '.join(signals)}")

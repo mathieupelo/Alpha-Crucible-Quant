@@ -1,6 +1,6 @@
 # Equal-Weight Benchmark
 
-This document explains the equal-weight benchmark functionality in the Quant Project system.
+This document explains the equal-weight benchmark functionality in the Alpha Crucible Quant system.
 
 ## Overview
 
@@ -228,6 +228,41 @@ config_custom = BacktestConfig(
 )
 ```
 
+## Web Application Integration
+
+### API Endpoints
+
+The equal-weight benchmark functionality is accessible through the REST API:
+
+```http
+# Get backtest with equal-weight benchmark
+GET /api/backtests/{run_id}?use_equal_weight_benchmark=true
+
+# Get backtest metrics including equal-weight comparison
+GET /api/backtests/{run_id}/metrics
+```
+
+### Frontend Visualization
+
+The web application provides comprehensive visualization of equal-weight benchmark comparisons:
+
+#### Performance Charts
+- **Cumulative Returns**: Side-by-side comparison of strategy vs equal-weight
+- **Rolling Performance**: Rolling window performance analysis
+- **Drawdown Analysis**: Drawdown comparison between strategies
+
+#### Benchmark Selection
+- **Interactive Toggle**: Switch between SPY and equal-weight benchmarks
+- **Real-time Updates**: Live updates when changing benchmark settings
+- **Performance Metrics**: Dynamic calculation of alpha, beta, and other metrics
+
+### Dashboard Integration
+
+The dashboard displays equal-weight benchmark information:
+- **Benchmark Type Indicator**: Shows which benchmark is being used
+- **Performance Comparison**: Quick comparison of strategy vs benchmark
+- **Risk-Adjusted Metrics**: Sharpe ratio, information ratio, and other metrics
+
 ## Best Practices
 
 1. **Use Equal-Weight for Stock Selection**: When evaluating stock picking strategies
@@ -235,6 +270,8 @@ config_custom = BacktestConfig(
 3. **Compare Both**: Run backtests with both benchmarks to get full picture
 4. **Document Choice**: Clearly document which benchmark you're using and why
 5. **Consider Universe**: Ensure your benchmark matches your investment universe
+6. **Web Interface**: Use the web application to easily switch between benchmarks
+7. **API Integration**: Leverage API endpoints for programmatic benchmark analysis
 
 ## Limitations
 

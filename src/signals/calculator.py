@@ -5,32 +5,44 @@ Calculates signals for multiple tickers and dates, integrating with the database
 """
 
 import logging
-from datetime import date, datetime
-from typing import List, Dict, Optional, Tuple, Any
+from datetime import date, datetime, timedelta
+from typing import List, Dict, Optional, Tuple, Any, Union
 import pandas as pd
 import numpy as np
 
 from .base import SignalBase
 from .registry import signal_registry
 from database import DatabaseManager, SignalRaw, ScoreCombined
-from utils import PriceFetcher, DateUtils
+from utils import DateUtils, validate_ticker_list, validate_signal_list, validate_date_range
 
 logger = logging.getLogger(__name__)
 
 
 class SignalCalculator:
-    """Calculates signals for multiple tickers and dates."""
+    """
+    Calculates investment signals for multiple tickers and dates.
     
-    def __init__(self, price_fetcher: Optional[PriceFetcher] = None, 
-                 database_manager: Optional[DatabaseManager] = None):
+    This class orchestrates the calculation of various investment signals across multiple 
+    tickers and time periods. All signals are calculated without requiring price data.
+    
+    The calculator supports:
+    - Batch calculation of signals across multiple tickers and dates
+    - Database storage and retrieval of calculated signals
+    - Signal combination and scoring methods
+    - Missing signal detection and calculation
+    
+    Attributes:
+        database_manager: Instance for database operations
+        registry: Signal registry containing available signal implementations
+    """
+    
+    def __init__(self, database_manager: Optional[DatabaseManager] = None):
         """
         Initialize signal calculator.
         
         Args:
-            price_fetcher: Price fetcher instance (optional)
             database_manager: Database manager instance (optional)
         """
-        self.price_fetcher = price_fetcher or PriceFetcher()
         self.database_manager = database_manager or DatabaseManager()
         self.registry = signal_registry
     
@@ -50,30 +62,49 @@ class SignalCalculator:
         Returns:
             DataFrame with signal scores
         """
+        # Validate inputs
+        if not validate_ticker_list(tickers):
+            logger.error("Invalid ticker list")
+            return pd.DataFrame()
+        
+        if not validate_signal_list(signals):
+            logger.error("Invalid signal list")
+            return pd.DataFrame()
+        
+        if not validate_date_range(start_date, end_date):
+            logger.error("Invalid date range")
+            return pd.DataFrame()
+        
         logger.info(f"Calculating signals for {len(tickers)} tickers, {len(signals)} signals from {start_date} to {end_date}")
         
-        # Get trading days
-        trading_days = DateUtils.get_trading_days(start_date, end_date)
-        logger.info(f"Found {len(trading_days)} trading days")
+        # Generate all dates in the range (not just trading days)
+        all_dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            all_dates.append(current_date)
+            current_date += timedelta(days=1)
         
-        # Calculate signals for each ticker and date
+        logger.info(f"Found {len(all_dates)} dates in range")
+        
+        # Calculate all signals (no price data required)
+        all_signals = self._calculate_all_signals(tickers, signals, all_dates)
+        
+        # Convert to DataFrame and store
+        return self._process_and_store_signals(all_signals, store_in_db)
+    
+    
+    
+    def _calculate_all_signals(self, tickers: List[str], signals: List[str], 
+                               all_dates: List[date]) -> List[SignalRaw]:
+        """Calculate all signals (no price data required)."""
         all_signals = []
+        
+        logger.info(f"Processing signals: {signals}")
         
         for ticker in tickers:
             logger.info(f"Processing ticker: {ticker}")
             
-            # Get price data for the ticker
-            price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
-            
-            if price_data is None or price_data.empty:
-                logger.warning(f"No price data available for {ticker}")
-                continue
-            
-            # Calculate signals for each date
-            for target_date in trading_days:
-                if target_date not in price_data.index:
-                    continue
-                
+            for target_date in all_dates:
                 for signal_id in signals:
                     try:
                         # Get signal instance
@@ -82,8 +113,8 @@ class SignalCalculator:
                             logger.warning(f"Signal not found: {signal_id}")
                             continue
                         
-                        # Calculate signal value
-                        signal_value = signal.calculate(price_data, ticker, target_date)
+                        # Calculate signal value without price data
+                        signal_value = signal.calculate(None, ticker, target_date)
                         
                         if not np.isnan(signal_value):
                             # Store raw signal
@@ -101,29 +132,34 @@ class SignalCalculator:
                         logger.error(f"Error calculating {signal_id} for {ticker} on {target_date}: {e}")
                         continue
         
-        # Convert to DataFrame
-        if all_signals:
-            df = pd.DataFrame([{
-                'asof_date': signal.asof_date,
-                'ticker': signal.ticker,
-                'signal_name': signal.signal_name,
-                'value': signal.value,
-                'metadata': signal.metadata,
-                'created_at': signal.created_at
-            } for signal in all_signals])
-            
-            # Store in database if requested
-            if store_in_db:
-                try:
-                    self.database_manager.store_signals_raw(all_signals)
-                    logger.info(f"Stored {len(all_signals)} raw signals in database")
-                except Exception as e:
-                    logger.error(f"Error storing raw signals in database: {e}")
-            
-            return df
-        else:
+        return all_signals
+    
+    def _process_and_store_signals(self, all_signals: List[SignalRaw], 
+                                 store_in_db: bool) -> pd.DataFrame:
+        """Process signals into DataFrame and store in database if requested."""
+        if not all_signals:
             logger.warning("No signals calculated")
             return pd.DataFrame()
+        
+        # Convert to DataFrame
+        df = pd.DataFrame([{
+            'asof_date': signal.asof_date,
+            'ticker': signal.ticker,
+            'signal_name': signal.signal_name,
+            'value': signal.value,
+            'metadata': signal.metadata,
+            'created_at': signal.created_at
+        } for signal in all_signals])
+        
+        # Store in database if requested
+        if store_in_db:
+            try:
+                self.database_manager.store_signals_raw(all_signals)
+                logger.info(f"Stored {len(all_signals)} raw signals in database")
+            except Exception as e:
+                logger.error(f"Error storing raw signals in database: {e}")
+        
+        return df
     
     def calculate_signal_for_ticker(self, ticker: str, signal_id: str, 
                                    target_date: date) -> Optional[float]:
@@ -145,16 +181,8 @@ class SignalCalculator:
                 logger.warning(f"Signal not found: {signal_id}")
                 return None
             
-            # Get required price data
-            start_date, end_date = signal.get_required_price_data(target_date)
-            price_data = self.price_fetcher.get_price_history(ticker, start_date, end_date)
-            
-            if price_data is None or price_data.empty:
-                logger.warning(f"No price data available for {ticker}")
-                return None
-            
-            # Calculate signal
-            signal_value = signal.calculate(price_data, ticker, target_date)
+            # Calculate signal without price data
+            signal_value = signal.calculate(None, ticker, target_date)
             
             if np.isnan(signal_value):
                 logger.warning(f"Signal calculation returned NaN for {ticker} on {target_date}")
@@ -229,7 +257,16 @@ class SignalCalculator:
                 
                 # Apply combination method
                 if method == 'equal_weight':
-                    combined_score = date_signals['value'].mean()
+                    # Only calculate mean if we have all required signals
+                    available_signals = set(date_signals['signal_name'].unique())
+                    required_signals = set(signal_names)
+                    
+                    if available_signals == required_signals:
+                        combined_score = date_signals['value'].mean()
+                    else:
+                        logger.warning(f"Missing signals for {ticker} on {asof_date}. "
+                                     f"Available: {available_signals}, Required: {required_signals}")
+                        continue
                 elif method == 'weighted':
                     weights = method_params.get('weights', {})
                     total_weight = 0
@@ -440,3 +477,96 @@ class SignalCalculator:
             } for signal in all_signals])
         else:
             return pd.DataFrame()
+    
+    def _enforce_signal_range(self, signal_value: float, min_range: float = -1.0, max_range: float = 1.0) -> float:
+        """
+        Enforce signal values to be within the specified range [-1, 1].
+        
+        Args:
+            signal_value: Raw signal value
+            min_range: Minimum allowed value (default: -1.0)
+            max_range: Maximum allowed value (default: 1.0)
+            
+        Returns:
+            Signal value clamped to the specified range
+        """
+        if np.isnan(signal_value) or np.isinf(signal_value):
+            logger.warning(f"Invalid signal value: {signal_value}, returning 0.0")
+            return 0.0
+        
+        # Clamp to range
+        clamped_value = np.clip(signal_value, min_range, max_range)
+        
+        if clamped_value != signal_value:
+            logger.debug(f"Signal value {signal_value} clamped to {clamped_value} (range: [{min_range}, {max_range}])")
+        
+        return float(clamped_value)
+    
+    def validate_signals_complete(self, tickers: List[str], signal_names: List[str], 
+                                target_date: date) -> Tuple[bool, List[str]]:
+        """
+        Validate that all required signals exist for all tickers on a given date.
+        
+        Args:
+            tickers: List of stock ticker symbols
+            signal_names: List of signal names to validate
+            target_date: Date to validate
+            
+        Returns:
+            Tuple of (is_complete, missing_signals_list)
+        """
+        try:
+            # Get existing signals for the target date
+            existing_signals = self.get_signals_raw(tickers, signal_names, target_date, target_date)
+            
+            if existing_signals.empty:
+                missing_signals = [f"{ticker}_{signal}" for ticker in tickers for signal in signal_names]
+                return False, missing_signals
+            
+            # Check for missing combinations
+            required_combinations = {(ticker, signal) for ticker in tickers for signal in signal_names}
+            existing_combinations = set(zip(existing_signals['ticker'], existing_signals['signal_name']))
+            missing_combinations = required_combinations - existing_combinations
+            
+            missing_signals = [f"{ticker}_{signal}" for ticker, signal in missing_combinations]
+            is_complete = len(missing_combinations) == 0
+            
+            if not is_complete:
+                logger.warning(f"Missing {len(missing_combinations)} signal combinations on {target_date}: {missing_signals}")
+            
+            return is_complete, missing_signals
+            
+        except Exception as e:
+            logger.error(f"Error validating signal completeness: {e}")
+            return False, [f"validation_error_{i}" for i in range(len(tickers) * len(signal_names))]
+    
+    def calculate_and_enforce_signals(self, tickers: List[str], signals: List[str], 
+                                     start_date: date, end_date: date,
+                                     store_in_db: bool = True) -> pd.DataFrame:
+        """
+        Calculate signals with automatic range enforcement (-1 to 1).
+        
+        Args:
+            tickers: List of stock ticker symbols
+            signals: List of signal IDs to calculate
+            start_date: Start date for calculation
+            end_date: End date for calculation
+            store_in_db: Whether to store results in database
+            
+        Returns:
+            DataFrame with signal scores clamped to [-1, 1] range
+        """
+        logger.info(f"Calculating signals with range enforcement for {len(tickers)} tickers, {len(signals)} signals from {start_date} to {end_date}")
+        
+        # Calculate signals normally
+        signals_df = self.calculate_signals(tickers, signals, start_date, end_date, store_in_db)
+        
+        if signals_df.empty:
+            return signals_df
+        
+        # Apply range enforcement to all signal values
+        signals_df['value'] = signals_df['value'].apply(lambda x: self._enforce_signal_range(x))
+        
+        logger.info(f"Applied range enforcement to {len(signals_df)} signal values")
+        
+        return signals_df

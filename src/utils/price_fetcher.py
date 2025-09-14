@@ -2,6 +2,7 @@
 Stock price fetcher using yfinance.
 
 Replaces the database-stored stock prices with real-time fetching from Yahoo Finance.
+This module now uses the enhanced RealTimeDataFetcher for better performance and reliability.
 """
 
 import os
@@ -19,13 +20,36 @@ logger = logging.getLogger(__name__)
 
 
 class PriceFetcher:
-    """Fetches stock prices using yfinance API."""
+    """
+    Fetches stock prices using yfinance API.
+    
+    This class now wraps the enhanced RealTimeDataFetcher for better performance
+    and maintains backward compatibility with existing code.
+    """
+    
+    # Configuration constants
+    DEFAULT_FALLBACK_DAYS = 5
     
     def __init__(self, timeout: Optional[int] = None, retries: Optional[int] = None):
         """Initialize price fetcher with configuration."""
-        self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', '10'))
-        self.retries = retries or int(os.getenv('YFINANCE_RETRIES', '3'))
-        self._cache = {}  # Simple in-memory cache
+        # Import here to avoid circular imports
+        from data import RealTimeDataFetcher
+        
+        # Configuration constants
+        DEFAULT_TIMEOUT_SECONDS = 10
+        DEFAULT_RETRY_ATTEMPTS = 3
+        
+        self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', str(DEFAULT_TIMEOUT_SECONDS)))
+        self.retries = retries or int(os.getenv('YFINANCE_RETRIES', str(DEFAULT_RETRY_ATTEMPTS)))
+        
+        # Use the enhanced real-time data fetcher
+        self._real_fetcher = RealTimeDataFetcher(
+            timeout=self.timeout,
+            retries=self.retries
+        )
+        
+        # Maintain backward compatibility
+        self._cache = self._real_fetcher._cache
     
     def get_price(self, ticker: str, target_date: date) -> Optional[float]:
         """
@@ -38,28 +62,7 @@ class PriceFetcher:
         Returns:
             Closing price or None if not available
         """
-        try:
-            # Check cache first
-            cache_key = f"{ticker}_{target_date}"
-            if cache_key in self._cache:
-                return self._cache[cache_key]
-            
-            # Get price data
-            price_data = self._fetch_price_data(ticker, target_date, target_date)
-            
-            if price_data is not None and not price_data.empty:
-                price = price_data['Close'].iloc[0]
-                if pd.notna(price):
-                    # Cache the result
-                    self._cache[cache_key] = float(price)
-                    return float(price)
-            
-            logger.warning(f"No price data available for {ticker} on {target_date}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error fetching price for {ticker} on {target_date}: {e}")
-            return None
+        return self._real_fetcher.get_price(ticker, target_date)
     
     def get_prices(self, tickers: List[str], target_date: date) -> Dict[str, Optional[float]]:
         """
@@ -72,12 +75,7 @@ class PriceFetcher:
         Returns:
             Dictionary mapping ticker to price (or None if not available)
         """
-        prices = {}
-        
-        for ticker in tickers:
-            prices[ticker] = self.get_price(ticker, target_date)
-        
-        return prices
+        return self._real_fetcher.get_prices(tickers, target_date)
     
     def get_price_history(self, ticker: str, start_date: date, end_date: date) -> Optional[pd.DataFrame]:
         """
@@ -91,26 +89,7 @@ class PriceFetcher:
         Returns:
             DataFrame with OHLCV data or None if not available
         """
-        try:
-            # Check cache first
-            cache_key = f"{ticker}_{start_date}_{end_date}"
-            if cache_key in self._cache:
-                return self._cache[cache_key]
-            
-            # Get price data
-            price_data = self._fetch_price_data(ticker, start_date, end_date)
-            
-            if price_data is not None and not price_data.empty:
-                # Cache the result
-                self._cache[cache_key] = price_data
-                return price_data
-            
-            logger.warning(f"No price history available for {ticker} from {start_date} to {end_date}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error fetching price history for {ticker}: {e}")
-            return None
+        return self._real_fetcher.get_price_history(ticker, start_date, end_date)
     
     def get_price_history_batch(self, tickers: List[str], start_date: date, end_date: date) -> Dict[str, pd.DataFrame]:
         """
@@ -143,14 +122,7 @@ class PriceFetcher:
         Returns:
             DataFrame with dates as index and tickers as columns
         """
-        price_matrix = pd.DataFrame()
-        
-        for ticker in tickers:
-            price_data = self.get_price_history(ticker, start_date, end_date)
-            if price_data is not None and not price_data.empty:
-                price_matrix[ticker] = price_data['Close']
-        
-        return price_matrix
+        return self._real_fetcher.get_price_matrix(tickers, start_date, end_date)
     
     def _fetch_price_data(self, ticker: str, start_date: date, end_date: date) -> Optional[pd.DataFrame]:
         """
@@ -194,7 +166,8 @@ class PriceFetcher:
                 
                 # Wait before retry
                 import time
-                time.sleep(1)
+                RETRY_DELAY_SECONDS = 1
+                time.sleep(RETRY_DELAY_SECONDS)
         
         return None
     
@@ -223,7 +196,8 @@ class PriceFetcher:
             current_date = start_date
             
             while current_date <= end_date:
-                if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+                WEEKDAY_FRIDAY = 4  # Friday is weekday 4
+                if current_date.weekday() < WEEKDAY_FRIDAY + 1:  # Monday = 0, Friday = 4
                     trading_days.append(current_date)
                 current_date += timedelta(days=1)
             
@@ -236,7 +210,8 @@ class PriceFetcher:
             current_date = start_date
             
             while current_date <= end_date:
-                if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+                WEEKDAY_FRIDAY = 4  # Friday is weekday 4
+                if current_date.weekday() < WEEKDAY_FRIDAY + 1:  # Monday = 0, Friday = 4
                     trading_days.append(current_date)
                 current_date += timedelta(days=1)
             
@@ -244,21 +219,35 @@ class PriceFetcher:
     
     def clear_cache(self):
         """Clear the price cache."""
-        self._cache.clear()
+        self._real_fetcher.clear_cache()
         logger.info("Price cache cleared")
     
     def get_cache_info(self) -> Dict[str, int]:
         """Get information about the cache."""
-        return {
-            'cache_size': len(self._cache),
-            'cache_keys': list(self._cache.keys())[:10]  # First 10 keys as sample
-        }
+        return self._real_fetcher.get_cache_info()
 
 
 class PriceFetcherWithFallback(PriceFetcher):
     """Price fetcher with fallback to previous trading day if data is missing."""
     
-    def get_price(self, ticker: str, target_date: date, fallback_days: int = 5) -> Optional[float]:
+    def __init__(self, timeout: Optional[int] = None, retries: Optional[int] = None):
+        """Initialize price fetcher with fallback capabilities."""
+        # Import here to avoid circular imports
+        from data import RealTimeDataFetcherWithFallback
+        
+        self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', '10'))
+        self.retries = retries or int(os.getenv('YFINANCE_RETRIES', '3'))
+        
+        # Use the enhanced real-time data fetcher with fallback
+        self._real_fetcher = RealTimeDataFetcherWithFallback(
+            timeout=self.timeout,
+            retries=self.retries
+        )
+        
+        # Maintain backward compatibility
+        self._cache = self._real_fetcher._cache
+    
+    def get_price(self, ticker: str, target_date: date, fallback_days: int = PriceFetcher.DEFAULT_FALLBACK_DAYS) -> Optional[float]:
         """
         Get price with fallback to previous trading days.
         
@@ -270,18 +259,4 @@ class PriceFetcherWithFallback(PriceFetcher):
         Returns:
             Closing price or None if not available
         """
-        # Try the target date first
-        price = super().get_price(ticker, target_date)
-        if price is not None:
-            return price
-        
-        # Try previous trading days
-        for i in range(1, fallback_days + 1):
-            fallback_date = target_date - timedelta(days=i)
-            price = super().get_price(ticker, fallback_date)
-            if price is not None:
-                logger.info(f"Using fallback price for {ticker} on {fallback_date} (target: {target_date})")
-                return price
-        
-        logger.warning(f"No price data available for {ticker} on {target_date} or {fallback_days} previous days")
-        return None
+        return self._real_fetcher.get_price(ticker, target_date, fallback_days)

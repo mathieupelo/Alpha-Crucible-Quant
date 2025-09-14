@@ -30,7 +30,7 @@ def test_forward_fill():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         db_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher, db_manager)
+        signal_calculator = SignalCalculator(db_manager)
         
         if not db_manager.connect():
             print("Failed to connect to database")
@@ -38,7 +38,7 @@ def test_forward_fill():
         
         # Test parameters
         tickers = ['AAPL', 'MSFT', 'GOOGL']
-        signals = ['RSI', 'SMA']
+        signals = ['SENTIMENT']
         start_date = date.today() - timedelta(days=30)
         end_date = date.today()
         

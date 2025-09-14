@@ -1,6 +1,6 @@
 # Forward Fill Signal Scores
 
-This document explains the forward-fill functionality for signal scores in the Quant Project system.
+This document explains the forward-fill functionality for signal scores in the Alpha Crucible Quant system.
 
 ## Overview
 
@@ -54,7 +54,7 @@ signal_scores = db_manager.get_signal_scores_dataframe(
 ```python
 from signals import SignalCalculator
 
-signal_calculator = SignalCalculator(price_fetcher, db_manager)
+signal_calculator = SignalCalculator(db_manager)
 
 # Get signal scores with forward fill
 signal_scores = signal_calculator.get_signal_scores_pivot(
@@ -118,6 +118,8 @@ Date       AAPL-RSI  AAPL-SMA  MSFT-RSI  MSFT-SMA
 2. **Strategy Consistency**: Uses the last known signal values, maintaining strategy logic
 3. **Reduced Gaps**: Minimizes gaps in backtest results due to missing data
 4. **Realistic Simulation**: Mimics real-world trading where you use the latest available information
+5. **Web Application Support**: Seamlessly integrates with the web interface for real-time analysis
+6. **API Integration**: Works with REST API endpoints for programmatic access
 
 ## Use Cases
 
@@ -212,6 +214,42 @@ INFO: No signal scores for 2023-01-02, using latest available from 2023-01-01
 
 This helps track when the system is using forward-filled data vs. current data.
 
+## Web Application Integration
+
+### API Endpoints
+
+The forward-fill functionality is accessible through the REST API:
+
+```http
+# Get signal scores with forward fill
+GET /api/signals?tickers=AAPL,MSFT&signal_names=RSI,SMA&start_date=2024-01-01&end_date=2024-01-31
+
+# Get backtest signals with forward fill
+GET /api/backtests/{run_id}/signals?start_date=2024-01-01&end_date=2024-01-31
+```
+
+### Frontend Visualization
+
+The web application provides visual indicators for forward-filled data:
+- **Data Quality Indicators**: Show when forward fill is being used
+- **Timeline Visualization**: Display data availability and gaps
+- **Signal Charts**: Highlight forward-filled values in performance charts
+
+### Real-time Monitoring
+
+The system logs forward-fill usage for monitoring:
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "INFO",
+  "message": "Forward fill applied for AAPL-RSI on 2024-01-15, using data from 2024-01-12",
+  "ticker": "AAPL",
+  "signal": "RSI",
+  "target_date": "2024-01-15",
+  "source_date": "2024-01-12"
+}
+```
+
 ## Best Practices
 
 1. **Enable by Default**: Use forward fill for most backtesting scenarios
@@ -219,6 +257,8 @@ This helps track when the system is using forward-filled data vs. current data.
 3. **Data Quality**: Ensure signal data quality to minimize forward fill usage
 4. **Testing**: Test both with and without forward fill to understand the impact
 5. **Documentation**: Document when and why forward fill is used in your strategies
+6. **Web Interface**: Use the web application to monitor forward-fill usage
+7. **API Monitoring**: Monitor API responses for forward-fill indicators
 
 ## Limitations
 

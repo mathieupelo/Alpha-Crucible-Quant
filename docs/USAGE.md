@@ -1,25 +1,51 @@
-# Quant Project Usage Guide
+# Alpha Crucible Quant Usage Guide
 
 ## Quick Start
 
-### 1. Setup
+### 1. Web Application Setup (Recommended)
 
 ```bash
 # Clone or navigate to the project directory
-cd "Quant Project"
-
-# Install dependencies
-pip install -r requirements.txt
+cd "Alpha-Crucible-Quant"
 
 # Setup environment
 cp env.example .env
 # Edit .env with your database credentials
 
-# Setup database
-python scripts/setup_database.py
+# Start all services with Docker Compose
+docker-compose up -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/api/docs
 ```
 
-### 2. Run Tests
+### 2. Development Setup
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
+
+# Install Node.js dependencies
+cd frontend
+npm install
+cd ..
+
+# Setup database
+python scripts/setup_database.py
+
+# Start backend (in one terminal)
+cd backend
+python main.py
+
+# Start frontend (in another terminal)
+cd frontend
+npm run dev
+```
+
+### 3. Run Tests
 
 ```bash
 # Run all tests
@@ -31,19 +57,54 @@ pytest tests/test_database.py -v
 pytest tests/test_utils.py -v
 ```
 
-### 3. Calculate Signals
+### 4. Calculate Signals
 
 ```bash
 # Calculate signals for a set of tickers
 python scripts/calculate_signals.py
 ```
 
-### 4. Run Backtest
+### 5. Run Backtest
 
 ```bash
 # Run a complete backtest
 python scripts/run_backtest.py
 ```
+
+## Web Application Usage
+
+### Dashboard Overview
+The web application provides an intuitive dashboard for monitoring and analyzing your quantitative strategies:
+
+1. **Performance Metrics**: View key performance indicators at a glance
+2. **Backtest History**: Browse and analyze historical backtest results
+3. **Interactive Charts**: Explore performance data with interactive visualizations
+4. **Portfolio Analysis**: Dive deep into portfolio compositions and allocations
+
+### Using the API
+The REST API provides programmatic access to all system functionality:
+
+```python
+import requests
+
+# Get all backtests
+response = requests.get("http://localhost:8000/api/backtests")
+backtests = response.json()
+
+# Get specific backtest details
+backtest_id = "your_backtest_id"
+response = requests.get(f"http://localhost:8000/api/backtests/{backtest_id}")
+backtest = response.json()
+
+# Get backtest NAV data
+response = requests.get(f"http://localhost:8000/api/backtests/{backtest_id}/nav")
+nav_data = response.json()
+```
+
+### API Documentation
+Access the interactive API documentation at:
+- **Swagger UI**: http://localhost:8000/api/docs
+- **ReDoc**: http://localhost:8000/api/redoc
 
 ## Detailed Usage
 
@@ -59,7 +120,7 @@ from src.utils import PriceFetcher
 # Initialize components
 price_fetcher = PriceFetcher()
 database_manager = DatabaseManager()
-calculator = SignalCalculator(price_fetcher, database_manager)
+calculator = SignalCalculator(database_manager)
 
 # Calculate signals
 tickers = ['AAPL', 'MSFT', 'GOOGL']
@@ -352,19 +413,48 @@ parsed_date = DateUtils.parse_date('2024-01-15')
 formatted_date = DateUtils.format_date(date(2024, 1, 15), '%Y/%m/%d')
 ```
 
-## Configuration
+## Docker Deployment
 
-### Environment Variables
+### Using Docker Compose (Recommended)
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+
+# Rebuild and start
+docker-compose up --build -d
+```
+
+### Individual Services
+
+```bash
+# Start only database
+docker-compose up mysql -d
+
+# Start backend with database
+docker-compose up mysql backend -d
+
+# Start frontend with backend
+docker-compose up mysql backend frontend -d
+```
+
+### Environment Configuration
 
 Create a `.env` file with the following variables:
 
 ```bash
 # Database Configuration
-DB_HOST=127.0.0.1
+DB_HOST=mysql
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password_here
-DB_NAME=quant_project
+DB_NAME=signal_forge
 
 # yfinance Configuration
 YFINANCE_TIMEOUT=10
@@ -372,7 +462,7 @@ YFINANCE_RETRIES=3
 
 # Logging Configuration
 LOG_LEVEL=INFO
-LOG_FILE=logs/quant_project.log
+LOG_FILE=logs/alpha_crucible.log
 ```
 
 ### Database Setup
@@ -385,6 +475,9 @@ python scripts/setup_database.py
 # 1. Create the database if it doesn't exist
 # 2. Create all required tables
 # 3. Insert default signal definitions
+
+# Or with Docker
+docker-compose exec backend python scripts/setup_database.py
 ```
 
 ## Error Handling

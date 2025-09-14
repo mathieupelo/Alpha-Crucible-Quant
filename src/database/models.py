@@ -37,12 +37,14 @@ class ScoreCombined:
 class Portfolio:
     """Represents a portfolio with metadata."""
     run_id: str
+    universe_id: int
     asof_date: date
     method: str
     params: Optional[Dict[str, Any]] = None
     cash: float = 0.0
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
@@ -53,6 +55,7 @@ class PortfolioPosition:
     weight: float
     price_used: float
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
@@ -62,10 +65,13 @@ class Backtest:
     start_date: date
     end_date: date
     frequency: str
+    universe_id: int
+    name: Optional[str] = None
     universe: Optional[Dict[str, Any]] = None
     benchmark: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
@@ -76,6 +82,25 @@ class BacktestNav:
     nav: float
     benchmark_nav: Optional[float] = None
     pnl: Optional[float] = None
+
+
+@dataclass
+class Universe:
+    """Represents a universe of tickers."""
+    name: str
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class UniverseTicker:
+    """Represents a ticker within a universe."""
+    universe_id: int
+    ticker: str
+    added_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 class DataFrameConverter:
@@ -229,9 +254,11 @@ class DataFrameConverter:
         for backtest in backtests:
             data.append({
                 'run_id': backtest.run_id,
+                'name': backtest.name,
                 'start_date': backtest.start_date,
                 'end_date': backtest.end_date,
                 'frequency': backtest.frequency,
+                'universe_id': backtest.universe_id,
                 'universe': json.dumps(backtest.universe) if backtest.universe else None,
                 'benchmark': backtest.benchmark,
                 'params': json.dumps(backtest.params) if backtest.params else None,
@@ -260,9 +287,11 @@ class DataFrameConverter:
             
             backtests.append(Backtest(
                 run_id=row['run_id'],
+                name=row.get('name'),
                 start_date=row['start_date'],
                 end_date=row['end_date'],
                 frequency=row['frequency'],
+                universe_id=row.get('universe_id'),
                 universe=universe,
                 benchmark=row.get('benchmark'),
                 params=params,
@@ -297,3 +326,55 @@ class DataFrameConverter:
                 pnl=row.get('pnl')
             ))
         return nav_data
+    
+    @staticmethod
+    def universes_to_dataframe(universes: List[Universe]) -> pd.DataFrame:
+        """Convert list of Universe objects to DataFrame."""
+        data = []
+        for universe in universes:
+            data.append({
+                'name': universe.name,
+                'description': universe.description,
+                'created_at': universe.created_at,
+                'updated_at': universe.updated_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_universes(df: pd.DataFrame) -> List[Universe]:
+        """Convert DataFrame to list of Universe objects."""
+        universes = []
+        for _, row in df.iterrows():
+            universes.append(Universe(
+                id=row.get('id'),
+                name=row['name'],
+                description=row.get('description'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at')
+            ))
+        return universes
+    
+    @staticmethod
+    def universe_tickers_to_dataframe(tickers: List[UniverseTicker]) -> pd.DataFrame:
+        """Convert list of UniverseTicker objects to DataFrame."""
+        data = []
+        for ticker in tickers:
+            data.append({
+                'universe_id': ticker.universe_id,
+                'ticker': ticker.ticker,
+                'added_at': ticker.added_at
+            })
+        return pd.DataFrame(data)
+    
+    @staticmethod
+    def dataframe_to_universe_tickers(df: pd.DataFrame) -> List[UniverseTicker]:
+        """Convert DataFrame to list of UniverseTicker objects."""
+        tickers = []
+        for _, row in df.iterrows():
+            tickers.append(UniverseTicker(
+                id=row.get('id'),
+                universe_id=row['universe_id'],
+                ticker=row['ticker'],
+                added_at=row.get('added_at')
+            ))
+        return tickers

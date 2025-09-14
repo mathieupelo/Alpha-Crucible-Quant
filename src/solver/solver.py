@@ -22,7 +22,25 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 
 class PortfolioSolver:
-    """Portfolio optimization solver using CVXOPT."""
+    """
+    Portfolio optimization solver using CVXOPT.
+    
+    This class implements portfolio optimization using convex optimization techniques.
+    It supports both score-based allocation (simple ranking-based allocation) and
+    mean-variance optimization with various constraints.
+    
+    The solver can handle:
+    - Score-based allocation: Allocates weights based on signal scores with ranking
+    - Mean-variance optimization: Traditional Markowitz optimization with risk-return tradeoff
+    - Various constraints: Long-only, maximum weight limits, minimum weight thresholds
+    - Risk management: Risk aversion parameter, covariance matrix regularization
+    
+    Attributes:
+        config: Solver configuration with optimization parameters
+    """
+    
+    # Constants
+    MIN_WEIGHT_THRESHOLD = 1e-6  # Minimum weight to consider a position meaningful
     
     def __init__(self, config: Optional[SolverConfig] = None):
         """
@@ -76,20 +94,22 @@ class PortfolioSolver:
             
             logger.info(f"Solving portfolio for {len(common_tickers)} tickers on {target_date}")
             
-            # Prepare data
-            returns_data = self._prepare_returns_data(price_data, common_tickers)
-            if returns_data is None:
-                return None
-            
-            # Calculate expected returns and covariance matrix
-            expected_returns = self._calculate_expected_returns(alpha_scores, common_tickers)
-            covariance_matrix = self._calculate_covariance_matrix(returns_data, common_tickers)
-            
-            if expected_returns is None or covariance_matrix is None:
-                return None
-            
-            # Solve optimization problem
-            weights = self._solve_optimization(expected_returns, covariance_matrix, common_tickers)
+            # Choose allocation method based on config
+            if self.config.allocation_method == "score_based":
+                weights = self._solve_score_based_allocation(alpha_scores, common_tickers)
+            else:
+                # Use mean-variance optimization
+                returns_data = self._prepare_returns_data(price_data, common_tickers)
+                if returns_data is None:
+                    return None
+                
+                expected_returns = self._calculate_expected_returns(alpha_scores, common_tickers)
+                covariance_matrix = self._calculate_covariance_matrix(returns_data, common_tickers)
+                
+                if expected_returns is None or covariance_matrix is None:
+                    return None
+                
+                weights = self._solve_optimization(expected_returns, covariance_matrix, common_tickers)
             
             if weights is None:
                 return None
@@ -102,7 +122,7 @@ class PortfolioSolver:
             
             # Add positions
             for i, ticker in enumerate(common_tickers):
-                if weights[i] > 1e-6:  # Only add positions with meaningful weights
+                if weights[i] > self.MIN_WEIGHT_THRESHOLD:  # Only add positions with meaningful weights
                     portfolio.add_position(
                         ticker=ticker,
                         weight=weights[i],
@@ -120,6 +140,149 @@ class PortfolioSolver:
         except Exception as e:
             logger.error(f"Error solving portfolio: {e}")
             return None
+    
+    def _solve_score_based_allocation(self, alpha_scores: Dict[str, float], 
+                                    tickers: List[str]) -> Optional[np.ndarray]:
+        """
+        Solve for portfolio weights based purely on alpha scores.
+        
+        This method allocates weights based on score ranking, with higher scores
+        getting maximum allocation up to the max_weight constraint, and remaining
+        weight distributed proportionally among lower-ranked stocks.
+        
+        Args:
+            alpha_scores: Dictionary mapping ticker to alpha score
+            tickers: List of tickers to include
+            
+        Returns:
+            Array of weights or None if allocation fails
+        """
+        try:
+            # Get scores and sort by ranking
+            scores, sorted_indices = self._prepare_scores_for_allocation(alpha_scores, tickers)
+            
+            # Initialize weights
+            weights = np.zeros(len(tickers))
+            n_assets = len(tickers)
+            
+            if n_assets == 0:
+                return weights
+            
+            # Allocate maximum weights to top stocks
+            remaining_weight, allocated_count = self._allocate_maximum_weights(
+                weights, sorted_indices, n_assets
+            )
+            
+            # Distribute remaining weight proportionally
+            if remaining_weight > 0 and allocated_count < n_assets:
+                self._distribute_remaining_weight(
+                    weights, sorted_indices, scores, remaining_weight, allocated_count
+                )
+            
+            # Clean up and normalize weights
+            weights = self._normalize_weights(weights, tickers)
+            
+            logger.info(f"Score-based allocation completed. Weights: {dict(zip(tickers, weights))}")
+            logger.info(f"Allocation strategy: {allocated_count} stocks at max weight ({self.config.max_weight:.1%}), remainder distributed proportionally")
+            return weights
+            
+        except Exception as e:
+            logger.error(f"Error in score-based allocation: {e}")
+            return None
+    
+    def _prepare_scores_for_allocation(self, alpha_scores: Dict[str, float], 
+                                     tickers: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+        """Prepare and sort scores for allocation."""
+        # Get scores for common tickers
+        scores = np.array([alpha_scores.get(ticker, 0.0) for ticker in tickers])
+        
+        # Sort by score (descending)
+        sorted_indices = np.argsort(scores)[::-1]
+        
+        return scores, sorted_indices
+    
+    def _allocate_maximum_weights(self, weights: np.ndarray, sorted_indices: np.ndarray, 
+                                n_assets: int) -> Tuple[float, int]:
+        """Allocate maximum weights to top-ranked stocks."""
+        remaining_weight = 1.0
+        allocated_count = 0
+        
+        # Give maximum allocation to top stocks until we run out of weight or stocks
+        for i in range(n_assets):
+            if remaining_weight <= 0:
+                break
+            
+            # Calculate how much weight to allocate to this stock
+            weight_to_allocate = min(self.config.max_weight, remaining_weight)
+            
+            # Only allocate if we have enough remaining weight
+            if weight_to_allocate >= self.config.min_weight:
+                weights[sorted_indices[i]] = weight_to_allocate
+                remaining_weight -= weight_to_allocate
+                allocated_count += 1
+            else:
+                break
+        
+        return remaining_weight, allocated_count
+    
+    def _distribute_remaining_weight(self, weights: np.ndarray, sorted_indices: np.ndarray,
+                                   scores: np.ndarray, remaining_weight: float, 
+                                   allocated_count: int) -> None:
+        """Distribute remaining weight proportionally among remaining stocks."""
+        # Get remaining stocks (those not yet allocated)
+        remaining_stocks = sorted_indices[allocated_count:]
+        
+        if len(remaining_stocks) == 0:
+            return
+        
+        # Calculate proportional weights based on scores
+        remaining_scores = scores[remaining_stocks]
+        
+        # Handle case where all remaining scores are the same or zero
+        if np.all(remaining_scores == remaining_scores[0]):
+            # Equal distribution among remaining stocks
+            equal_weight = remaining_weight / len(remaining_stocks)
+            for idx in remaining_stocks:
+                if equal_weight >= self.config.min_weight:
+                    weights[idx] = equal_weight
+        else:
+            # Proportional distribution based on scores
+            self._apply_proportional_weights(weights, remaining_stocks, remaining_scores, remaining_weight)
+    
+    def _apply_proportional_weights(self, weights: np.ndarray, remaining_stocks: np.ndarray,
+                                  remaining_scores: np.ndarray, remaining_weight: float) -> None:
+        """Apply proportional weights based on scores."""
+        # Normalize scores to positive values for proportional allocation
+        min_score = np.min(remaining_scores)
+        if min_score < 0:
+            normalized_scores = remaining_scores - min_score + 1e-8
+        else:
+            normalized_scores = remaining_scores + 1e-8
+        
+        # Calculate proportional weights
+        total_normalized_score = np.sum(normalized_scores)
+        if total_normalized_score > 0:
+            proportional_weights = (normalized_scores / total_normalized_score) * remaining_weight
+            
+            # Apply proportional weights
+            for i, idx in enumerate(remaining_stocks):
+                if proportional_weights[i] >= self.config.min_weight:
+                    weights[idx] = proportional_weights[i]
+    
+    def _normalize_weights(self, weights: np.ndarray, tickers: List[str]) -> np.ndarray:
+        """Normalize weights to ensure they sum to 1."""
+        # Apply minimum weight threshold and clean up
+        weights[weights < self.config.min_weight] = 0.0
+        
+        # Renormalize to ensure weights sum to 1
+        total_weight = np.sum(weights)
+        if total_weight > 0:
+            weights = weights / total_weight
+        else:
+            # If all weights are zero (shouldn't happen), distribute equally
+            weights = np.ones(len(tickers)) / len(tickers)
+        
+        return weights
     
     def _prepare_returns_data(self, price_data: pd.DataFrame, tickers: List[str]) -> Optional[pd.DataFrame]:
         """
@@ -174,8 +337,21 @@ class PortfolioSolver:
         try:
             expected_returns = np.array([alpha_scores.get(ticker, 0.0) for ticker in tickers])
             
-            # Normalize expected returns to have zero mean
-            expected_returns = expected_returns - np.mean(expected_returns)
+            # For signal-based allocation, we want to preserve the relative ranking
+            # Higher scores should get higher allocations, lower scores should get lower allocations
+            # We'll use the raw scores as expected returns, but scale them appropriately
+            # to work with the mean-variance optimization
+            
+            # Scale scores to a reasonable range for expected returns (e.g., -0.1 to 0.1)
+            min_score = np.min(expected_returns)
+            max_score = np.max(expected_returns)
+            
+            if max_score > min_score:
+                # Scale to [-0.1, 0.1] range
+                expected_returns = 0.2 * (expected_returns - min_score) / (max_score - min_score) - 0.1
+            else:
+                # All scores are the same, set to zero
+                expected_returns = np.zeros_like(expected_returns)
             
             return expected_returns
             

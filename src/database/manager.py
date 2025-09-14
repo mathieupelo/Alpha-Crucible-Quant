@@ -13,7 +13,8 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 
-from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, DataFrameConverter
+from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, Universe, UniverseTicker, DataFrameConverter
+from utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
 load_dotenv()
@@ -69,15 +70,23 @@ class DatabaseManager:
         if not self.is_connected():
             self.connect()
     
+    @handle_database_errors
     def execute_query(self, query: str, params: Optional[tuple] = None) -> pd.DataFrame:
         """Execute a SELECT query and return results as DataFrame."""
         self.ensure_connection()
         try:
-            df = pd.read_sql(query, self._connection, params=params)
-            return df
-        except Error as e:
-            logger.error(f"Error executing query: {e}")
-            raise
+            cursor = self._connection.cursor(dictionary=True)
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            cursor.close()
+            
+            if not results:
+                return pd.DataFrame()
+            
+            return pd.DataFrame(results)
+        except Exception as e:
+            logger.error(f"Database error in execute_query: {e}")
+            return pd.DataFrame()
     
     def execute_insert(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute an INSERT query and return the last insert ID."""
@@ -262,9 +271,10 @@ class DatabaseManager:
     def store_portfolio(self, portfolio: Portfolio) -> int:
         """Store a portfolio in the database."""
         query = """
-        INSERT INTO portfolios (run_id, asof_date, method, params, cash, notes, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO portfolios (run_id, universe_id, asof_date, method, params, cash, notes, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
+            universe_id = VALUES(universe_id),
             method = VALUES(method),
             params = VALUES(params),
             cash = VALUES(cash),
@@ -279,6 +289,7 @@ class DatabaseManager:
         
         params = (
             portfolio.run_id,
+            portfolio.universe_id,
             portfolio.asof_date,
             portfolio.method,
             params_json,
@@ -330,12 +341,14 @@ class DatabaseManager:
                 params = None
         
         return Portfolio(
-            run_id=row['run_id'],
+            id=int(row['id']),
+            run_id=str(row['run_id']),
+            universe_id=int(row['universe_id']),
             asof_date=row['asof_date'],
-            method=row['method'],
+            method=str(row['method']),
             params=params,
-            cash=row.get('cash', 0.0),
-            notes=row.get('notes'),
+            cash=float(row.get('cash', 0.0)),
+            notes=str(row.get('notes')) if pd.notna(row.get('notes')) else None,
             created_at=row.get('created_at')
         )
     
@@ -391,12 +404,14 @@ class DatabaseManager:
     def store_backtest(self, backtest: Backtest) -> int:
         """Store a backtest configuration in the database."""
         query = """
-        INSERT INTO backtests (run_id, start_date, end_date, frequency, universe, benchmark, params, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO backtests (run_id, name, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
             start_date = VALUES(start_date),
             end_date = VALUES(end_date),
             frequency = VALUES(frequency),
+            universe_id = VALUES(universe_id),
             universe = VALUES(universe),
             benchmark = VALUES(benchmark),
             params = VALUES(params),
@@ -415,9 +430,11 @@ class DatabaseManager:
         
         params = (
             backtest.run_id,
+            backtest.name,
             backtest.start_date,
             backtest.end_date,
             backtest.frequency,
+            backtest.universe_id,
             universe_json,
             backtest.benchmark,
             params_json,
@@ -475,10 +492,13 @@ class DatabaseManager:
                 params = None
         
         return Backtest(
+            id=row['id'],
             run_id=row['run_id'],
             start_date=row['start_date'],
             end_date=row['end_date'],
             frequency=row['frequency'],
+            universe_id=row['universe_id'],
+            name=row.get('name'),
             universe=universe,
             benchmark=row.get('benchmark'),
             params=params,
@@ -536,6 +556,153 @@ class DatabaseManager:
         
         return self.execute_query(query, tuple(params) if params else None)
     
+    # Universe Operations
+    
+    def store_universe(self, universe: Universe) -> int:
+        """Store a universe in the database."""
+        query = """
+        INSERT INTO universes (name, description, created_at, updated_at)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            description = VALUES(description),
+            updated_at = VALUES(updated_at)
+        """
+        
+        params = (
+            universe.name,
+            universe.description,
+            universe.created_at or datetime.now(),
+            universe.updated_at or datetime.now()
+        )
+        
+        return self.execute_insert(query, params)
+    
+    def get_universes(self) -> pd.DataFrame:
+        """Retrieve all universes from the database."""
+        query = "SELECT * FROM universes ORDER BY created_at DESC"
+        return self.execute_query(query)
+    
+    def get_universe_by_id(self, universe_id: int) -> Optional[Universe]:
+        """Get a specific universe by ID."""
+        query = "SELECT * FROM universes WHERE id = %s"
+        df = self.execute_query(query, (int(universe_id),))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        return Universe(
+            id=row['id'],
+            name=row['name'],
+            description=row.get('description'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def get_universe_by_name(self, name: str) -> Optional[Universe]:
+        """Get a specific universe by name."""
+        query = "SELECT * FROM universes WHERE name = %s"
+        df = self.execute_query(query, (name,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        return Universe(
+            id=row['id'],
+            name=row['name'],
+            description=row.get('description'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def delete_universe(self, universe_id: int) -> bool:
+        """Delete a universe and all its tickers."""
+        query = "DELETE FROM universes WHERE id = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id,))
+            return cursor.rowcount > 0
+        except Error as e:
+            logger.error(f"Error deleting universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
+    
+    # Universe Ticker Operations
+    
+    def store_universe_ticker(self, ticker: UniverseTicker) -> int:
+        """Store a ticker in a universe."""
+        query = """
+        INSERT INTO universe_tickers (universe_id, ticker, added_at)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            added_at = VALUES(added_at)
+        """
+        
+        params = (
+            ticker.universe_id,
+            ticker.ticker,
+            ticker.added_at or datetime.now()
+        )
+        
+        return self.execute_insert(query, params)
+    
+    def store_universe_tickers(self, tickers: List[UniverseTicker]) -> int:
+        """Store multiple tickers in a universe."""
+        if not tickers:
+            return 0
+        
+        query = """
+        INSERT INTO universe_tickers (universe_id, ticker, added_at)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            added_at = VALUES(added_at)
+        """
+        
+        params_list = []
+        for ticker in tickers:
+            params_list.append((
+                ticker.universe_id,
+                ticker.ticker,
+                ticker.added_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_universe_tickers(self, universe_id: int) -> pd.DataFrame:
+        """Get all tickers for a universe."""
+        query = "SELECT * FROM universe_tickers WHERE universe_id = %s ORDER BY ticker"
+        return self.execute_query(query, (universe_id,))
+    
+    def delete_universe_ticker(self, universe_id: int, ticker: str) -> bool:
+        """Delete a ticker from a universe."""
+        query = "DELETE FROM universe_tickers WHERE universe_id = %s AND ticker = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id, ticker))
+            return cursor.rowcount > 0
+        except Error as e:
+            logger.error(f"Error deleting ticker {ticker} from universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
+    
+    def delete_all_universe_tickers(self, universe_id: int) -> int:
+        """Delete all tickers from a universe."""
+        query = "DELETE FROM universe_tickers WHERE universe_id = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (universe_id,))
+            return cursor.rowcount
+        except Error as e:
+            logger.error(f"Error deleting all tickers from universe {universe_id}: {e}")
+            raise
+        finally:
+            cursor.close()
     
     # Utility Methods
     

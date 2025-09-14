@@ -19,6 +19,12 @@ class BacktestConfig:
     end_date: date
     """End date for backtesting"""
     
+    universe_id: int
+    """ID of the universe to use for backtesting"""
+    
+    name: Optional[str] = None
+    """Name for the backtest (optional)"""
+    
     initial_capital: float = 10000.0
     """Initial capital for backtesting (default: $10,000)"""
     
@@ -58,6 +64,9 @@ class BacktestConfig:
     signal_weights: Optional[dict] = None
     """Weights for combining signals (optional)"""
     
+    signal_combination_method: str = 'equal_weight'
+    """Method for combining signals ('equal_weight', 'weighted', 'zscore') (default: equal_weight)"""
+    
     forward_fill_signals: bool = True
     """Whether to forward fill missing signal scores with latest available values (default: True)"""
     
@@ -94,6 +103,42 @@ class BacktestConfig:
         
         if self.evaluation_period not in valid_frequencies:
             raise ValueError(f"Evaluation period must be one of {valid_frequencies}")
+        
+        # Validate signal combination method
+        valid_methods = ['equal_weight', 'weighted', 'zscore']
+        if self.signal_combination_method not in valid_methods:
+            raise ValueError(f"Signal combination method must be one of {valid_methods}")
+    
+    def validate_universe_requirements(self, database_manager=None) -> None:
+        """
+        Validate that the universe exists and has at least 5 tickers.
+        
+        Args:
+            database_manager: DatabaseManager instance for validation
+            
+        Raises:
+            ValueError: If universe validation fails
+        """
+        if database_manager is None:
+            # Import here to avoid circular imports
+            from database import DatabaseManager
+            database_manager = DatabaseManager()
+        
+        # Check if universe exists
+        universe = database_manager.get_universe_by_id(self.universe_id)
+        if universe is None:
+            raise ValueError(f"Universe with ID {self.universe_id} not found")
+        
+        # Check ticker count
+        tickers_df = database_manager.get_universe_tickers(self.universe_id)
+        ticker_count = len(tickers_df)
+        
+        if ticker_count < 5:
+            raise ValueError(
+                f"The selected universe '{universe.name}' must contain at least 5 tickers. "
+                f"Please add more tickers or choose another universe. "
+                f"Current ticker count: {ticker_count}"
+            )
     
     def get_rebalancing_interval(self) -> timedelta:
         """
@@ -148,6 +193,7 @@ class BacktestConfig:
             'use_equal_weight_benchmark': self.use_equal_weight_benchmark,
             'min_lookback_days': self.min_lookback_days,
             'max_lookback_days': self.max_lookback_days,
+            'signal_combination_method': self.signal_combination_method,
             'forward_fill_signals': self.forward_fill_signals
         }
     

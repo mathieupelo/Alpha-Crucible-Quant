@@ -30,8 +30,8 @@ def test_equal_weight_benchmark():
     try:
         # Test parameters
         tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
-        signals = ['RSI', 'SMA']
-        signal_weights = {'RSI': 0.5, 'SMA': 0.5}
+        signals = ['SENTIMENT']
+        signal_weights = {'SENTIMENT': 1.0}
         
         # Date range (last 6 months)
         end_date = date.today()
@@ -46,7 +46,7 @@ def test_equal_weight_benchmark():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(price_fetcher, database_manager)
+        signal_calculator = SignalCalculator(database_manager)
         backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
         
         # Test 1: Equal-weight benchmark

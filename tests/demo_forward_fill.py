@@ -27,7 +27,7 @@ def demo_forward_fill():
     
     dates = pd.date_range(start='2023-01-01', end='2023-01-10', freq='D')
     tickers = ['AAPL', 'MSFT', 'GOOGL']
-    signals = ['RSI', 'SMA']
+    signals = ['SENTIMENT']
     
     # Create data with intentional gaps
     data = []

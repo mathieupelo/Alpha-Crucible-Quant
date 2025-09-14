@@ -15,7 +15,21 @@ import os
 
 @pytest.fixture
 def sample_price_data():
-    """Create sample price data for testing."""
+    """Create sample price data for testing using real market data."""
+    try:
+        # Try to get real market data first
+        from data import RealTimeDataFetcher
+        fetcher = RealTimeDataFetcher()
+        
+        # Get real data for AAPL
+        real_data = fetcher.get_price_history('AAPL', date(2023, 12, 1), date(2024, 1, 31))
+        
+        if real_data is not None and not real_data.empty:
+            return real_data
+    except Exception as e:
+        print(f"Could not fetch real data: {e}")
+    
+    # Fallback to mock data if real data is not available
     dates = pd.date_range(start='2023-12-01', end='2024-01-31', freq='D')
     np.random.seed(42)
     
@@ -42,7 +56,7 @@ def sample_tickers():
 @pytest.fixture
 def sample_signals():
     """Create sample signal list."""
-    return ['RSI', 'SMA', 'MACD']
+    return ['SENTIMENT']
 
 
 @pytest.fixture
@@ -55,7 +69,7 @@ def sample_date_range():
 def sample_signal_scores():
     """Create sample signal scores."""
     tickers = ['AAPL', 'MSFT', 'GOOGL']
-    signals = ['RSI', 'SMA']
+    signals = ['SENTIMENT']
     dates = pd.date_range(start='2024-01-01', end='2024-01-31', freq='D')
     
     data = []
@@ -87,7 +101,21 @@ def mock_database_manager():
 
 @pytest.fixture
 def mock_price_fetcher():
-    """Create mock price fetcher."""
+    """Create mock price fetcher with real data when possible."""
+    try:
+        # Try to use real data fetcher
+        from data import RealTimeDataFetcher
+        fetcher = RealTimeDataFetcher()
+        
+        # Test if we can get real data
+        test_data = fetcher.get_price_history('AAPL', date(2024, 1, 1), date(2024, 1, 5))
+        if test_data is not None and not test_data.empty:
+            # Use real data fetcher
+            return fetcher
+    except Exception as e:
+        print(f"Could not use real data fetcher: {e}")
+    
+    # Fallback to mock fetcher
     mock_fetcher = Mock()
     mock_fetcher.get_price.return_value = 100.0
     mock_fetcher.get_prices.return_value = {'AAPL': 100.0, 'MSFT': 200.0}
@@ -140,7 +168,7 @@ def sample_backtest_result():
         start_date=date(2024, 1, 1),
         end_date=date(2024, 12, 31),
         tickers=['AAPL', 'MSFT', 'GOOGL'],
-        signals=['RSI', 'SMA'],
+        signals=['SENTIMENT'],
         total_return=0.15,
         annualized_return=0.12,
         volatility=0.18,

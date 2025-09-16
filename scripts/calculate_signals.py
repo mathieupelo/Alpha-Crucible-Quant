@@ -45,7 +45,8 @@ def main():
         tickers = ['EA', 'TTWO', 'NTES']
     
     signals = ['SENTIMENT', 'SENTIMENT_YT']
-    tickers = ['EA', 'TTWO', 'NTES']
+    #tickers = []
+    tickers = ['EA', 'TTWO', 'NTES', 'RBLX', 'MSFT', 'SONY', 'WBD', 'NCBDY', 'GDEV', 'OTGLF', 'SNAL', 'GRVY']
     
     # Date range (last 2 years to match backtest)
     end_date = date.today()

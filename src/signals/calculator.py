@@ -116,17 +116,32 @@ class SignalCalculator:
                         # Calculate signal value without price data
                         signal_value = signal.calculate(None, ticker, target_date)
                         
-                        if not np.isnan(signal_value):
-                            # Store raw signal
-                            raw_signal = SignalRaw(
-                                asof_date=target_date,
-                                ticker=ticker,
-                                signal_name=signal_id,
-                                value=signal_value,
-                                metadata={'signal_class': signal.__class__.__name__},
-                                created_at=datetime.now()
-                            )
-                            all_signals.append(raw_signal)
+                        # Store signal with default value if NaN (to ensure all combinations exist)
+                        if np.isnan(signal_value):
+                            # Use 0 as default value for missing signals
+                            signal_value = 0.0
+                            metadata = {
+                                'signal_class': signal.__class__.__name__,
+                                'default_value': True,
+                                'reason': 'no_data_available'
+                            }
+                            logger.debug(f"Using default value 0.0 for {signal_id} on {ticker} for {target_date} (no data available)")
+                        else:
+                            metadata = {
+                                'signal_class': signal.__class__.__name__,
+                                'default_value': False
+                            }
+                        
+                        # Store raw signal
+                        raw_signal = SignalRaw(
+                            asof_date=target_date,
+                            ticker=ticker,
+                            signal_name=signal_id,
+                            value=signal_value,
+                            metadata=metadata,
+                            created_at=datetime.now()
+                        )
+                        all_signals.append(raw_signal)
                         
                     except Exception as e:
                         logger.error(f"Error calculating {signal_id} for {ticker} on {target_date}: {e}")
@@ -532,7 +547,21 @@ class SignalCalculator:
             is_complete = len(missing_combinations) == 0
             
             if not is_complete:
-                logger.warning(f"Missing {len(missing_combinations)} signal combinations on {target_date}: {missing_signals}")
+                # Group missing signals by signal type for better logging
+                missing_by_signal = {}
+                for ticker, signal in missing_combinations:
+                    if signal not in missing_by_signal:
+                        missing_by_signal[signal] = []
+                    missing_by_signal[signal].append(ticker)
+                
+                for signal, tickers in missing_by_signal.items():
+                    if signal == 'SENTIMENT_YT':
+                        logger.info(f"SENTIMENT_YT signal missing for {len(tickers)} tickers on {target_date}: {tickers}")
+                        logger.info("This is expected when games have already been released (trailers filtered out by business logic)")
+                        logger.info("Note: Missing signals will be stored with default value 0.0")
+                    else:
+                        logger.warning(f"Missing {signal} signal for {len(tickers)} tickers on {target_date}: {tickers}")
+                        logger.info("Note: Missing signals will be stored with default value 0.0")
             
             return is_complete, missing_signals
             

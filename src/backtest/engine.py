@@ -287,7 +287,44 @@ class BacktestEngine:
             DataFrame with signal scores
         """
         try:
-            # Calculate signals with range enforcement
+            # First try to get combined scores from database
+            logger.info("Attempting to fetch existing combined scores from database...")
+            combined_scores = self.signal_calculator.get_scores_combined_pivot(
+                tickers, [config.signal_combination_method], config.start_date, config.end_date,
+                forward_fill=config.forward_fill_signals
+            )
+            
+            if not combined_scores.empty:
+                logger.info(f"Found existing combined scores in database: {combined_scores.shape}")
+                return combined_scores
+            
+            # If no combined scores exist, try to get raw signals from database
+            logger.info("No combined scores found, checking for existing raw signals...")
+            signals_df = self.signal_calculator.get_signals_raw(
+                tickers, signals, config.start_date, config.end_date
+            )
+            
+            if not signals_df.empty:
+                logger.info(f"Found existing raw signals in database: {len(signals_df)} records")
+                # Combine existing signals into scores
+                logger.info(f"Combining existing signals using method: {config.signal_combination_method}")
+                combined_scores = self._combine_signals_to_scores(
+                    signals_df, tickers, signals, config
+                )
+                
+                if not combined_scores.empty:
+                    # Convert to pivot format
+                    signal_scores = combined_scores.pivot_table(
+                        index='asof_date',
+                        columns='ticker',
+                        values='score',
+                        aggfunc='first'
+                    )
+                    logger.info(f"Combined existing signals into scores: {signal_scores.shape}")
+                    return signal_scores
+            
+            # If no signals exist in database, calculate them
+            logger.info("No existing signals found in database, calculating new signals...")
             signals_df = self.signal_calculator.calculate_and_enforce_signals(
                 tickers, signals, config.start_date, config.end_date, store_in_db=True
             )
@@ -297,7 +334,7 @@ class BacktestEngine:
                 return pd.DataFrame()
             
             # Combine signals into scores using configured method
-            logger.info(f"Combining signals using method: {config.signal_combination_method}")
+            logger.info(f"Combining calculated signals using method: {config.signal_combination_method}")
             combined_scores = self._combine_signals_to_scores(
                 signals_df, tickers, signals, config
             )
@@ -314,7 +351,7 @@ class BacktestEngine:
                 aggfunc='first'
             )
             
-            logger.info(f"Fetched signal scores: {signal_scores.shape}")
+            logger.info(f"Calculated and combined new signals into scores: {signal_scores.shape}")
             return signal_scores
             
         except Exception as e:
@@ -684,7 +721,7 @@ class BacktestEngine:
             
             # First try to get combined scores
             signal_scores = self.signal_calculator.get_scores_combined_pivot(
-                tickers, ['equal_weight'], extended_start, config.end_date, 
+                tickers, [config.signal_combination_method], extended_start, config.end_date, 
                 forward_fill=config.forward_fill_signals
             )
             

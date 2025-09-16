@@ -1,13 +1,50 @@
 {
-  "EA": [
-    { "game": "Skate", "trailer_url": "https://www.youtube.com/watch?v=p14MSdRtNIo", "release_date": "2025-09-16" },
-    { "game": "Battlefield", "trailer_url": "https://www.youtube.com/watch?v=pgNCgJG0vnY", "release_date": "2025-07-24" }
+  "OTGLF": [
+    { "game": "The Witcher 4", "trailer_url": "https://www.youtube.com/watch?v=54dabgZJ5YA", "release_date": "2024-12-12", "game_release_date": "2025-12-31" },
+    { "game": "The Witcher 3: Wild Hunt", "trailer_url": "https://www.youtube.com/watch?v=c0i88t0Kacs", "release_date": "2013-08-14", "game_release_date": "2015-05-19" },
+    { "game": "Cyberpunk 2077", "trailer_url": "https://www.youtube.com/watch?v=8X2kIfS6fb8", "release_date": "2018-06-10", "game_release_date": "2022-02-15" }
   ],
-  "TTWO": [
-    { "game": "GTA VI", "trailer_url": "https://www.youtube.com/watch?v=QdBZY2fkU-0", "release_date": "2023-12-04" }
+  "SNAL": [
+    { "game": "ARK: Survival Evolved", "trailer_url": "https://www.youtube.com/watch?v=FW9vsrPWujI", "release_date": "2015-05-11", "game_release_date": "2017-08-29" },
+    { "game": "ARK 2", "trailer_url": "https://www.youtube.com/watch?v=ALTzkzMyI-Y", "release_date": "2020-12-10", "game_release_date": "2025-12-31" }
+  ],
+  "GRVY": [
+    { "game": "Ragnarok Online", "trailer_url": "https://www.youtube.com/watch?v=rxeRPXD3JhY", "release_date": "2013-09-19", "game_release_date": "2013-10-31" }
+  ],
+  "GDEV": [
+    { "game": "Hero Wars", "trailer_url": "https://www.youtube.com/watch?v=ZD-UdNGjkBI", "release_date": "2022-05-27", "game_release_date": "2016-10-01" }
+  ],
+  "NCBDY": [
+    { "game": "Elden Ring", "trailer_url": "https://www.youtube.com/watch?v=E3Huy2cdih0", "release_date": "2019-06-10", "game_release_date": "2022-02-25" },
+    { "game": "Tekken 8", "trailer_url": "https://www.youtube.com/watch?v=2hPuRQz6IlM", "release_date": "2022-09-13", "game_release_date": "2024-01-26" },
+    { "game": "Elden Ring Nightreign", "trailer_url": "https://www.youtube.com/watch?v=Djtsw5k_DNc", "release_date": "2022-09-13", "game_release_date": "2024-12-12" }
+  ],
+  "RBLX": [
+    { "game": "Roblox (Platform Trailer)", "trailer_url": "https://www.youtube.com/watch?v=97dyt7MXWpo", "release_date": "2011-07-18", "game_release_date": "2014-07-14" }
+  ],
+  "WBD": [
+    { "game": "Hogwarts Legacy", "trailer_url": "https://www.youtube.com/watch?v=1O6Qstncpnc", "release_date": "2020-09-16", "game_release_date": "2023-02-10" },
+    { "game": "Mortal Kombat 1", "trailer_url": "https://www.youtube.com/watch?v=UZ6eFEjFfJ0", "release_date": "2023-05-18", "game_release_date": "2023-09-19" },
+    { "game": "Lego Batman : Legacy of the Dark Knight", "trailer_url": "https://www.youtube.com/watch?v=1hQAoGj01Rc&t=24s", "release_date": "2025-08-19", "game_release_date": "2025-12-31" }
   ],
   "NTES": [
-    { "game": "Destiny: Rising", "trailer_url": "https://www.youtube.com/watch?v=Nz0dClII69w", "release_date": "2024-10-14" }
+    { "game": "Destiny: Rising", "trailer_url": "https://www.youtube.com/watch?v=Nz0dClII69w", "release_date": "2024-10-14", "game_release_date": "2025-08-28" },
+    { "game": "Marvel Rivals", "trailer_url": "https://www.youtube.com/watch?v=DA4iVv4MARE", "release_date": "2023-03-27", "game_release_date": "2024-12-06" }
+  ],
+  "TTWO": [
+    { "game": "GTA VI", "trailer_url": "https://www.youtube.com/watch?v=QdBZY2fkU-0", "release_date": "2023-12-04", "game_release_date": "2025-12-31" },
+    { "game": "Red Dead Redemption 2", "trailer_url": "https://www.youtube.com/watch?v=eaW0tYpxyp0", "release_date": "2018-05-18", "game_release_date": "2019-11-05" }
+  ],
+  "MSFT": [
+    { "game": "Halo Infinite", "trailer_url": "https://www.youtube.com/watch?v=Fmdb-KmlzD8", "release_date": "2018-06-10", "game_release_date": "2021-12-08" },
+    { "game": "Starfield", "trailer_url": "https://www.youtube.com/watch?v=pYqyVpCV-3c", "release_date": "2021-06-13", "game_release_date": "2023-09-06" }
+  ],
+  "EA": [
+    { "game": "Skate", "trailer_url": "https://www.youtube.com/watch?v=p14MSdRtNIo", "release_date": "2025-08-26", "game_release_date": "2025-09-16" },
+    { "game": "Battlefield", "trailer_url": "https://www.youtube.com/watch?v=pgNCgJG0vnY", "release_date": "2025-07-24", "game_release_date": "2025-10-10" }
+  ],
+  "SONY": [
+    { "game": "Spider-Man 2", "trailer_url": "https://www.youtube.com/watch?v=qIQ3xNqkVC4", "release_date": "2021-08-09", "game_release_date": "2023-10-20" },
+    { "game": "God of War Ragnarok", "trailer_url": "https://www.youtube.com/watch?v=EE-4GvjKcfs", "release_date": "2021-08-09", "game_release_date": "2022-08-19" }
   ]
 }
-

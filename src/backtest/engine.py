@@ -277,6 +277,10 @@ class BacktestEngine:
         """
         Fetch signal scores for all rebalancing dates.
         
+        This method always uses raw signals and combines them fresh to ensure
+        consistency with current backtest parameters. The combined_scores table
+        is only used for visualization/debugging, not for portfolio creation.
+        
         Args:
             tickers: List of stock ticker symbols
             signals: List of signal IDs
@@ -287,19 +291,11 @@ class BacktestEngine:
             DataFrame with signal scores
         """
         try:
-            # First try to get combined scores from database
-            logger.info("Attempting to fetch existing combined scores from database...")
-            combined_scores = self.signal_calculator.get_scores_combined_pivot(
-                tickers, [config.signal_combination_method], config.start_date, config.end_date,
-                forward_fill=config.forward_fill_signals
-            )
+            # Always use raw signals and combine them fresh to ensure consistency
+            # with current backtest parameters (tickers, dates, combination method, etc.)
+            logger.info("Using raw signals and combining them fresh for portfolio creation...")
             
-            if not combined_scores.empty:
-                logger.info(f"Found existing combined scores in database: {combined_scores.shape}")
-                return combined_scores
-            
-            # If no combined scores exist, try to get raw signals from database
-            logger.info("No combined scores found, checking for existing raw signals...")
+            # Try to get raw signals from database first
             signals_df = self.signal_calculator.get_signals_raw(
                 tickers, signals, config.start_date, config.end_date
             )

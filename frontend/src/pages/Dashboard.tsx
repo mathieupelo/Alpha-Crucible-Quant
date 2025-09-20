@@ -102,11 +102,12 @@ const Dashboard: React.FC = () => {
             Select Backtest
           </Typography>
           <FormControl fullWidth>
-            <InputLabel>Choose a backtest to analyze</InputLabel>
+            <InputLabel shrink={!!selectedBacktest}>Choose a backtest to analyze</InputLabel>
             <Select
               value={selectedBacktest}
               onChange={(e) => handleBacktestChange(e.target.value)}
               disabled={backtestsLoading}
+              label="Choose a backtest to analyze"
             >
               {backtestsData?.backtests.map((backtest) => (
                 <MenuItem key={backtest.run_id} value={backtest.run_id}>
@@ -189,6 +190,7 @@ const Dashboard: React.FC = () => {
               <PerformanceChart
                 data={navData?.nav_data || []}
                 height={400}
+                showTrendLine={true}
               />
             )}
           </CardContent>

@@ -3,7 +3,7 @@
  * Displays portfolio performance over time using Recharts
  */
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, Typography, useTheme, Switch, FormControlLabel } from '@mui/material';
 import { format, parseISO } from 'date-fns';
 
 import { NavData } from '@/types';
@@ -24,21 +24,58 @@ interface PerformanceChartProps {
   data: NavData[];
   height?: number;
   showBenchmark?: boolean;
+  showTrendLine?: boolean;
 }
 
 const PerformanceChart: React.FC<PerformanceChartProps> = ({
   data,
   height = 400,
   showBenchmark = true,
+  showTrendLine: initialShowTrendLine = false,
 }) => {
   const theme = useTheme();
+  const [showTrendLine, setShowTrendLine] = useState(initialShowTrendLine);
+
+  // Calculate linear regression trend line
+  const trendLineData = useMemo(() => {
+    if (!showTrendLine || data.length < 2) return [];
+    
+    const n = data.length;
+    const xValues = data.map((_, index) => index);
+    const yValues = data.map(item => item.portfolio_nav);
+    
+    // Calculate means
+    const xMean = xValues.reduce((sum, x) => sum + x, 0) / n;
+    const yMean = yValues.reduce((sum, y) => sum + y, 0) / n;
+    
+    // Calculate slope and intercept
+    let numerator = 0;
+    let denominator = 0;
+    
+    for (let i = 0; i < n; i++) {
+      const xDiff = xValues[i] - xMean;
+      const yDiff = yValues[i] - yMean;
+      numerator += xDiff * yDiff;
+      denominator += xDiff * xDiff;
+    }
+    
+    const slope = denominator === 0 ? 0 : numerator / denominator;
+    const intercept = yMean - slope * xMean;
+    
+    // Generate trend line points
+    return data.map((item, index) => ({
+      date: item.nav_date,
+      trend: slope * index + intercept,
+    }));
+  }, [data, showTrendLine]);
 
   // Transform data for chart
-  const chartData = data.map((item) => ({
+  const chartData = data.map((item, index) => ({
     date: item.nav_date,
     portfolio: item.portfolio_nav,
     benchmark: item.benchmark_nav || null,
     pnl: item.pnl || 0,
+    trend: showTrendLine && trendLineData.length > 0 ? trendLineData[index]?.trend : null,
   }));
 
   // Calculate performance metrics
@@ -66,6 +103,9 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
     if (name === 'pnl') {
       return [`$${value.toFixed(2)}`, 'PnL'];
     }
+    if (name === 'trend') {
+      return [`$${value.toFixed(2)}`, 'Trend Line'];
+    }
     return [`$${value.toFixed(2)}`, name === 'portfolio' ? 'Portfolio' : 'Benchmark'];
   };
 
@@ -92,6 +132,26 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
 
   return (
     <Box sx={{ width: '100%', height }}>
+      {/* Chart Controls */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={showTrendLine}
+              onChange={(e) => setShowTrendLine(e.target.checked)}
+              color="warning"
+            />
+          }
+          label="Show Trend Line"
+          sx={{ 
+            '& .MuiFormControlLabel-label': {
+              fontSize: '0.875rem',
+              color: theme.palette.text.secondary,
+            }
+          }}
+        />
+      </Box>
+      
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
@@ -174,6 +234,24 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
               activeDot={{
                 r: 4,
                 stroke: theme.palette.secondary.main,
+                strokeWidth: 2,
+                fill: theme.palette.background.paper,
+              }}
+            />
+          )}
+          
+          {/* Trend line */}
+          {showTrendLine && (
+            <Line
+              type="monotone"
+              dataKey="trend"
+              stroke={theme.palette.warning.main}
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="8 4"
+              activeDot={{
+                r: 4,
+                stroke: theme.palette.warning.main,
                 strokeWidth: 2,
                 fill: theme.palette.background.paper,
               }}

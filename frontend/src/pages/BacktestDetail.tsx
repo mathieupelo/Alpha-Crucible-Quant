@@ -224,6 +224,7 @@ const BacktestDetail: React.FC = () => {
               data={navData?.nav_data || []}
               height={400}
               showBenchmark={true}
+              showTrendLine={true}
             />
           )}
         </CardContent>

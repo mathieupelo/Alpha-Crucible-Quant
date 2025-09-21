@@ -225,6 +225,8 @@ const BacktestDetail: React.FC = () => {
               height={400}
               showBenchmark={true}
               showTrendLine={true}
+              backtestStartDate={backtest.start_date}
+              backtestEndDate={backtest.end_date}
             />
           )}
         </CardContent>

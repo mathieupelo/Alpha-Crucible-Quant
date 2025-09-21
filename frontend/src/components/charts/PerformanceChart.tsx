@@ -3,7 +3,7 @@
  * Displays portfolio performance over time using Recharts
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LineChart,
   Line,
@@ -15,16 +15,32 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Box, Typography, useTheme, Switch, FormControlLabel } from '@mui/material';
+import { 
+  Box, 
+  Typography, 
+  useTheme, 
+  Switch, 
+  FormControlLabel, 
+  FormControl, 
+  Select, 
+  MenuItem, 
+  InputLabel,
+  CircularProgress,
+  Alert
+} from '@mui/material';
 import { format, parseISO } from 'date-fns';
+import { useQuery } from 'react-query';
 
 import { NavData } from '@/types';
+import { marketApi } from '@/services/api';
 
 interface PerformanceChartProps {
   data: NavData[];
   height?: number;
   showBenchmark?: boolean;
   showTrendLine?: boolean;
+  backtestStartDate?: string;
+  backtestEndDate?: string;
 }
 
 const PerformanceChart: React.FC<PerformanceChartProps> = ({
@@ -32,9 +48,36 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   height = 400,
   showBenchmark = true,
   showTrendLine: initialShowTrendLine = false,
+  backtestStartDate,
+  backtestEndDate,
 }) => {
   const theme = useTheme();
   const [showTrendLine, setShowTrendLine] = useState(initialShowTrendLine);
+  const [showMarketOverlay, setShowMarketOverlay] = useState(false);
+  const [marketSymbol, setMarketSymbol] = useState('SPY');
+
+  // Get the starting value for normalization
+  const startingValue = data.length > 0 ? data[0].portfolio_nav : 100;
+
+  // Fetch market overlay data
+  const {
+    data: marketOverlayData,
+    isLoading: marketOverlayLoading,
+    error: marketOverlayError,
+  } = useQuery(
+    ['market-overlay', marketSymbol, backtestStartDate, backtestEndDate, startingValue],
+    () => marketApi.getNormalizedMarketData(
+      marketSymbol,
+      backtestStartDate || data[0]?.nav_date || '',
+      backtestEndDate || data[data.length - 1]?.nav_date || '',
+      startingValue
+    ),
+    {
+      enabled: showMarketOverlay && !!backtestStartDate && !!backtestEndDate,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    }
+  );
 
   // Calculate linear regression trend line
   const trendLineData = useMemo(() => {
@@ -70,13 +113,29 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   }, [data, showTrendLine]);
 
   // Transform data for chart
-  const chartData = data.map((item, index) => ({
-    date: item.nav_date,
-    portfolio: item.portfolio_nav,
-    benchmark: item.benchmark_nav || null,
-    pnl: item.pnl || 0,
-    trend: showTrendLine && trendLineData.length > 0 ? trendLineData[index]?.trend : null,
-  }));
+  const chartData = useMemo(() => {
+    const baseData = data.map((item, index) => ({
+      date: item.nav_date,
+      portfolio: item.portfolio_nav,
+      benchmark: item.benchmark_nav || null,
+      pnl: item.pnl || 0,
+      trend: showTrendLine && trendLineData.length > 0 ? trendLineData[index]?.trend : null,
+    }));
+
+    // Add market overlay data if available
+    if (showMarketOverlay && marketOverlayData?.data) {
+      const marketDataMap = new Map(
+        marketOverlayData.data.map(point => [point.date, point.value])
+      );
+      
+      return baseData.map(item => ({
+        ...item,
+        marketOverlay: marketDataMap.get(item.date) || null,
+      }));
+    }
+
+    return baseData;
+  }, [data, showTrendLine, trendLineData, showMarketOverlay, marketOverlayData]);
 
   // Calculate performance metrics
   const firstValue = chartData[0]?.portfolio || 0;
@@ -106,6 +165,9 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
     if (name === 'trend') {
       return [`$${value.toFixed(2)}`, 'Trend Line'];
     }
+    if (name === 'marketOverlay') {
+      return [`$${value.toFixed(2)}`, `${marketSymbol} (overlay)`];
+    }
     return [`$${value.toFixed(2)}`, name === 'portfolio' ? 'Portfolio' : 'Benchmark'];
   };
 
@@ -133,7 +195,39 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   return (
     <Box sx={{ width: '100%', height }}>
       {/* Chart Controls */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showMarketOverlay}
+                onChange={(e) => setShowMarketOverlay(e.target.checked)}
+                color="info"
+              />
+            }
+            label="Show Market Overlay"
+            sx={{ 
+              '& .MuiFormControlLabel-label': {
+                fontSize: '0.875rem',
+                color: theme.palette.text.secondary,
+              }
+            }}
+          />
+          {showMarketOverlay && (
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Symbol</InputLabel>
+              <Select
+                value={marketSymbol}
+                onChange={(e) => setMarketSymbol(e.target.value)}
+                label="Symbol"
+              >
+                <MenuItem value="SPY">SPY</MenuItem>
+                <MenuItem value="^GSPC">S&P 500</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+        </Box>
+        
         <FormControlLabel
           control={
             <Switch
@@ -151,6 +245,22 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
           }}
         />
       </Box>
+
+      {/* Loading and Error States */}
+      {showMarketOverlay && marketOverlayLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 50 }}>
+          <CircularProgress size={24} />
+          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+            Loading market overlay...
+          </Typography>
+        </Box>
+      )}
+      
+      {showMarketOverlay && marketOverlayError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Couldn't load market overlay.
+        </Alert>
+      )}
       
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
@@ -234,6 +344,24 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
               activeDot={{
                 r: 4,
                 stroke: theme.palette.secondary.main,
+                strokeWidth: 2,
+                fill: theme.palette.background.paper,
+              }}
+            />
+          )}
+          
+          {/* Market overlay line */}
+          {showMarketOverlay && marketOverlayData && (
+            <Line
+              type="monotone"
+              dataKey="marketOverlay"
+              stroke={theme.palette.info.main}
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="3 3"
+              activeDot={{
+                r: 4,
+                stroke: theme.palette.info.main,
                 strokeWidth: 2,
                 fill: theme.palette.background.paper,
               }}

@@ -56,6 +56,11 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   const [showMarketOverlay, setShowMarketOverlay] = useState(false);
   const [marketSymbol, setMarketSymbol] = useState('SPY');
 
+  // Helper function to get display name for market symbol
+  const getMarketDisplayName = (symbol: string) => {
+    return symbol === '^GSPC' ? 'S&P 500' : symbol;
+  };
+
   // Get the starting value for normalization
   const startingValue = data.length > 0 ? data[0].portfolio_nav : 100;
 
@@ -166,7 +171,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
       return [`$${value.toFixed(2)}`, 'Trend Line'];
     }
     if (name === 'marketOverlay') {
-      return [`$${value.toFixed(2)}`, `${marketSymbol} (overlay)`];
+      return [`$${value.toFixed(2)}`, `${getMarketDisplayName(marketSymbol)} (overlay)`];
     }
     return [`$${value.toFixed(2)}`, name === 'portfolio' ? 'Portfolio' : 'Benchmark'];
   };

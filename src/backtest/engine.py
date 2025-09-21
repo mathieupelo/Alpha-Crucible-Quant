@@ -1249,6 +1249,9 @@ class BacktestEngine:
                 if weights_row.isna().all():
                     continue
                 
+                # Calculate portfolio value based on current NAV
+                current_nav = portfolio_values.get(date, config.initial_capital)
+                
                 # Create portfolio
                 portfolio = Portfolio(
                     run_id=result.backtest_id,
@@ -1256,7 +1259,8 @@ class BacktestEngine:
                     asof_date=date,
                     method='optimization',
                     params={'risk_aversion': result.signal_weights},
-                    cash=0.0,  # Assuming no cash for now
+                    cash=0.0,  # Always 0 since weights are normalized to sum to 1.0
+                    total_value=current_nav,  # Total portfolio value available for investment
                     notes=f'Portfolio for {date}',
                     created_at=datetime.now()
                 )

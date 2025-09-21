@@ -52,10 +52,10 @@ export interface Portfolio {
   method: string;
   params?: Record<string, any>;
   cash: number;
+  total_value?: number;
   notes?: string;
   created_at: string;
   position_count?: number;
-  total_value?: number;
 }
 
 export interface Position {

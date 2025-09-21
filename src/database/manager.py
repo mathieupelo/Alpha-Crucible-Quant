@@ -271,13 +271,14 @@ class DatabaseManager:
     def store_portfolio(self, portfolio: Portfolio) -> int:
         """Store a portfolio in the database."""
         query = """
-        INSERT INTO portfolios (run_id, universe_id, asof_date, method, params, cash, notes, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO portfolios (run_id, universe_id, asof_date, method, params, cash, total_value, notes, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             universe_id = VALUES(universe_id),
             method = VALUES(method),
             params = VALUES(params),
             cash = VALUES(cash),
+            total_value = VALUES(total_value),
             notes = VALUES(notes),
             created_at = VALUES(created_at)
         """
@@ -294,6 +295,7 @@ class DatabaseManager:
             portfolio.method,
             params_json,
             portfolio.cash,
+            portfolio.total_value,
             portfolio.notes,
             portfolio.created_at or datetime.now()
         )
@@ -348,6 +350,7 @@ class DatabaseManager:
             method=str(row['method']),
             params=params,
             cash=float(row.get('cash', 0.0)),
+            total_value=float(row.get('total_value')) if pd.notna(row.get('total_value')) else None,
             notes=str(row.get('notes')) if pd.notna(row.get('notes')) else None,
             created_at=row.get('created_at')
         )

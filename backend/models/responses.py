@@ -93,6 +93,7 @@ class PortfolioResponse(BaseModel):
     method: str = Field(..., description="Portfolio optimization method")
     params: Optional[Dict[str, Any]] = Field(None, description="Portfolio parameters")
     cash: float = Field(0.0, description="Cash allocation")
+    total_value: Optional[float] = Field(None, description="Total portfolio value")
     notes: Optional[str] = Field(None, description="Portfolio notes")
     created_at: datetime = Field(..., description="Creation timestamp")
     positions: List[PositionResponse] = Field(default=[], description="Portfolio positions")

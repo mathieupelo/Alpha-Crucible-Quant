@@ -280,7 +280,7 @@ const BacktestDetail: React.FC = () => {
                       }
                       secondary={
                         <Typography variant="body2" color="text.secondary">
-                          Portfolio ID: {portfolio.id} • Cash: ${portfolio.cash.toFixed(2)}
+                          Portfolio ID: {portfolio.id} • Portfolio Value: ${portfolio.total_value?.toFixed(2) || 'N/A'}
                         </Typography>
                       }
                     />

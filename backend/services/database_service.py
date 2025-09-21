@@ -156,7 +156,7 @@ class DatabaseService:
                 portfolio['params'] = self._parse_json_field(portfolio.get('params'))
                 positions_df = self.db_manager.get_portfolio_positions(portfolio['id'])
                 portfolio['position_count'] = len(positions_df)
-                portfolio['total_value'] = 0.0  # Will be calculated from NAV data
+                # total_value is already in the database, no need to override it
                 
                 # Get universe information
                 universe = self.db_manager.get_universe_by_id(portfolio.get('universe_id'))
@@ -203,6 +203,7 @@ class DatabaseService:
                 "method": portfolio.method,
                 "params": self._parse_json_field(portfolio.params),
                 "cash": portfolio.cash,
+                "total_value": portfolio.total_value,
                 "notes": portfolio.notes,
                 "created_at": portfolio.created_at,
                 "positions": positions

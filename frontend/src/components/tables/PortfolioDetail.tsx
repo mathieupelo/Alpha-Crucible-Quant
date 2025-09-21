@@ -203,10 +203,10 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Cash Allocation
+                  Portfolio Value
                 </Typography>
                 <Typography variant="h6">
-                  ${portfolio.cash.toFixed(2)}
+                  ${portfolio.total_value?.toFixed(2) || 'N/A'}
                 </Typography>
               </CardContent>
             </Card>

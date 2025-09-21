@@ -79,6 +79,11 @@ const RunBacktest: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [runResult, setRunResult] = useState<{ success: boolean; runId?: string; error?: string } | null>(null);
+  const [nameValidation, setNameValidation] = useState<{ 
+    isValid: boolean; 
+    message: string; 
+    isChecking: boolean 
+  }>({ isValid: true, message: '', isChecking: false });
 
   // Fetch universes
   const { data: universesData, isLoading: universesLoading } = useQuery(
@@ -114,11 +119,50 @@ const RunBacktest: React.FC = () => {
 
   const handleInputChange = (field: keyof BacktestCreateRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Validate name when it changes
+    if (field === 'name') {
+      validateBacktestName(value);
+    }
+  };
+
+  const validateBacktestName = async (name: string) => {
+    // Clear previous validation state
+    setNameValidation({ isValid: true, message: '', isChecking: false });
+
+    // Check for empty or whitespace-only names
+    if (!name || name.trim() === '') {
+      setNameValidation({ isValid: false, message: 'Name is required', isChecking: false });
+      return;
+    }
+
+    // Check for very long names (assuming 100 character limit)
+    if (name.length > 100) {
+      setNameValidation({ isValid: false, message: 'Name must be 100 characters or less', isChecking: false });
+      return;
+    }
+
+    // Check for uniqueness
+    setNameValidation({ isValid: true, message: '', isChecking: true });
+    
+    try {
+      const result = await backtestApi.checkBacktestName(name);
+      if (result.exists) {
+        setNameValidation({ isValid: false, message: 'This backtest name already exists. Please choose a different name.', isChecking: false });
+      } else {
+        setNameValidation({ isValid: true, message: '', isChecking: false });
+      }
+    } catch (error) {
+      console.error('Error checking backtest name:', error);
+      setNameValidation({ isValid: false, message: 'Error checking name availability', isChecking: false });
+    }
   };
 
   const validateForm = (): boolean => {
-    const required = ['start_date', 'end_date', 'universe_id', 'signals'];
-    return required.every(field => formData[field as keyof BacktestCreateRequest]);
+    const required = ['name', 'start_date', 'end_date', 'universe_id', 'signals'];
+    return required.every(field => formData[field as keyof BacktestCreateRequest]) && 
+           nameValidation.isValid && 
+           !nameValidation.isChecking;
   };
 
   const runPreflightChecks = async (): Promise<PreflightResult> => {
@@ -128,7 +172,23 @@ const RunBacktest: React.FC = () => {
     let rebalancingDates: string[] = [];
 
     try {
-      // 1. Universe validation
+      // 1. Name validation
+      if (!formData.name || formData.name.trim() === '') {
+        errors.push('Backtest name is required');
+        return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
+      }
+
+      if (!nameValidation.isValid) {
+        errors.push(nameValidation.message);
+        return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
+      }
+
+      if (nameValidation.isChecking) {
+        errors.push('Name validation is still in progress');
+        return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
+      }
+
+      // 2. Universe validation
       if (!formData.universe_id) {
         errors.push('Universe must be selected');
         return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
@@ -304,7 +364,19 @@ const RunBacktest: React.FC = () => {
                     value={formData.name || ''}
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     required
-                    helperText="Enter a descriptive name for this backtest"
+                    error={!nameValidation.isValid}
+                    helperText={
+                      nameValidation.isChecking 
+                        ? "Checking name availability..." 
+                        : nameValidation.message || "Enter a descriptive name for this backtest"
+                    }
+                    InputProps={{
+                      endAdornment: nameValidation.isChecking ? (
+                        <CircularProgress size={20} />
+                      ) : nameValidation.isValid && formData.name ? (
+                        <CheckCircleIcon color="success" />
+                      ) : null
+                    }}
                   />
                 </Grid>
 

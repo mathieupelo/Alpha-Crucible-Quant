@@ -469,6 +469,16 @@ class DatabaseManager:
         
         return self.execute_query(query, tuple(params) if params else None)
     
+    def check_backtest_name_exists(self, name: str) -> bool:
+        """Check if a backtest name already exists."""
+        query = "SELECT COUNT(*) as count FROM backtests WHERE name = %s"
+        result = self.execute_query(query, (name,))
+        if result.empty:
+            return False
+        # Convert numpy int64 to Python int, then to bool
+        count = int(result.iloc[0]['count'])
+        return count > 0
+    
     def get_backtest_by_run_id(self, run_id: str) -> Optional[Backtest]:
         """Get a specific backtest by run_id."""
         query = "SELECT * FROM backtests WHERE run_id = %s"

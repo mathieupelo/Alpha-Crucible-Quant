@@ -114,6 +114,14 @@ class DatabaseService:
             logger.error(f"Error getting backtest {run_id}: {e}")
             raise
     
+    def check_backtest_name_exists(self, name: str) -> bool:
+        """Check if a backtest name already exists."""
+        try:
+            return self.db_manager.check_backtest_name_exists(name)
+        except Exception as e:
+            logger.error(f"Error checking backtest name {name}: {e}")
+            raise
+    
     def get_backtest_nav(self, run_id: str, start_date: Optional[date] = None, 
                         end_date: Optional[date] = None) -> List[Dict[str, Any]]:
         """Get NAV data for a backtest."""

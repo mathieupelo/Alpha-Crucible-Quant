@@ -22,10 +22,32 @@ router = APIRouter()
 db_service = DatabaseService()
 
 
+@router.get("/backtests/check-name")
+async def check_backtest_name(name: str = Query(..., description="Backtest name to check")):
+    """Check if a backtest name already exists."""
+    try:
+        exists = db_service.check_backtest_name_exists(name)
+        return {
+            "name": name,
+            "exists": exists,
+            "available": not exists
+        }
+    except Exception as e:
+        logger.error(f"Error checking backtest name {name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/backtests", response_model=BacktestResponse)
 async def create_backtest(request: BacktestCreateRequest):
     """Create a new backtest with universe validation."""
     try:
+        # Check if backtest name already exists (race condition protection)
+        if request.name and db_service.check_backtest_name_exists(request.name):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Backtest name '{request.name}' already exists. Please choose a different name."
+            )
+        
         # Validate universe exists and has minimum tickers
         universe = db_service.get_universe_by_id(request.universe_id)
         if universe is None:

@@ -276,6 +276,14 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                     // Find position data for this ticker
                     const position = portfolioDetails?.positions?.find((pos: Position) => pos.ticker === ticker);
                     
+                    // Calculate investable value: portfolio value minus cash allocation
+                    const portfolioValue = portfolioDetails?.total_value || 0;
+                    const cashAllocation = portfolioDetails?.cash || 0;
+                    const investableValue = portfolioValue - cashAllocation;
+                    
+                    // Calculate position value based on weight and investable value
+                    const positionValue = position ? investableValue * position.weight : 0;
+                    
                     return (
                       <TableRow key={ticker}>
                         <TableCell>
@@ -294,7 +302,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                           {position ? `$${position.price_used.toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell align="right">
-                          {position ? `$${(position.weight * 10000).toFixed(2)}` : '$0.00'}
+                          {position ? `$${positionValue.toFixed(2)}` : '$0.00'}
                         </TableCell>
                       </TableRow>
                     );

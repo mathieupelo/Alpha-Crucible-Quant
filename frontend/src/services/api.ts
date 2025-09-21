@@ -107,6 +107,12 @@ export const backtestApi = {
   createBacktest: async (request: BacktestCreateRequest): Promise<Backtest> => {
     const response: AxiosResponse<Backtest> = await api.post('/backtests', request);
     return response.data;
+  },
+
+  // Check if backtest name exists
+  checkBacktestName: async (name: string): Promise<{ name: string; exists: boolean; available: boolean }> => {
+    const response = await api.get(`/backtests/check-name?name=${encodeURIComponent(name)}`);
+    return response.data;
   }
 };
 
@@ -253,6 +259,61 @@ export const universeApi = {
   // Validate tickers
   validateTickers: async (tickers: string[]): Promise<TickerValidation[]> => {
     const response = await api.post('/tickers/validate', tickers);
+    return response.data;
+  }
+};
+
+// Market Data API calls
+export const marketApi = {
+  // Get market data for a symbol
+  getMarketData: async (symbol: string, startDate: string, endDate: string): Promise<{
+    symbol: string;
+    start_date: string;
+    end_date: string;
+    data: Array<{
+      date: string;
+      close: number;
+      open: number;
+      high: number;
+      low: number;
+      volume: number;
+    }>;
+    total_points: number;
+  }> => {
+    const response = await api.get(`/market-data/${symbol}`, {
+      params: {
+        start_date: startDate,
+        end_date: endDate
+      }
+    });
+    return response.data;
+  },
+
+  // Get normalized market data for a symbol
+  getNormalizedMarketData: async (
+    symbol: string, 
+    startDate: string, 
+    endDate: string, 
+    startValue: number = 100
+  ): Promise<{
+    symbol: string;
+    start_date: string;
+    end_date: string;
+    start_value: number;
+    data: Array<{
+      date: string;
+      value: number;
+      return_since_start: number;
+    }>;
+    total_points: number;
+  }> => {
+    const response = await api.get(`/market-data/${symbol}/normalized`, {
+      params: {
+        start_date: startDate,
+        end_date: endDate,
+        start_value: startValue
+      }
+    });
     return response.data;
   }
 };

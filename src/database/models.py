@@ -42,6 +42,7 @@ class Portfolio:
     method: str
     params: Optional[Dict[str, Any]] = None
     cash: float = 0.0
+    total_value: Optional[float] = None
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
     id: Optional[int] = None

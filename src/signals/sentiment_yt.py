@@ -10,7 +10,8 @@ import json
 import logging
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs
 
@@ -21,6 +22,29 @@ from googleapiclient.errors import HttpError
 from textblob import TextBlob
 
 from .base import SignalBase
+import sys
+from pathlib import Path
+import os
+import importlib.util
+
+# Get the absolute path to the src directory
+src_path = Path(__file__).parent.parent
+copper_service_path = src_path / "services" / "copper_service.py"
+
+# Import copper service using absolute path
+if copper_service_path.exists():
+    spec = importlib.util.spec_from_file_location("copper_service", copper_service_path)
+    copper_service_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(copper_service_module)
+    CopperService = copper_service_module.CopperService
+else:
+    # Fallback: try normal import with path manipulation
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    try:
+        from services.copper_service import CopperService
+    except ImportError:
+        raise ImportError(f"Could not find copper_service module at {copper_service_path}")
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +70,13 @@ class SentimentSignalYT(SignalBase):
         self.seed = seed
         self.youtube_api_key = youtube_api_key or os.getenv('YOUTUBE_API_KEY')
         self.youtube_service = None
+        self.copper_service = None
         
         # Set random seed if provided
         if seed is not None:
             np.random.seed(seed)
     
-    def calculate(self, price_data: pd.DataFrame, ticker: str, target_date: date) -> float:
+    def calculate(self, price_data: Optional[pd.DataFrame], ticker: str, target_date: date) -> float:
         """
         Calculate YouTube sentiment signal value for a ticker on a specific date.
         
@@ -75,41 +100,50 @@ class SentimentSignalYT(SignalBase):
             # Filter trailers by release date (point-in-time)
             eligible_trailers = self._eligible_trailers(trailer_map[ticker], target_date)
             if not eligible_trailers:
-                logger.debug(f"No eligible trailers for {ticker} on {target_date}")
+                logger.debug(f"No eligible trailers for {ticker} on {target_date} (all games may have been released)")
                 return np.nan
             
-            # Initialize YouTube service if needed
-            if self.youtube_service is None:
-                self.youtube_service = self._get_youtube_service()
-                if self.youtube_service is None:
-                    logger.warning("YouTube API not available, using mock data for testing")
-                    # For testing with placeholder URLs, return a mock sentiment
-                    return self._get_mock_sentiment(ticker, target_date, len(eligible_trailers))
+            # Initialize copper service for database access
+            if self.copper_service is None:
+                self.copper_service = CopperService()
+                if not self.copper_service.connect():
+                    logger.error("Failed to connect to copper database")
+                    return np.nan
             
-            # Collect comments from all eligible trailers
-            all_comments = []
-            videos_used = 0
-            
+            # Get video IDs for all eligible trailers
+            video_ids = []
             for trailer in eligible_trailers:
-                try:
-                    video_id = self._parse_video_id(trailer['trailer_url'])
-                    if not video_id:
-                        logger.warning(f"Could not parse video ID from {trailer['trailer_url']}")
-                        continue
-                    
-                    comments = self._fetch_comments_upto(video_id, target_date)
-                    if comments:
-                        all_comments.extend(comments)
-                        videos_used += 1
-                        logger.debug(f"Fetched {len(comments)} comments from {trailer['game']}")
-                    
-                except Exception as e:
-                    logger.warning(f"Error fetching comments for {trailer['game']}: {e}")
-                    continue
+                video_id = self._parse_video_id(trailer['trailer_url'])
+                if video_id:
+                    video_ids.append(video_id)
+                else:
+                    logger.warning(f"Could not parse video ID from {trailer['trailer_url']}")
             
-            if not all_comments:
+            if not video_ids:
+                logger.debug(f"No valid video IDs found for {ticker}")
+                return np.nan
+            
+            # Fetch comments from database with point-in-time filtering
+            comments_df = self.copper_service.get_comments_by_video_ids_and_date(
+                video_ids, target_date
+            )
+            
+            if comments_df.empty:
                 logger.debug(f"No comments found for {ticker} on {target_date}")
                 return np.nan
+            
+            # Convert DataFrame to list of comment dictionaries for scoring
+            all_comments = []
+            for _, row in comments_df.iterrows():
+                comment_dict = {
+                    'text': row['text_content'],
+                    'published_at': row['published_at'],
+                    'author': row['author_display_name'],
+                    'like_count': row['like_count']
+                }
+                all_comments.append(comment_dict)
+            
+            videos_used = len(video_ids)
             
             # Score comments and aggregate
             comment_scores = self._score_comments(all_comments)
@@ -159,35 +193,19 @@ class SentimentSignalYT(SignalBase):
         Raises:
             NotImplementedError: SENTIMENT signal doesn't need price data
         """
-        raise NotImplementedError("SENTIMENT signal doesn't require price data")
+        raise NotImplementedError("SENTIMENT_YT signal doesn't require price data")
     
-    def validate_price_data(self, price_data: pd.DataFrame, target_date: date) -> bool:
+    def validate_price_data(self, price_data: Optional[pd.DataFrame], target_date: date) -> bool:
         """
-        Validate that price data is available for the target date.
+        Validate price data - always returns True since sentiment signals don't use price data.
         
         Args:
-            price_data: DataFrame with price data
-            target_date: Date to validate
+            price_data: DataFrame with price data (ignored)
+            target_date: Date to validate (ignored)
             
         Returns:
-            True if data is valid, False otherwise
+            Always True since sentiment signals don't require price data
         """
-        if price_data is None or price_data.empty:
-            return False
-        
-        if target_date not in price_data.index:
-            return False
-        
-        # Check if we have the required columns
-        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-        if not all(col in price_data.columns for col in required_columns):
-            return False
-        
-        # Check if the data for target_date is valid
-        target_row = price_data.loc[target_date]
-        if target_row.isnull().any():
-            return False
-        
         return True
     
     # Helper methods
@@ -203,6 +221,12 @@ class SentimentSignalYT(SignalBase):
             Dictionary mapping tickers to lists of trailer info
         """
         try:
+            # If path is relative, make it relative to project root
+            if not os.path.isabs(path):
+                # Get the project root (assuming this file is in src/signals/)
+                project_root = Path(__file__).parent.parent.parent
+                path = str(project_root / path)
+            
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
@@ -217,7 +241,8 @@ class SentimentSignalYT(SignalBase):
     
     def _eligible_trailers(self, trailers: List[Dict[str, str]], asof_date: date) -> List[Dict[str, str]]:
         """
-        Filter trailers to only those released on or before the asof_date.
+        Filter trailers to only those released on or before the asof_date AND 
+        where the game hasn't been released yet (with 7-day buffer).
         
         Args:
             trailers: List of trailer dictionaries
@@ -229,11 +254,28 @@ class SentimentSignalYT(SignalBase):
         eligible = []
         for trailer in trailers:
             try:
+                # Check trailer release date (must be on or before asof_date)
                 release_date = datetime.strptime(trailer['release_date'], '%Y-%m-%d').date()
-                if release_date <= asof_date:
+                if release_date > asof_date:
+                    continue
+                
+                # Check game release date (must be after asof_date + 7 days)
+                if 'game_release_date' not in trailer:
+                    logger.warning(f"Missing game_release_date in trailer {trailer['game']}")
+                    continue
+                
+                game_release_date = datetime.strptime(trailer['game_release_date'], '%Y-%m-%d').date()
+                buffer_date = asof_date + timedelta(days=7)
+                
+                # Only include trailers for games that haven't been released yet (with 7-day buffer)
+                if game_release_date > buffer_date:
                     eligible.append(trailer)
+                    logger.debug(f"Eligible trailer: {trailer['game']} (game releases {game_release_date}, buffer until {buffer_date})")
+                else:
+                    logger.debug(f"Excluded trailer: {trailer['game']} (game released {game_release_date}, within buffer of {buffer_date})")
+                    
             except (ValueError, KeyError) as e:
-                logger.warning(f"Invalid release date in trailer {trailer}: {e}")
+                logger.warning(f"Invalid date in trailer {trailer}: {e}")
                 continue
         return eligible
     
@@ -276,67 +318,6 @@ class SentimentSignalYT(SignalBase):
         
         return None
     
-    def _fetch_comments_upto(self, video_id: str, asof_date: date, max_comments: int = 100) -> List[Dict[str, Any]]:
-        """
-        Fetch YouTube comments posted on or before the asof_date.
-        
-        Args:
-            video_id: YouTube video ID
-            asof_date: Date to filter comments by
-            max_comments: Maximum number of comments to fetch
-            
-        Returns:
-            List of comment dictionaries
-        """
-        if not self.youtube_service:
-            return []
-        
-        comments = []
-        asof_datetime = datetime.combine(asof_date, datetime.min.time()).replace(tzinfo=None)
-        
-        try:
-            # Get video comments
-            request = self.youtube_service.commentThreads().list(
-                part='snippet',
-                videoId=video_id,
-                maxResults=min(100, max_comments),  # YouTube API max is 100 per request
-                order='time'
-            )
-            
-            while request and len(comments) < max_comments:
-                response = request.execute()
-                
-                for item in response.get('items', []):
-                    comment = item['snippet']['topLevelComment']['snippet']
-                    comment_date = datetime.fromisoformat(comment['publishedAt'].replace('Z', '+00:00')).replace(tzinfo=None)
-                    
-                    # Only include comments posted on or before asof_date
-                    if comment_date <= asof_datetime:
-                        comments.append({
-                            'text': comment['textDisplay'],
-                            'published_at': comment_date,
-                            'author': comment['authorDisplayName'],
-                            'like_count': comment['likeCount']
-                        })
-                    else:
-                        # Comments are ordered by time, so we can stop here
-                        break
-                
-                # Check if we have more pages
-                if 'nextPageToken' in response and len(comments) < max_comments:
-                    request = self.youtube_service.commentThreads().list_next(request, response)
-                else:
-                    break
-                    
-        except HttpError as e:
-            if e.resp.status == 403:
-                logger.warning(f"YouTube API quota exceeded or video comments disabled: {e}")
-            else:
-                logger.warning(f"YouTube API error for video {video_id}: {e}")
-        except Exception as e:
-            logger.warning(f"Error fetching comments for video {video_id}: {e}")
-        
-        return comments[:max_comments]
     
     def _score_comments(self, comments: List[Dict[str, Any]]) -> List[float]:
         """
@@ -375,7 +356,7 @@ class SentimentSignalYT(SignalBase):
     
     def _get_mock_sentiment(self, ticker: str, target_date: date, num_trailers: int) -> float:
         """
-        Generate mock sentiment for testing when YouTube API is not available.
+        Generate mock sentiment for testing when database is not available.
         
         Args:
             ticker: Stock ticker symbol

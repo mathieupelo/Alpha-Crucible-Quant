@@ -224,6 +224,9 @@ const BacktestDetail: React.FC = () => {
               data={navData?.nav_data || []}
               height={400}
               showBenchmark={true}
+              showTrendLine={true}
+              backtestStartDate={backtest.start_date}
+              backtestEndDate={backtest.end_date}
             />
           )}
         </CardContent>
@@ -279,7 +282,7 @@ const BacktestDetail: React.FC = () => {
                       }
                       secondary={
                         <Typography variant="body2" color="text.secondary">
-                          Portfolio ID: {portfolio.id} • Cash: ${portfolio.cash.toFixed(2)}
+                          Portfolio ID: {portfolio.id} • Portfolio Value: ${portfolio.total_value?.toFixed(2) || 'N/A'}
                         </Typography>
                       }
                     />

@@ -45,35 +45,35 @@ class TestSentimentSignal:
     
     def test_sentiment_calculation_valid_data(self):
         """Test Sentiment calculation with valid data."""
-        result = self.signal.calculate(self.price_data, self.ticker, self.target_date)
+        result = self.signal.calculate(None, self.ticker, self.target_date)
         
         assert not np.isnan(result)
         assert -1.0 <= result <= 1.0
     
     def test_sentiment_calculation_insufficient_data(self):
         """Test Sentiment calculation with insufficient data."""
-        # Create price data with only 10 days
-        short_data = self.price_data.tail(10)
-        result = self.signal.calculate(short_data, self.ticker, self.target_date)
+        # Sentiment signal doesn't use price data, so insufficient data doesn't matter
+        result = self.signal.calculate(None, self.ticker, self.target_date)
         
-        # Sentiment signal should still work with insufficient data
+        # Sentiment signal should work regardless of price data
         assert not np.isnan(result)
         assert -1.0 <= result <= 1.0
     
     def test_sentiment_calculation_missing_date(self):
         """Test Sentiment calculation with missing target date."""
-        # Remove target date from data
-        data_without_date = self.price_data[self.price_data.index != self.target_date]
-        result = self.signal.calculate(data_without_date, self.ticker, self.target_date)
+        # Sentiment signal doesn't use price data, so missing dates don't matter
+        result = self.signal.calculate(None, self.ticker, self.target_date)
         
-        assert np.isnan(result)
+        # Should still work since sentiment doesn't depend on price data
+        assert not np.isnan(result)
     
     def test_sentiment_calculation_empty_data(self):
         """Test Sentiment calculation with empty data."""
-        empty_data = pd.DataFrame()
-        result = self.signal.calculate(empty_data, self.ticker, self.target_date)
+        # Sentiment signal doesn't use price data, so empty data doesn't matter
+        result = self.signal.calculate(None, self.ticker, self.target_date)
         
-        assert np.isnan(result)
+        # Should still work since sentiment doesn't depend on price data
+        assert not np.isnan(result)
     
     def test_sentiment_calculation_none_data(self):
         """Test Sentiment calculation with None data."""
@@ -83,26 +83,24 @@ class TestSentimentSignal:
         assert not np.isnan(result)
         assert -1.0 <= result <= 1.0
     
-    def test_rsi_validation(self):
-        """Test RSI data validation."""
-        # Valid data
+    def test_sentiment_validation(self):
+        """Test Sentiment data validation."""
+        # Sentiment signals always return True for validation since they don't use price data
+        assert self.signal.validate_price_data(None, self.target_date)
         assert self.signal.validate_price_data(self.price_data, self.target_date)
         
-        # Insufficient data
+        # Even with insufficient or missing data, validation should pass
         short_data = self.price_data.tail(10)
-        assert not self.signal.validate_price_data(short_data, self.target_date)
+        assert self.signal.validate_price_data(short_data, self.target_date)
         
-        # Missing date
         data_without_date = self.price_data[self.price_data.index != self.target_date]
-        assert not self.signal.validate_price_data(data_without_date, self.target_date)
+        assert self.signal.validate_price_data(data_without_date, self.target_date)
     
-    def test_rsi_get_required_data_range(self):
-        """Test RSI required data range calculation."""
-        start_date, end_date = self.signal.get_required_price_data(self.target_date)
-        
-        expected_start = self.target_date - timedelta(days=42)
-        assert start_date == expected_start
-        assert end_date == self.target_date
+    def test_sentiment_get_required_data_range(self):
+        """Test Sentiment required data range calculation."""
+        # Sentiment signals don't require price data, so this should raise NotImplementedError
+        with pytest.raises(NotImplementedError):
+            self.signal.get_required_price_data(self.target_date)
 
 
 class TestSignalRegistry:
@@ -115,20 +113,18 @@ class TestSignalRegistry:
     def test_registry_initialization(self):
         """Test registry initialization."""
         assert len(self.registry) > 0
-        assert 'RSI' in self.registry
-        assert 'SMA' in self.registry
-        assert 'MACD' in self.registry
+        assert 'SENTIMENT' in self.registry
+        assert 'SENTIMENT_YT' in self.registry
     
     def test_get_signal(self):
         """Test getting signal from registry."""
-        signal = self.registry.get_signal('RSI')
+        signal = self.registry.get_signal('SENTIMENT')
         assert signal is not None
-        assert signal.signal_id == 'RSI'
+        assert signal.signal_id == 'SENTIMENT'
         
-        signal = self.registry.get_signal('SMA', short_period=20, long_period=50)
+        signal = self.registry.get_signal('SENTIMENT_YT', seed=42)
         assert signal is not None
-        assert signal.short_period == 20
-        assert signal.long_period == 50
+        assert signal.signal_id == 'SENTIMENT_YT'
     
     def test_get_nonexistent_signal(self):
         """Test getting nonexistent signal."""
@@ -138,19 +134,20 @@ class TestSignalRegistry:
     def test_get_available_signals(self):
         """Test getting available signals."""
         signals = self.registry.get_available_signals()
-        assert 'RSI' in signals
-        assert 'SMA' in signals
-        assert 'MACD' in signals
+        assert 'SENTIMENT' in signals
+        assert 'SENTIMENT_YT' in signals
     
     def test_get_signal_info(self):
         """Test getting signal information."""
-        info = self.registry.get_signal_info('RSI')
+        info = self.registry.get_signal_info('SENTIMENT')
         assert info is not None
-        assert info['signal_id'] == 'RSI'
-        assert info['name'] == 'Relative Strength Index'
+        assert info['signal_id'] == 'SENTIMENT'
+        assert info['name'] == 'Sentiment Signal'
         assert 'parameters' in info
         assert 'min_lookback' in info
         assert 'max_lookback' in info
+        assert info['min_lookback'] == 0
+        assert info['max_lookback'] == 0
     
     def test_get_nonexistent_signal_info(self):
         """Test getting information for nonexistent signal."""
@@ -178,16 +175,13 @@ class TestSignalCalculator:
     
     def test_calculator_initialization(self):
         """Test calculator initialization."""
-        assert self.calculator.price_fetcher is not None
         assert self.calculator.database_manager is not None
         assert self.calculator.registry is not None
     
     def test_calculate_signal_for_ticker(self):
         """Test calculating signal for single ticker."""
-        self.price_fetcher.get_price_history.return_value = self.price_data
-        
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', date(2024, 1, 15)
+            'AAPL', 'SENTIMENT', date(2024, 1, 15)
         )
         
         assert result is not None
@@ -196,18 +190,16 @@ class TestSignalCalculator:
     
     def test_calculate_signal_for_ticker_no_data(self):
         """Test calculating signal with no price data."""
-        self.price_fetcher.get_price_history.return_value = None
-        
+        # Sentiment signals don't need price data, so this should still work
         result = self.calculator.calculate_signal_for_ticker(
-            'AAPL', 'RSI', date(2024, 1, 15)
+            'AAPL', 'SENTIMENT', date(2024, 1, 15)
         )
         
-        assert result is None
+        assert result is not None
+        assert not np.isnan(result)
     
     def test_calculate_signal_for_ticker_invalid_signal(self):
         """Test calculating signal with invalid signal ID."""
-        self.price_fetcher.get_price_history.return_value = self.price_data
-        
         result = self.calculator.calculate_signal_for_ticker(
             'AAPL', 'INVALID', date(2024, 1, 15)
         )
@@ -218,13 +210,13 @@ class TestSignalCalculator:
         """Test signal combination."""
         # Create mock signal scores
         signal_scores = pd.DataFrame([
-            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'RSI', 'score': 0.5},
-            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'SMA', 'score': 0.3},
-            {'ticker': 'MSFT', 'date': date(2024, 1, 15), 'signal_id': 'RSI', 'score': 0.2},
-            {'ticker': 'MSFT', 'date': date(2024, 1, 15), 'signal_id': 'SMA', 'score': 0.4},
+            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'SENTIMENT', 'score': 0.5},
+            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'SENTIMENT_YT', 'score': 0.3},
+            {'ticker': 'MSFT', 'date': date(2024, 1, 15), 'signal_id': 'SENTIMENT', 'score': 0.2},
+            {'ticker': 'MSFT', 'date': date(2024, 1, 15), 'signal_id': 'SENTIMENT_YT', 'score': 0.4},
         ])
         
-        signal_weights = {'RSI': 0.6, 'SMA': 0.4}
+        signal_weights = {'SENTIMENT': 0.6, 'SENTIMENT_YT': 0.4}
         
         combined = self.calculator.combine_signals(signal_scores, signal_weights)
         
@@ -240,7 +232,7 @@ class TestSignalCalculator:
     def test_combine_signals_empty_data(self):
         """Test signal combination with empty data."""
         empty_scores = pd.DataFrame()
-        signal_weights = {'RSI': 0.6, 'SMA': 0.4}
+        signal_weights = {'SENTIMENT': 0.6, 'SENTIMENT_YT': 0.4}
         
         combined = self.calculator.combine_signals(empty_scores, signal_weights)
         
@@ -249,10 +241,10 @@ class TestSignalCalculator:
     def test_combine_signals_zero_weights(self):
         """Test signal combination with zero weights."""
         signal_scores = pd.DataFrame([
-            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'RSI', 'score': 0.5},
+            {'ticker': 'AAPL', 'date': date(2024, 1, 15), 'signal_id': 'SENTIMENT', 'score': 0.5},
         ])
         
-        signal_weights = {'RSI': 0.0, 'SMA': 0.0}
+        signal_weights = {'SENTIMENT': 0.0, 'SENTIMENT_YT': 0.0}
         
         combined = self.calculator.combine_signals(signal_scores, signal_weights)
         

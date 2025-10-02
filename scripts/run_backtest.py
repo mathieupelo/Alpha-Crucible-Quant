@@ -15,7 +15,7 @@ from datetime import date, timedelta
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from backtest import BacktestEngine, BacktestConfig
-from signals import SignalCalculator
+from signals import SignalReader
 from database import DatabaseManager
 from utils import PriceFetcher
 from data import RealTimeDataFetcher, DataValidator
@@ -75,12 +75,12 @@ def main():
     print(f"Tickers in universe: {', '.join(tickers)}")
     
     # Configuration
-    signals = ['SENTIMENT']
-    signal_weights = {'SENTIMENT': 1.0}
+    signals = ['SENTIMENT_YT']  # Use the actual signal name from database
+    signal_weights = {'SENTIMENT_YT': 1.0}
     
     # Date range (matching signal calculation)
-    start_date = date(2023, 9, 5)
-    end_date = date(2024, 12, 31)  # More recent end date for real data
+    start_date = date(2025, 9, 16)  # Use available signal dates
+    end_date = date(2025, 9, 21)    # Use available signal dates
     
     print(f"Date range: {start_date} to {end_date}")
     
@@ -118,7 +118,7 @@ def main():
         end_date=end_date,
         universe_id=universe_id,  # Use the universe we loaded
         initial_capital=10000.0,
-        rebalancing_frequency='monthly',
+        rebalancing_frequency='daily',
         evaluation_period='monthly',
         transaction_costs=0.001,
         max_weight=0.4,
@@ -126,7 +126,7 @@ def main():
         benchmark_ticker='SPY',
         use_equal_weight_benchmark=True,  # Use equal-weight portfolio of all stocks as benchmark
         signal_weights=signal_weights,
-        signal_combination_method='equal_weight',  # Method for combining signals
+        signal_combination_method='weighted',  # Method for combining signals
         forward_fill_signals=True  # Use latest available signal scores when missing
     )
     
@@ -145,8 +145,8 @@ def main():
         # Initialize components
         print("Initializing components...")
         price_fetcher = PriceFetcher()  # This now uses the enhanced real-time fetcher
-        signal_calculator = SignalCalculator(database_manager)
-        backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
+        signal_reader = SignalReader(database_manager)
+        backtest_engine = BacktestEngine(price_fetcher, signal_reader, database_manager)
         
         # Test data fetching and validation
         print("Testing data fetching and validation...")

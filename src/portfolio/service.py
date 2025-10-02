@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
 
-from signals import SignalCalculator
+from signals import SignalReader
 from solver import PortfolioSolver
 from database import DatabaseManager, Portfolio, PortfolioPosition
 from utils import TradingCalendar, validate_ticker_list, validate_signal_list
@@ -39,7 +39,7 @@ class PortfolioService:
         trading_calendar: Instance for trading date validation
     """
     
-    def __init__(self, signal_calculator: Optional[SignalCalculator] = None,
+    def __init__(self, signal_reader: Optional[SignalReader] = None,
                  portfolio_solver: Optional[PortfolioSolver] = None,
                  database_manager: Optional[DatabaseManager] = None,
                  trading_calendar: Optional[TradingCalendar] = None,
@@ -54,7 +54,7 @@ class PortfolioService:
             trading_calendar: Trading calendar instance (optional)
             price_fetcher: Price fetcher instance (optional)
         """
-        self.signal_calculator = signal_calculator or SignalCalculator()
+        self.signal_reader = signal_reader or SignalReader()
         self.portfolio_solver = portfolio_solver or PortfolioSolver()
         self.database_manager = database_manager or DatabaseManager()
         self.trading_calendar = trading_calendar or TradingCalendar()
@@ -373,7 +373,7 @@ class PortfolioService:
             errors.append(f"Date {inference_date} is not a valid NYSE trading day")
         
         # Check signal completeness
-        is_complete, missing_signals = self.signal_calculator.validate_signals_complete(
+        is_complete, missing_signals = self.signal_reader.validate_signals_complete(
             tickers, signals, inference_date
         )
         

@@ -1,27 +1,25 @@
-# Quant Project - Unified Quantitative Investment System
+# Alpha-Crucible - Quantitative Investment System
 
-A unified quantitative investment system that combines signal generation, portfolio optimization, and backtesting in a single repository.
+A quantitative investment system focused on portfolio optimization, backtesting, and performance analysis. Signal computation is handled by a separate signals repository.
 
 ## Architecture Overview
 
-This system replaces the previous Signal Forge multi-repository architecture with a simplified, unified approach:
+This system is part of a two-repository architecture:
 
 ### Key Components
 
-1. **Signal System** (`src/signals/`): Calculate investment signals from alternative data
+1. **Signal Reader** (`src/signals/`): Read computed signals from signal_forge.signal_raw
 2. **Portfolio Solver** (`src/solver/`): Optimize portfolio weights using CVXOPT
 3. **Backtesting Engine** (`src/backtest/`): Run historical performance analysis
-4. **Database Layer** (`src/database/`): Simplified MySQL database for signal scores and results
-5. **Utilities** (`src/utils/`): Common utilities and data fetching
+4. **Database Layer** (`src/database/`): MySQL database for portfolios, backtests, and results
+5. **Web Application** (`frontend/`, `backend/`): User interface and API
+6. **Utilities** (`src/utils/`): Common utilities and data fetching
 
-### Key Changes from Signal Forge
+### Repository Separation
 
-- **Unified Repository**: All components in one place
-- **Local Database**: MySQL hosted on your machine (127.0.0.1:3306)
-- **Real-time Prices**: yfinance integration instead of stored stock prices
-- **DataFrame Communication**: All database operations use pandas DataFrames
-- **No Airflow**: Manual execution with simple scripts
-- **Simplified Schema**: Only essential data stored in database
+- **Alpha-Crucible** (this repo): Portfolio optimization, backtesting, and web application
+- **Signals Repository** (separate): Signal computation and data ingestion
+- **Integration**: Alpha-crucible reads from `signal_forge.signal_raw` table
 
 ## Setup
 
@@ -66,18 +64,32 @@ The script is idempotent and safe to run multiple times.
 
 ## Usage
 
-### Calculate Signals
+### Read Signals
 ```python
-from src.signals import SignalCalculator
-from src.database import DatabaseManager
+from src.signals import SignalReader
+from datetime import date, timedelta
 
-# Calculate signals for a date range
-calculator = SignalCalculator()
-signals = calculator.calculate_signals(['AAPL', 'MSFT'], '2024-01-01', '2024-12-31')
+# Initialize signal reader
+reader = SignalReader()
 
-# Store in database
-db = DatabaseManager()
-db.store_signal_scores(signals)
+# Get signals for a date range
+end_date = date.today()
+start_date = end_date - timedelta(days=30)
+
+signals_df = reader.get_signals(
+    tickers=['AAPL', 'MSFT'],
+    signal_names=['SENTIMENT_YT'],
+    start_date=start_date,
+    end_date=end_date
+)
+
+# Get pivoted signals for portfolio optimization
+pivot_df = reader.get_signal_pivot(
+    tickers=['AAPL', 'MSFT'],
+    signal_names=['SENTIMENT_YT'],
+    start_date=start_date,
+    end_date=end_date
+)
 ```
 
 ### Run Backtest
@@ -95,20 +107,32 @@ result = engine.run_backtest(
 
 ## Database Schema
 
-The simplified database contains only essential tables:
+The database contains the following tables:
 
-- `signal_scores`: Signal scores by ticker, signal, and date
+- `signal_raw`: Raw signal scores (read from signals repository)
 - `portfolios`: Portfolio configurations and metadata
-- `backtest_results`: Backtest performance metrics
-- `signal_definitions`: Signal metadata and parameters
+- `portfolio_positions`: Individual position weights
+- `backtests`: Backtest run configurations
+- `backtest_nav`: Daily NAV data for backtests
+- `universes`: Ticker universe definitions
+- `universe_tickers`: Ticker membership in universes
+- `scores_combined`: Combined signal scores
+
+## Integration with Signals Repository
+
+This repository depends on the signals repository for signal data:
+
+1. **Signals Repository** computes signals and writes to `signal_forge.signal_raw`
+2. **Alpha-Crucible** reads from `signal_forge.signal_raw` for portfolio optimization
+3. **No Direct Signal Computation**: Alpha-crucible does not compute signals directly
 
 ## Testing
 
 Comprehensive unit tests cover:
-- Signal calculation edge cases
-- Database operations
+- Signal reading from database
 - Portfolio optimization
 - Backtesting scenarios
+- Database operations
 - Error handling for missing data
 
 Run tests with:

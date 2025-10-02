@@ -62,6 +62,8 @@ const RunBacktest: React.FC = () => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<Partial<BacktestCreateRequest>>({
+    start_date: '2024-01-01',  // Default to a reasonable range within available signals
+    end_date: '2024-12-31',    // Default to a reasonable range within available signals
     rebalancing_frequency: 'monthly',
     max_weight: 0.1,
     min_weight: 0.0,
@@ -192,6 +194,18 @@ const RunBacktest: React.FC = () => {
       if (!formData.universe_id) {
         errors.push('Universe must be selected');
         return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
+      }
+
+      // 2.5. Signal date range validation
+      if (formData.start_date && formData.end_date) {
+        const startDate = new Date(formData.start_date);
+        const endDate = new Date(formData.end_date);
+        const availableStartDate = new Date('2020-10-17');  // Updated to actual signal range
+        const availableEndDate = new Date('2025-09-21');    // Updated to actual signal range
+        
+        if (startDate < availableStartDate || endDate > availableEndDate) {
+          warnings.push(`Selected date range (${formData.start_date} to ${formData.end_date}) extends beyond available signal data (2020-10-17 to 2025-09-21). Backtest will only use available signal data.`);
+        }
       }
 
       const universe = universesData?.universes.find(u => u.id === formData.universe_id);

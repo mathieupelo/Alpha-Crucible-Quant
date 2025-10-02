@@ -122,7 +122,7 @@ class DatabaseManager:
             return 0
         
         query = """
-        INSERT INTO signals_raw (asof_date, ticker, signal_name, value, metadata, created_at)
+        INSERT INTO signal_raw (asof_date, ticker, signal_name, value, metadata, created_at)
         VALUES (%s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE 
             value = VALUES(value),
@@ -153,7 +153,7 @@ class DatabaseManager:
                        start_date: Optional[date] = None,
                        end_date: Optional[date] = None) -> pd.DataFrame:
         """Retrieve raw signals from the database."""
-        query = "SELECT * FROM signals_raw WHERE 1=1"
+        query = "SELECT * FROM signal_raw WHERE 1=1"
         params = []
         
         if tickers:

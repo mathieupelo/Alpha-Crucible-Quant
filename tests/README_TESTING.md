@@ -39,8 +39,8 @@ The testing suite covers all critical components of the system with extensive ed
    - Parameter validation and error handling
    - 40+ test cases covering registry functionality
 
-5. **`test_signal_calculator.py`** - Signal Calculator Tests
-   - Tests signal calculation and combination
+5. **`test_signal_reader.py`** - Signal Reader Tests
+   - Tests signal reading and combination
    - Edge cases: missing data, extreme values, invalid inputs
    - Different combination methods (equal weight, weighted, z-score)
    - Database integration and error handling
@@ -137,8 +137,8 @@ python -m pytest tests/integration/ -v
 # Portfolio solver tests
 python -m pytest tests/unit/solver/test_portfolio_solver.py -v
 
-# Signal calculator tests
-python -m pytest tests/unit/signals/test_signal_calculator.py -v
+# Signal reader tests
+python -m pytest tests/unit/signals/test_signal_reader.py -v
 
 # End-to-end tests
 python -m pytest tests/integration/test_end_to_end.py -v

@@ -50,7 +50,7 @@ def test_forward_fill():
         print("\n1. Testing WITHOUT forward fill:")
         print("-" * 35)
         
-        signal_scores_no_ff = signal_calculator.get_signal_scores_pivot(
+        signal_scores_no_ff = signal_reader.get_signal_scores_pivot(
             tickers, signals, start_date, end_date, forward_fill=False
         )
         
@@ -70,7 +70,7 @@ def test_forward_fill():
         print("\n2. Testing WITH forward fill:")
         print("-" * 32)
         
-        signal_scores_with_ff = signal_calculator.get_signal_scores_pivot(
+        signal_scores_with_ff = signal_reader.get_signal_scores_pivot(
             tickers, signals, start_date, end_date, forward_fill=True
         )
         

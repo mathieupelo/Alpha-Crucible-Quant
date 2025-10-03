@@ -28,7 +28,7 @@ The project has been split into two decoupled repositories:
 #### Scripts
 - `scripts/insert_copper.py` - YouTube comments ingestion
 - `scripts/setup_database_signal_schema.py` - Copper schema setup
-- `scripts/calculate_signals.py` - Batch signal calculation
+- `scripts/read_signals.py` - Read signals from database
 - `scripts/sentiment_yt_once.py` - Single signal testing
 
 #### Data Files

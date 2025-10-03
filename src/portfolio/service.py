@@ -33,7 +33,7 @@ class PortfolioService:
     6. Stores the portfolio in the database
     
     Attributes:
-        signal_calculator: Instance for signal operations
+        signal_reader: Instance for signal operations
         portfolio_solver: Instance for portfolio optimization
         database_manager: Instance for database operations
         trading_calendar: Instance for trading date validation
@@ -48,7 +48,7 @@ class PortfolioService:
         Initialize portfolio service.
         
         Args:
-            signal_calculator: Signal calculator instance (optional)
+            signal_reader: Signal reader instance (optional)
             portfolio_solver: Portfolio solver instance (optional)
             database_manager: Database manager instance (optional)
             trading_calendar: Trading calendar instance (optional)

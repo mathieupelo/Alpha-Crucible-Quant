@@ -17,7 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from backtest import BacktestEngine, BacktestConfig
-from signals import SignalCalculator
+from signals import SignalReader
 from database import DatabaseManager
 from utils import PriceFetcher
 
@@ -46,8 +46,8 @@ def test_equal_weight_benchmark():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         database_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(database_manager)
-        backtest_engine = BacktestEngine(price_fetcher, signal_calculator, database_manager)
+        signal_reader = SignalReader(database_manager)
+        backtest_engine = BacktestEngine(price_fetcher, signal_reader, database_manager)
         
         # Test 1: Equal-weight benchmark
         print("1. Testing with Equal-Weight Benchmark:")

@@ -13,7 +13,7 @@ from models import BacktestResponse, BacktestListResponse, BacktestMetricsRespon
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from services import DatabaseService
+from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -103,10 +103,13 @@ async def create_backtest(request: BacktestCreateRequest):
         # Get universe tickers
         universe_tickers = [ticker['ticker'] for ticker in tickers]
         
+        # Convert signal names to uppercase to match database
+        signals_upper = [signal.upper() for signal in request.signals]
+        
         # Run backtest
         result = engine.run_backtest(
             tickers=universe_tickers,
-            signals=request.signals,
+            signals=signals_upper,
             config=config
         )
         

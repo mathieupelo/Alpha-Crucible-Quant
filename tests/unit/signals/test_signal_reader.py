@@ -1,7 +1,7 @@
 """
-Comprehensive tests for the SignalCalculator class.
+Comprehensive tests for the SignalReader class.
 
-Tests signal calculation, combination, and edge cases for production readiness.
+Tests signal reading, combination, and edge cases for production readiness.
 """
 
 import pytest
@@ -15,19 +15,19 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / 'src'))
 
-from signals.calculator import SignalCalculator
+from signals import SignalReader
 from signals.registry import SignalRegistry
 from database.models import SignalRaw, ScoreCombined
 
 
-class TestSignalCalculator:
-    """Test SignalCalculator functionality with comprehensive edge cases."""
+class TestSignalReader:
+    """Test SignalReader functionality with comprehensive edge cases."""
     
     def setup_method(self):
         """Setup test data and calculator."""
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.calculator = SignalCalculator(self.database_manager)
+        self.reader = SignalReader(self.database_manager)
         
         # Create comprehensive test data
         self.dates = pd.date_range(start='2023-12-01', end='2024-01-31', freq='D')
@@ -53,20 +53,16 @@ class TestSignalCalculator:
     
     def test_calculator_initialization_default(self):
         """Test calculator initialization with default parameters."""
-        calculator = SignalCalculator()
+        reader = SignalReader()
         
-        assert calculator.price_fetcher is not None
-        assert calculator.database_manager is not None
-        assert calculator.registry is not None
-        assert isinstance(calculator.registry, SignalRegistry)
+        assert reader.database_manager is not None
     
     def test_calculator_initialization_custom(self):
         """Test calculator initialization with custom parameters."""
-        calculator = SignalCalculator(self.database_manager)
+        reader = SignalReader(self.database_manager)
         
-        # price_fetcher no longer exists in SignalCalculator
-        assert calculator.database_manager == self.database_manager
-        assert calculator.registry is not None
+        # price_fetcher no longer exists in SignalReader
+        assert reader.database_manager == self.database_manager
     
     def test_calculate_signals_valid_inputs(self):
         """Test signal calculation with valid inputs."""

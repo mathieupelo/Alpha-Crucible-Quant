@@ -81,7 +81,7 @@ frontend/
 Contains scripts for running the system operations:
 
 - **`run_backtest.py`** - Run backtests with various configurations
-- **`calculate_signals.py`** - Calculate and store signal scores
+- **`read_signals.py`** - Read signal scores from database
 - **`setup_database.py`** - Initialize database schema and tables
 - **`query_portfolio_data.py`** - Query and analyze stored portfolio data
 
@@ -129,7 +129,7 @@ Contains temporary files generated during operations.
 ## File Naming Conventions
 
 ### Scripts (`scripts/`)
-- Use descriptive names: `run_backtest.py`, `calculate_signals.py`
+- Use descriptive names: `run_backtest.py`, `read_signals.py`
 - No prefixes needed (they are operational scripts)
 - Should be executable and have proper shebang lines
 
@@ -180,8 +180,8 @@ python scripts/setup_database.py
 # Run a backtest
 python scripts/run_backtest.py
 
-# Calculate signals
-python scripts/calculate_signals.py
+# Read signals
+python scripts/read_signals.py
 
 # Setup database
 python scripts/setup_database.py

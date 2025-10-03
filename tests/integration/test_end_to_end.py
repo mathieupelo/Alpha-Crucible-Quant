@@ -16,7 +16,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from signals.calculator import SignalCalculator
+from signals import SignalReader
 from solver.solver import PortfolioSolver
 from solver.config import SolverConfig
 from solver.models import Portfolio
@@ -51,7 +51,7 @@ class TestEndToEndWorkflow:
         # Setup components
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.signal_calculator = SignalCalculator(self.database_manager)
+        self.signal_reader = SignalReader(self.database_manager)
         
         # Configure portfolio solver for testing
         from solver.config import SolverConfig
@@ -96,7 +96,7 @@ class TestEndToEndWorkflow:
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 31)
         
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
@@ -107,7 +107,7 @@ class TestEndToEndWorkflow:
         assert 'value' in signal_results.columns
         
         # Step 2: Combine signals to scores
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -147,7 +147,7 @@ class TestEndToEndWorkflow:
         start_date = date(2023, 1, 1)
         end_date = date(2024, 1, 31)
         
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
@@ -155,7 +155,7 @@ class TestEndToEndWorkflow:
         assert not signal_results.empty
         
         # Step 2: Combine signals to scores
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -197,11 +197,11 @@ class TestEndToEndWorkflow:
         target_date = date(2024, 1, 15)
         
         # Calculate signals and scores
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -242,7 +242,7 @@ class TestEndToEndWorkflow:
         target_date = date(2024, 1, 15)
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -254,7 +254,7 @@ class TestEndToEndWorkflow:
         ]
         
         for method, method_params in methods:
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method=method, method_params=method_params, store_in_db=False
             )
@@ -296,7 +296,7 @@ class TestEndToEndWorkflow:
         self.price_fetcher.get_price_history.return_value = incomplete_price_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -304,7 +304,7 @@ class TestEndToEndWorkflow:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -344,7 +344,7 @@ class TestEndToEndWorkflow:
         self.price_fetcher.get_price_history.return_value = extreme_price_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -352,7 +352,7 @@ class TestEndToEndWorkflow:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -391,14 +391,14 @@ class TestEndToEndWorkflow:
         self.price_fetcher.get_price_history.return_value = unicode_price_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             unicode_tickers, signals, start_date, end_date, store_in_db=False
         )
         
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             unicode_tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -445,14 +445,14 @@ class TestEndToEndWorkflow:
         self.price_fetcher.get_price_history.return_value = large_price_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             large_tickers, signals, start_date, end_date, store_in_db=False
         )
         
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             large_tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -490,14 +490,14 @@ class TestEndToEndWorkflow:
         self.database_manager.store_scores_combined.side_effect = Exception("Database error")
         
         # Calculate signals (should handle database errors gracefully)
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals (should handle database errors gracefully)
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=True
         )
@@ -535,12 +535,12 @@ class TestEndToEndWorkflow:
         start_time = time.time()
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -575,11 +575,11 @@ class TestEndToEndWorkflow:
         
         # Run workflow twice
         def run_workflow():
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method='equal_weight', store_in_db=False
             )
@@ -627,11 +627,11 @@ class TestEndToEndWorkflow:
         results = []
         
         def run_workflow_thread():
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method='equal_weight', store_in_db=False
             )
@@ -688,11 +688,11 @@ class TestEndToEndWorkflow:
         self.price_fetcher.get_price_history.return_value = large_price_data
         
         # Run workflow
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             large_tickers, signals, start_date, end_date, store_in_db=False
         )
         
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             large_tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -722,12 +722,12 @@ class TestEndToEndWorkflow:
         
         # Test with invalid inputs
         with pytest.raises(TypeError):
-            self.signal_calculator.calculate_signals(
+            self.signal_reader.calculate_signals(
                 None, signals, start_date, end_date
             )
         
         with pytest.raises(TypeError):
-            self.signal_calculator.calculate_signals(
+            self.signal_reader.calculate_signals(
                 self.tickers, None, start_date, end_date
             )
         
@@ -752,7 +752,7 @@ class TestEndToEndWorkflow:
             start_date = date(2024, 1, 1)
             end_date = date(2024, 1, 31)
             
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
@@ -768,11 +768,11 @@ class TestEndToEndWorkflow:
         target_date = date(2024, 1, 15)
         
         # Run complete workflow
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )

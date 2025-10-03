@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Test script for signals with automatic data fetching.
+Test script for signals with data reading.
 
-This script tests that signals can now automatically fetch price data
-and calculate signal values without requiring pre-fetched data.
+This script tests that signals can be read from the database
+and combined without requiring signal calculation.
 """
 
 import sys
@@ -16,18 +16,18 @@ import numpy as np
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from data import RealTimeDataFetcher
-from signals import SignalCalculator
-from signals.sentiment import SentimentSignal
+from signals import SignalReader
 
 
 def test_individual_signals():
-    """Test individual signals with automatic data fetching."""
-    print("Testing Individual Signals with Data Fetching")
+    """Test individual signals with data reading."""
+    print("Testing Individual Signals with Data Reading")
     print("=" * 50)
     
-    # Initialize data fetcher
-    data_fetcher = RealTimeDataFetcher()
+    # Initialize signal reader
+    from unittest.mock import Mock
+    database_manager = Mock()
+    signal_reader = SignalReader(database_manager)
     
     # Test tickers and dates
     tickers = ['AAPL', 'MSFT', 'GOOGL']
@@ -37,14 +37,21 @@ def test_individual_signals():
     print(f"Tickers: {', '.join(tickers)}")
     print()
     
-    # Test Sentiment signal
-    print("1. Testing Sentiment Signal:")
-    sentiment_signal = SentimentSignal(seed=42, price_fetcher=data_fetcher)
+    # Mock signal data
+    mock_signal_data = pd.DataFrame([
+        {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'asof_date': test_date, 'value': 0.5},
+        {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'asof_date': test_date, 'value': 0.3},
+        {'ticker': 'GOOGL', 'signal_id': 'SENTIMENT', 'asof_date': test_date, 'value': 0.7},
+    ])
+    database_manager.get_signals.return_value = mock_signal_data
+    
+    # Test reading signals
+    print("1. Testing Signal Reading:")
     
     for ticker in tickers:
         try:
-            signal_value = sentiment_signal.calculate_with_data_fetch(ticker, test_date)
-            if not np.isnan(signal_value):
+            signal_value = signal_reader.read_signal_for_ticker(ticker, 'SENTIMENT', test_date)
+            if signal_value is not None and not np.isnan(signal_value):
                 print(f"  {ticker}: {signal_value:.4f}")
             else:
                 print(f"  {ticker}: No data available")
@@ -53,14 +60,15 @@ def test_individual_signals():
     print()
 
 
-def test_signal_calculator():
-    """Test signal calculator with automatic data fetching."""
-    print("Testing Signal Calculator with Data Fetching")
+def test_signal_reader():
+    """Test signal reader with data reading."""
+    print("Testing Signal Reader with Data Reading")
     print("=" * 50)
     
-    # Initialize signal calculator
-    data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator()
+    # Initialize signal reader
+    from unittest.mock import Mock
+    database_manager = Mock()
+    signal_reader = SignalReader(database_manager)
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
@@ -73,19 +81,27 @@ def test_signal_calculator():
     print(f"Date range: {start_date} to {end_date}")
     print()
     
+    # Mock signal data
+    mock_signal_data = pd.DataFrame([
+        {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 15), 'value': 0.5},
+        {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 31), 'value': 0.6},
+        {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 15), 'value': 0.3},
+        {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 31), 'value': 0.4},
+    ])
+    database_manager.get_signals.return_value = mock_signal_data
+    
     try:
-        # Calculate signals
-        print("Calculating signals...")
-        signal_df = signal_calculator.calculate_signals(
+        # Read signals
+        print("Reading signals...")
+        signal_df = signal_reader.read_signals(
             tickers=tickers,
             signals=signals,
             start_date=start_date,
-            end_date=end_date,
-            store_in_db=False  # Don't store in database for testing
+            end_date=end_date
         )
         
         if not signal_df.empty:
-            print(f"✓ Successfully calculated {len(signal_df)} signal values")
+            print(f"✓ Successfully read {len(signal_df)} signal values")
             print()
             
             # Show sample results
@@ -98,7 +114,7 @@ def test_signal_calculator():
                 ticker_data = signal_df[signal_df['ticker'] == ticker]
                 
                 for signal in signals:
-                    signal_data = ticker_data[ticker_data['signal_name'] == signal]
+                    signal_data = ticker_data[ticker_data['signal_id'] == signal]
                     if not signal_data.empty:
                         # Get the latest value
                         latest = signal_data.iloc[-1]
@@ -108,9 +124,9 @@ def test_signal_calculator():
             
             # Show summary statistics
             print(f"\nSummary Statistics:")
-            print(f"  Total signals calculated: {len(signal_df)}")
+            print(f"  Total signals read: {len(signal_df)}")
             print(f"  Unique tickers: {signal_df['ticker'].nunique()}")
-            print(f"  Unique signals: {signal_df['signal_name'].nunique()}")
+            print(f"  Unique signals: {signal_df['signal_id'].nunique()}")
             print(f"  Date range: {signal_df['asof_date'].min()} to {signal_df['asof_date'].max()}")
             
             # Check for NaN values
@@ -121,10 +137,10 @@ def test_signal_calculator():
                 print(f"  ✓ No NaN values found")
                 
         else:
-            print("❌ No signals calculated")
+            print("❌ No signals read")
             
     except Exception as e:
-        print(f"❌ Error calculating signals: {e}")
+        print(f"❌ Error reading signals: {e}")
         import traceback
         traceback.print_exc()
 
@@ -134,9 +150,10 @@ def test_signal_combination():
     print("\nTesting Signal Combination")
     print("=" * 30)
     
-    # Initialize signal calculator
-    data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator()
+    # Initialize signal reader
+    from unittest.mock import Mock
+    database_manager = Mock()
+    signal_reader = SignalReader(database_manager)
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
@@ -144,20 +161,28 @@ def test_signal_combination():
     start_date = date(2024, 1, 1)
     end_date = date(2024, 1, 31)
     
+    # Mock signal data
+    mock_signal_data = pd.DataFrame([
+        {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 15), 'value': 0.5},
+        {'ticker': 'AAPL', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 31), 'value': 0.6},
+        {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 15), 'value': 0.3},
+        {'ticker': 'MSFT', 'signal_id': 'SENTIMENT', 'asof_date': date(2024, 1, 31), 'value': 0.4},
+    ])
+    database_manager.get_signals.return_value = mock_signal_data
+    
     try:
-        # Calculate combined scores
-        print("Calculating combined signal scores...")
-        combined_df = signal_calculator.combine_signals_to_scores(
+        # Read and combine signals
+        print("Reading and combining signal scores...")
+        combined_df = signal_reader.combine_signals_to_scores(
             tickers=tickers,
             signal_names=signals,
             start_date=start_date,
             end_date=end_date,
-            method='equal_weight',
-            store_in_db=False
+            method='equal_weight'
         )
         
         if not combined_df.empty:
-            print(f"✓ Successfully calculated {len(combined_df)} combined scores")
+            print(f"✓ Successfully combined {len(combined_df)} signal scores")
             print()
             
             # Show sample results
@@ -176,14 +201,14 @@ def test_signal_combination():
             print("❌ No combined scores calculated")
             
     except Exception as e:
-        print(f"❌ Error calculating combined scores: {e}")
+        print(f"❌ Error combining signals: {e}")
         import traceback
         traceback.print_exc()
 
 
 def main():
     """Main test function."""
-    print("Alpha Crucible Quant - Signal Data Fetching Test")
+    print("Alpha Crucible Quant - Signal Data Reading Test")
     print("=" * 60)
     print()
     
@@ -191,8 +216,8 @@ def main():
         # Test individual signals
         test_individual_signals()
         
-        # Test signal calculator
-        test_signal_calculator()
+        # Test signal reader
+        test_signal_reader()
         
         # Test signal combination
         test_signal_combination()

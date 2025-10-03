@@ -11,7 +11,7 @@ from models import PortfolioResponse, PositionResponse, ErrorResponse
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from services import DatabaseService
+from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

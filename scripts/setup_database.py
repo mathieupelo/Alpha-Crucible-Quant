@@ -80,9 +80,9 @@ def create_tables():
         
         cursor = connection.cursor()
         
-        # Signals raw table
+        # Signal raw table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS signals_raw (
+            CREATE TABLE IF NOT EXISTS signal_raw (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 asof_date DATE NOT NULL,
                 ticker VARCHAR(20) NOT NULL,
@@ -97,7 +97,7 @@ def create_tables():
                 INDEX idx_date_ticker (asof_date, ticker)
             )
         """)
-        logger.info("Created signals_raw table")
+        logger.info("Created signal_raw table")
         
         # Scores combined table
         cursor.execute("""

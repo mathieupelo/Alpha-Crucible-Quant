@@ -52,12 +52,12 @@ signal_scores = db_manager.get_signal_scores_dataframe(
 ### Signal Calculator Parameter
 
 ```python
-from signals import SignalCalculator
+from signals import SignalReader
 
-signal_calculator = SignalCalculator(db_manager)
+signal_reader = SignalReader(db_manager)
 
 # Get signal scores with forward fill
-signal_scores = signal_calculator.get_signal_scores_pivot(
+signal_scores = signal_reader.get_signal_scores_pivot(
     tickers=['AAPL', 'MSFT'],
     signals=['RSI', 'SMA'],
     start_date=date(2023, 1, 1),

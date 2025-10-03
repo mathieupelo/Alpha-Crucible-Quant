@@ -2,7 +2,7 @@
 Services package for the Quant Project system.
 """
 
-from .copper_service import CopperService
-from .youtube_comments_fetcher import YouTubeCommentsFetcher
+# Note: Copper services have been moved to the Signals repository
+# Only database and ticker validation services remain here
 
-__all__ = ['CopperService', 'YouTubeCommentsFetcher']
+__all__ = []

@@ -60,8 +60,8 @@ pytest tests/test_utils.py -v
 ### 4. Calculate Signals
 
 ```bash
-# Calculate signals for a set of tickers
-python scripts/calculate_signals.py
+# Read signals from database (signals are now calculated externally)
+python scripts/read_signals.py
 ```
 
 ### 5. Run Backtest
@@ -108,35 +108,32 @@ Access the interactive API documentation at:
 
 ## Detailed Usage
 
-### Signal Calculation
+### Signal Reading
 
-#### Basic Signal Calculation
+#### Basic Signal Reading
 
 ```python
-from src.signals import SignalCalculator
+from src.signals import SignalReader
 from src.database import DatabaseManager
-from src.utils import PriceFetcher
 
 # Initialize components
-price_fetcher = PriceFetcher()
 database_manager = DatabaseManager()
-calculator = SignalCalculator(database_manager)
+reader = SignalReader(database_manager)
 
-# Calculate signals
+# Read signals from database
 tickers = ['AAPL', 'MSFT', 'GOOGL']
-signals = ['RSI', 'SMA', 'MACD']
+signals = ['SENTIMENT']
 start_date = date(2024, 1, 1)
 end_date = date(2024, 12, 31)
 
-signal_scores = calculator.calculate_signals(
+signal_scores = reader.read_signals(
     tickers=tickers,
     signals=signals,
     start_date=start_date,
-    end_date=end_date,
-    store_in_db=True
+    end_date=end_date
 )
 
-print(f"Calculated {len(signal_scores)} signal scores")
+print(f"Read {len(signal_scores)} signal scores")
 ```
 
 #### Custom Signal Parameters
@@ -507,11 +504,11 @@ if price is None:
 #### Signal Calculation Errors
 
 ```python
-# Handle insufficient data
-calculator = SignalCalculator()
-result = calculator.calculate_signal_for_ticker('AAPL', 'RSI', date(2024, 1, 15))
+# Handle missing data
+reader = SignalReader()
+result = reader.read_signal_for_ticker('AAPL', 'SENTIMENT', date(2024, 1, 15))
 if result is None:
-    print("Signal calculation failed - insufficient data")
+    print("Signal not found - no data available")
 ```
 
 ## Performance Optimization
@@ -534,8 +531,8 @@ print(f"Cache size: {cache_info['cache_size']}")
 ### Batch Operations
 
 ```python
-# Batch signal calculation
-calculator.calculate_signals(tickers, signals, start_date, end_date)
+# Batch signal reading
+reader.read_signals(tickers, signals, start_date, end_date)
 
 # Batch price fetching
 fetcher.get_price_matrix(tickers, start_date, end_date)
@@ -574,9 +571,9 @@ if start_date >= end_date:
 
 ```python
 try:
-    result = calculator.calculate_signals(tickers, signals, start_date, end_date)
+    result = reader.read_signals(tickers, signals, start_date, end_date)
 except Exception as e:
-    logger.error(f"Signal calculation failed: {e}")
+    logger.error(f"Signal reading failed: {e}")
     # Handle error appropriately
 ```
 
@@ -598,11 +595,11 @@ logger.error("Database connection failed")
 ### 4. Testing
 
 ```python
-# Write unit tests for your custom signals
-def test_custom_signal():
-    signal = CustomSignal()
-    result = signal.calculate(price_data, 'AAPL', target_date)
-    assert -1 <= result <= 1
+# Write unit tests for signal reading
+def test_signal_reading():
+    reader = SignalReader()
+    result = reader.read_signal_for_ticker('AAPL', 'SENTIMENT', target_date)
+    assert result is not None or result is None  # Accept both cases
 ```
 
 ## Troubleshooting

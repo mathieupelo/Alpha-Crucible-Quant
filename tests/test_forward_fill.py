@@ -16,7 +16,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from database import DatabaseManager
-from signals import SignalCalculator
+from signals import SignalReader
 from utils import PriceFetcher
 
 
@@ -30,7 +30,7 @@ def test_forward_fill():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         db_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(db_manager)
+        signal_reader = SignalReader(db_manager)
         
         if not db_manager.connect():
             print("Failed to connect to database")
@@ -50,7 +50,7 @@ def test_forward_fill():
         print("\n1. Testing WITHOUT forward fill:")
         print("-" * 35)
         
-        signal_scores_no_ff = signal_calculator.get_signal_scores_pivot(
+        signal_scores_no_ff = signal_reader.get_signal_scores_pivot(
             tickers, signals, start_date, end_date, forward_fill=False
         )
         
@@ -70,7 +70,7 @@ def test_forward_fill():
         print("\n2. Testing WITH forward fill:")
         print("-" * 32)
         
-        signal_scores_with_ff = signal_calculator.get_signal_scores_pivot(
+        signal_scores_with_ff = signal_reader.get_signal_scores_pivot(
             tickers, signals, start_date, end_date, forward_fill=True
         )
         

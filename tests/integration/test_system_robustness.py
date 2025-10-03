@@ -18,7 +18,7 @@ import time
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from signals.calculator import SignalCalculator
+from signals import SignalReader
 from solver.solver import PortfolioSolver
 from solver.config import SolverConfig
 from backtest.engine import BacktestEngine
@@ -49,7 +49,7 @@ class TestSystemRobustness:
         # Setup components
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.signal_calculator = SignalCalculator(self.database_manager)
+        self.signal_reader = SignalReader(self.database_manager)
         self.portfolio_solver = PortfolioSolver()
         self.backtest_engine = BacktestEngine()
         
@@ -74,7 +74,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = corrupted_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -82,7 +82,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -120,7 +120,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = incomplete_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -128,7 +128,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -167,7 +167,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = duplicate_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -175,7 +175,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -213,7 +213,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = non_trading_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -221,7 +221,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -259,7 +259,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = holiday_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -267,7 +267,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -306,7 +306,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = crash_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -314,7 +314,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -353,7 +353,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = bubble_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -361,7 +361,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -407,7 +407,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = high_freq_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -415,7 +415,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -461,7 +461,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = low_freq_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -469,7 +469,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -519,7 +519,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = mixed_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -527,7 +527,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -561,11 +561,11 @@ class TestSystemRobustness:
         results = []
         
         def run_workflow():
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method='equal_weight', store_in_db=False
             )
@@ -622,7 +622,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = large_price_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             large_tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -630,7 +630,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             large_tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -673,7 +673,7 @@ class TestSystemRobustness:
         
         try:
             # Calculate signals
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
@@ -681,7 +681,7 @@ class TestSystemRobustness:
             assert isinstance(signal_results, pd.DataFrame)
             
             # Combine signals
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method='equal_weight', store_in_db=False
             )
@@ -720,7 +720,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.side_effect = Exception("Network error")
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -740,7 +740,7 @@ class TestSystemRobustness:
         self.database_manager.store_scores_combined.side_effect = Exception("Database error")
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=True
         )
         
@@ -748,7 +748,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=True
         )
@@ -792,7 +792,7 @@ class TestSystemRobustness:
         
         for target_date in edge_case_dates:
             # Calculate signals
-            signal_results = self.signal_calculator.calculate_signals(
+            signal_results = self.signal_reader.calculate_signals(
                 self.tickers, signals, start_date, end_date, store_in_db=False
             )
             
@@ -800,7 +800,7 @@ class TestSystemRobustness:
             assert isinstance(signal_results, pd.DataFrame)
             
             # Combine signals
-            combined_scores = self.signal_calculator.combine_signals_to_scores(
+            combined_scores = self.signal_reader.combine_signals_to_scores(
                 self.tickers, signals, start_date, end_date, 
                 method='equal_weight', store_in_db=False
             )
@@ -842,7 +842,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = extreme_data
         
         # Calculate signals
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -850,7 +850,7 @@ class TestSystemRobustness:
         assert isinstance(signal_results, pd.DataFrame)
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )
@@ -885,7 +885,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.side_effect = Exception("Network error")
         
         # Calculate signals (should fail gracefully)
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -897,7 +897,7 @@ class TestSystemRobustness:
         self.price_fetcher.get_price_history.return_value = self.price_history
         
         # Calculate signals again (should work now)
-        signal_results = self.signal_calculator.calculate_signals(
+        signal_results = self.signal_reader.calculate_signals(
             self.tickers, signals, start_date, end_date, store_in_db=False
         )
         
@@ -905,7 +905,7 @@ class TestSystemRobustness:
         assert not signal_results.empty
         
         # Combine signals
-        combined_scores = self.signal_calculator.combine_signals_to_scores(
+        combined_scores = self.signal_reader.combine_signals_to_scores(
             self.tickers, signals, start_date, end_date, 
             method='equal_weight', store_in_db=False
         )

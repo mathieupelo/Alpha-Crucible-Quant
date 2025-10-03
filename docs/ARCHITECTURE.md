@@ -43,7 +43,7 @@ Alpha Crucible Quant is a comprehensive quantitative investment system that comb
 - `RSISignal`: Relative Strength Index implementation
 - `SMASignal`: Simple Moving Average implementation
 - `MACDSignal`: Moving Average Convergence Divergence implementation
-- `SignalCalculator`: Orchestrates signal calculation
+- `SignalReader`: Orchestrates signal reading from database
 - `SignalRegistry`: Manages available signals
 
 **Design Decisions**:
@@ -248,7 +248,7 @@ User Request → Frontend → API Endpoint → Database Query → Response → U
 
 ### 1. Caching
 - **Price Caching**: In-memory caching of stock prices
-- **Signal Caching**: Caching of calculated signals
+- **Signal Caching**: Caching of read signals
 - **Database Caching**: Connection pooling and query optimization
 
 ### 2. Optimization

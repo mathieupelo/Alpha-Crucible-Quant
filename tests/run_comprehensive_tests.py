@@ -55,7 +55,7 @@ def main():
         ("tests/unit/solver/test_portfolio_models.py", "Portfolio Model Tests"),
         ("tests/unit/solver/test_portfolio_solver.py", "Portfolio Solver Tests"),
         ("tests/unit/signals/test_signal_registry.py", "Signal Registry Tests"),
-        ("tests/unit/signals/test_signal_calculator.py", "Signal Calculator Tests"),
+        ("tests/unit/signals/test_signal_reader.py", "Signal Reader Tests"),
         ("tests/integration/test_end_to_end.py", "End-to-End Integration Tests"),
         ("tests/integration/test_system_robustness.py", "System Robustness Tests"),
     ]

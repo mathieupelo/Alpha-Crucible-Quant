@@ -18,7 +18,7 @@ import time
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from signals.calculator import SignalCalculator
+from signals import SignalReader
 from solver.solver import PortfolioSolver
 from solver.config import SolverConfig
 from backtest.engine import BacktestEngine
@@ -49,7 +49,7 @@ class TestSystemRobustness:
         # Setup components
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.signal_calculator = SignalCalculator(self.database_manager)
+        self.signal_reader = SignalReader(self.database_manager)
         self.portfolio_solver = PortfolioSolver()
         self.backtest_engine = BacktestEngine()
         

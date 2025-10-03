@@ -16,7 +16,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from database import DatabaseManager
-from signals import SignalCalculator
+from signals import SignalReader
 from utils import PriceFetcher
 
 
@@ -30,7 +30,7 @@ def test_forward_fill():
         print("Initializing components...")
         price_fetcher = PriceFetcher()
         db_manager = DatabaseManager()
-        signal_calculator = SignalCalculator(db_manager)
+        signal_reader = SignalReader(db_manager)
         
         if not db_manager.connect():
             print("Failed to connect to database")

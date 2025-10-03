@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from signals import SentimentSignal, SignalCalculator
+from signals import SentimentSignal, SignalReader
 from signals.registry import SignalRegistry
 
 
@@ -155,14 +155,14 @@ class TestSignalRegistry:
         assert info is None
 
 
-class TestSignalCalculator:
+class TestSignalReader:
     """Test signal calculator functionality."""
     
     def setup_method(self):
         """Setup test calculator."""
         self.price_fetcher = Mock()
         self.database_manager = Mock()
-        self.calculator = SignalCalculator(self.database_manager)
+        self.reader = SignalReader(self.database_manager)
         
         # Mock price data
         dates = pd.date_range(start='2023-12-01', end='2024-01-15', freq='D')

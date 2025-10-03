@@ -13,7 +13,7 @@ import numpy as np
 
 from .config import BacktestConfig
 from .models import BacktestResult
-from signals import SignalCalculator
+from signals import SignalReader
 from portfolio import PortfolioService
 from database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
 from utils import PriceFetcher, DateUtils, TradingCalendar
@@ -38,7 +38,7 @@ class BacktestEngine:
     
     Attributes:
         price_fetcher: Instance for fetching stock price data
-        signal_calculator: Instance for calculating investment signals
+        signal_reader: Instance for reading investment signals
         database_manager: Instance for database operations
         portfolio_solver: Instance for portfolio optimization
         strategy_returns: Series of strategy returns for plotting
@@ -48,7 +48,7 @@ class BacktestEngine:
     """
     
     def __init__(self, price_fetcher: Optional[PriceFetcher] = None,
-                 signal_calculator: Optional[SignalCalculator] = None,
+                 signal_reader: Optional[SignalReader] = None,
                  database_manager: Optional[DatabaseManager] = None,
                  portfolio_service: Optional[PortfolioService] = None,
                  trading_calendar: Optional[TradingCalendar] = None):
@@ -57,16 +57,16 @@ class BacktestEngine:
         
         Args:
             price_fetcher: Price fetcher instance (optional)
-            signal_calculator: Signal calculator instance (optional)
+            signal_reader: Signal reader instance (optional)
             database_manager: Database manager instance (optional)
             portfolio_service: Portfolio service instance (optional)
             trading_calendar: Trading calendar instance (optional)
         """
         self.price_fetcher = price_fetcher or PriceFetcher()
-        self.signal_calculator = signal_calculator or SignalCalculator()
+        self.signal_reader = signal_reader or SignalReader()
         self.database_manager = database_manager or DatabaseManager()
         self.portfolio_service = portfolio_service or PortfolioService(
-            signal_calculator=self.signal_calculator,
+            signal_reader=self.signal_reader,
             database_manager=self.database_manager,
             price_fetcher=self.price_fetcher
         )
@@ -296,7 +296,7 @@ class BacktestEngine:
             logger.info("Using raw signals and combining them fresh for portfolio creation...")
             
             # Try to get raw signals from database first
-            signals_df = self.signal_calculator.get_signals_raw(
+            signals_df = self.signal_reader.get_signals_raw(
                 tickers, signals, config.start_date, config.end_date
             )
             
@@ -321,7 +321,7 @@ class BacktestEngine:
             
             # If no signals exist in database, calculate them
             logger.info("No existing signals found in database, calculating new signals...")
-            signals_df = self.signal_calculator.calculate_and_enforce_signals(
+            signals_df = self.signal_reader.calculate_and_enforce_signals(
                 tickers, signals, config.start_date, config.end_date, store_in_db=True
             )
             
@@ -370,7 +370,7 @@ class BacktestEngine:
         missing_signals = []
         
         for rebal_date in rebalancing_dates:
-            is_complete, missing = self.signal_calculator.validate_signals_complete(
+            is_complete, missing = self.signal_reader.validate_signals_complete(
                 tickers, signals, rebal_date
             )
             if not is_complete:
@@ -645,7 +645,7 @@ class BacktestEngine:
         
         for rebal_date in rebalancing_dates:
             # Check if signal scores exist for this date
-            signal_scores = self.signal_calculator.get_scores_combined_pivot(
+            signal_scores = self.signal_reader.get_scores_combined_pivot(
                 tickers, ['equal_weight'], rebal_date, rebal_date, 
                 forward_fill=False
             )
@@ -667,7 +667,7 @@ class BacktestEngine:
                         continue
                     
                     # Check if signal scores exist for this date
-                    signal_scores = self.signal_calculator.get_scores_combined_pivot(
+                    signal_scores = self.signal_reader.get_scores_combined_pivot(
                         tickers, ['equal_weight'], check_date, check_date, 
                         forward_fill=False
                     )
@@ -716,7 +716,7 @@ class BacktestEngine:
             extended_start = config.start_date - timedelta(days=config.max_lookback_days)
             
             # First try to get combined scores
-            signal_scores = self.signal_calculator.get_scores_combined_pivot(
+            signal_scores = self.signal_reader.get_scores_combined_pivot(
                 tickers, [config.signal_combination_method], extended_start, config.end_date, 
                 forward_fill=config.forward_fill_signals
             )
@@ -726,7 +726,7 @@ class BacktestEngine:
                 
                 # Calculate raw signals first
                 logger.info(f"Calculating raw signals for {len(tickers)} tickers from {extended_start} to {config.end_date}")
-                raw_signals = self.signal_calculator.calculate_signals(
+                raw_signals = self.signal_reader.calculate_signals(
                     tickers, signals, extended_start, config.end_date,
                     store_in_db=True
                 )
@@ -784,7 +784,7 @@ class BacktestEngine:
                             try:
                                 # Calculate signals for this specific date
                                 extended_start = missing_date - timedelta(days=config.max_lookback_days)
-                                raw_signals = self.signal_calculator.calculate_signals(
+                                raw_signals = self.signal_reader.calculate_signals(
                                     tickers, signals, extended_start, missing_date + timedelta(days=1),
                                     store_in_db=True
                                 )

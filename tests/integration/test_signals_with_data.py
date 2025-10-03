@@ -17,7 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 from data import RealTimeDataFetcher
-from signals import SignalCalculator
+from signals import SignalReader
 from signals.sentiment import SentimentSignal
 
 
@@ -60,7 +60,7 @@ def test_signal_calculator():
     
     # Initialize signal calculator
     data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator()
+    signal_reader = SignalReader()
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']
@@ -136,7 +136,7 @@ def test_signal_combination():
     
     # Initialize signal calculator
     data_fetcher = RealTimeDataFetcher()
-    signal_calculator = SignalCalculator()
+    signal_reader = SignalReader()
     
     # Test parameters
     tickers = ['AAPL', 'MSFT']

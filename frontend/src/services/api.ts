@@ -26,7 +26,7 @@ import {
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: 'http://localhost:8000/api',
-  timeout: 60000, // Increased to 30 seconds for ticker validation
+  timeout: 30000000, // Increased to 5 minutes for backtests (was 60 seconds)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -327,4 +327,3 @@ export const healthApi = {
 };
 
 export default api;
-

@@ -128,13 +128,42 @@ class BacktestEngine:
             if portfolios_created is None:  # Error occurred
                 return result
             
+            # Validate that portfolios were actually stored in database
+            portfolio_count = self.database_manager.execute_query(
+                "SELECT COUNT(*) as count FROM portfolios WHERE run_id = %s",
+                (run_id,)
+            )
+            if portfolio_count.empty or portfolio_count.iloc[0]['count'] == 0:
+                error_msg = "Portfolios created but not stored in database"
+                logger.error(error_msg)
+                result.error_message = error_msg
+                return result
+            
             # Step 5: Run simulation using created portfolios
             portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation_with_portfolios(
                 portfolios_created, tickers, config
             )
             
+            # Validate that simulation produced results
+            if portfolio_values.empty:
+                error_msg = "Simulation failed - no portfolio values generated"
+                logger.error(error_msg)
+                result.error_message = error_msg
+                return result
+            
             # Step 6: Insert backtest in database
             self._store_backtest_results(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
+            
+            # Validate that NAV data was actually stored
+            nav_count = self.database_manager.execute_query(
+                "SELECT COUNT(*) as count FROM backtest_nav WHERE run_id = %s",
+                (result.backtest_id,)
+            )
+            if nav_count.empty or nav_count.iloc[0]['count'] == 0:
+                error_msg = "Failed to store NAV data - backtest incomplete"
+                logger.error(error_msg)
+                result.error_message = error_msg
+                return result
             
             # Calculate and store results
             self._finalize_backtest_results(
@@ -207,7 +236,7 @@ class BacktestEngine:
             end_date=config.end_date,
             tickers=tickers,
             signals=signals,
-            signal_weights=config.signal_weights or {signal: 1.0/len(signals) for signal in signals}
+            signal_weights=config.signal_weights or {signal: float(1.0/len(signals)) for signal in signals}
         )
         
         return run_id, result
@@ -240,10 +269,11 @@ class BacktestEngine:
                     continue
                 
                 # Convert to the format expected by portfolio service
+                # Create a DataFrame with one row per ticker
                 combined_scores_df = pd.DataFrame({
-                    'asof_date': rebal_date,
-                    'ticker': date_scores.columns,
-                    'score': date_scores.iloc[0].values
+                    'asof_date': [rebal_date] * len(tickers),
+                    'ticker': tickers,
+                    'score': [date_scores.iloc[0][ticker] for ticker in tickers]
                 })
                 
                 portfolio_result = self.portfolio_service.create_portfolio_from_scores(
@@ -396,8 +426,8 @@ class BacktestEngine:
         # Get price data
         price_data = self._get_price_data(tickers, config)
         if price_data is None or price_data.empty:
-            logger.error("Failed to get price data")
-            return pd.Series(), pd.Series(), pd.DataFrame(), None
+            logger.error("Failed to get price data - simulation cannot proceed")
+            raise RuntimeError("Failed to get price data for simulation")
         
         # Initialize tracking variables
         portfolio_value = config.initial_capital
@@ -692,20 +722,26 @@ class BacktestEngine:
             # Extend start date to get enough lookback data
             extended_start = config.start_date - timedelta(days=config.max_lookback_days)
             
+            logger.info(f"Fetching price data for {len(tickers)} tickers from {extended_start} to {config.end_date}")
             price_data = self.price_fetcher.get_price_matrix(tickers, extended_start, config.end_date)
             
             if price_data.empty:
-                logger.error("No price data available")
+                logger.error(f"No price data available for tickers: {tickers}")
                 return None
             
             # Filter to trading days only
             price_data = price_data[price_data.index >= config.start_date]
             
+            if price_data.empty:
+                logger.error(f"No price data available after filtering to start date {config.start_date}")
+                return None
+            
             logger.info(f"Retrieved price data for {len(price_data.columns)} tickers over {len(price_data)} days")
+            logger.info(f"Available tickers: {list(price_data.columns)}")
             return price_data
             
         except Exception as e:
-            logger.error(f"Error getting price data: {e}")
+            logger.error(f"Error getting price data for tickers {tickers}: {e}")
             return None
     
     def _get_signal_scores(self, tickers: List[str], signals: List[str], 
@@ -1250,7 +1286,7 @@ class BacktestEngine:
                     continue
                 
                 # Calculate portfolio value based on current NAV
-                current_nav = portfolio_values.get(date, config.initial_capital)
+                current_nav = float(portfolio_values.get(date, config.initial_capital))
                 
                 # Create portfolio
                 portfolio = Portfolio(

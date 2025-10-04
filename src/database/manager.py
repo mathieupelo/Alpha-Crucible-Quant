@@ -95,7 +95,11 @@ class DatabaseManager:
         try:
             cursor.execute(query, params)
             self._connection.commit()
-            return cursor.fetchone()[0] if cursor.description else 0
+            if cursor.description:
+                result = cursor.fetchone()
+                return result[0] if result else 0
+            else:
+                return 0
         except Exception as e:
             logger.error(f"Error executing insert: {e}")
             raise
@@ -286,6 +290,7 @@ class DatabaseManager:
             total_value = EXCLUDED.total_value,
             notes = EXCLUDED.notes,
             created_at = EXCLUDED.created_at
+        RETURNING id
         """
         
         params_json = None

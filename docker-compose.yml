@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  # MySQL Database
-  mysql:
-    image: mysql:8.0
-    container_name: alpha-crucible-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-password}
-      MYSQL_DATABASE: signal_forge
-      MYSQL_USER: ${DB_USER:-root}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./scripts/setup_database.py:/docker-entrypoint-initdb.d/setup_database.py
-    networks:
-      - alpha-crucible-network
-    restart: unless-stopped
-
   # FastAPI Backend
   backend:
     build:
@@ -26,20 +8,20 @@ services:
       dockerfile: backend/Dockerfile
     container_name: alpha-crucible-backend
     environment:
-      - DB_HOST=mysql
+      - DB_HOST=host.docker.internal
       - DB_PORT=3306
       - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_PASSWORD=${DB_PASSWORD:-lulodro2}
       - DB_NAME=signal_forge
     ports:
       - "8000:8000"
-    depends_on:
-      - mysql
     networks:
       - alpha-crucible-network
     restart: unless-stopped
     volumes:
       - ./src:/app/src:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # React Frontend
   frontend:
@@ -70,9 +52,6 @@ services:
     networks:
       - alpha-crucible-network
     restart: unless-stopped
-
-volumes:
-  mysql_data:
 
 networks:
   alpha-crucible-network:

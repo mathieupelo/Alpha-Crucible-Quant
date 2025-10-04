@@ -16,8 +16,8 @@ import logging
 # Add src to path to import existing modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from database import DatabaseManager
-from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
+from src.database import DatabaseManager
+from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse

@@ -14,7 +14,7 @@ from mysql.connector import Error
 from dotenv import load_dotenv
 
 from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, Universe, UniverseTicker, DataFrameConverter
-from utils.error_handling import handle_database_errors, retry_on_failure
+from src.utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
 load_dotenv()

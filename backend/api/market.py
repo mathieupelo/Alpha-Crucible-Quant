@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 from models import ErrorResponse
-from utils.price_fetcher import PriceFetcher
+from src.utils.price_fetcher import PriceFetcher
 import pandas as pd
 
 logger = logging.getLogger(__name__)

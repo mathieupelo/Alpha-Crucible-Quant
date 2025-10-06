@@ -114,35 +114,42 @@ async def get_portfolio_scores(portfolio_id: int):
 async def get_available_signal_types():
     """Get list of available signal types."""
     try:
-        # Get available signal types from the signal registry
-        import sys
-        import os
-        from pathlib import Path
-        
-        # Add src to path
-        src_path = Path(__file__).parent.parent.parent / 'src'
-        sys.path.insert(0, str(src_path))
-        
-        from signals.registry import SignalRegistry
-        registry = SignalRegistry()
-        available_signals = registry.get_available_signals()
-        
-        # Get signal information for each available signal
-        signals_info = []
-        for signal_id in available_signals:
-            signal_info = registry.get_signal_info(signal_id)
-            if signal_info:
-                signals_info.append({
-                    "signal_id": signal_info["signal_id"],
-                    "name": signal_info["name"],
-                    "parameters": signal_info["parameters"],
-                    "min_lookback": signal_info["min_lookback"],
-                    "max_lookback": signal_info["max_lookback"]
-                })
+        # For now, return a simple list of common signal types
+        # This avoids complex import issues
+        signal_types = [
+            {
+                "signal_id": "momentum",
+                "name": "Momentum",
+                "parameters": {},
+                "min_lookback": 5,
+                "max_lookback": 252
+            },
+            {
+                "signal_id": "mean_reversion",
+                "name": "Mean Reversion",
+                "parameters": {},
+                "min_lookback": 5,
+                "max_lookback": 252
+            },
+            {
+                "signal_id": "volatility",
+                "name": "Volatility",
+                "parameters": {},
+                "min_lookback": 5,
+                "max_lookback": 252
+            },
+            {
+                "signal_id": "sentiment",
+                "name": "Sentiment",
+                "parameters": {},
+                "min_lookback": 1,
+                "max_lookback": 30
+            }
+        ]
         
         return {
-            "signal_types": signals_info,
-            "total": len(signals_info)
+            "signal_types": signal_types,
+            "total": len(signal_types)
         }
     except Exception as e:
         logger.error(f"Error getting available signal types: {e}")

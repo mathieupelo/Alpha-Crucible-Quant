@@ -1,7 +1,7 @@
 """
 Database manager for the Quant Project system.
 
-Provides a simplified interface to MySQL database operations using pandas DataFrames.
+Provides a simplified interface to PostgreSQL database operations using pandas DataFrames.
 """
 
 import os
@@ -9,12 +9,13 @@ import logging
 from datetime import date, datetime
 from typing import List, Dict, Optional, Any
 import pandas as pd
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
+from psycopg2 import Error as PgError
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, Universe, UniverseTicker, DataFrameConverter
-from utils.error_handling import handle_database_errors, retry_on_failure
+from src.utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
 load_dotenv()
@@ -27,55 +28,67 @@ class DatabaseManager:
     
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None, 
                  user: Optional[str] = None, password: Optional[str] = None, 
-                 database: Optional[str] = None):
+                 database: Optional[str] = None, database_url: Optional[str] = None):
         """Initialize database manager with connection parameters."""
+        self.database_url = database_url or os.getenv('DATABASE_URL')
         self.host = host or os.getenv('DB_HOST', '127.0.0.1')
-        self.port = port or int(os.getenv('DB_PORT', '3306'))
-        self.user = user or os.getenv('DB_USER', 'root')
+        self.port = port or int(os.getenv('DB_PORT', '5432'))
+        self.user = user or os.getenv('DB_USER', 'postgres')
         self.password = password or os.getenv('DB_PASSWORD', '')
-        self.database = database or os.getenv('DB_NAME', 'signal_forge')
+        self.database = database or os.getenv('DB_NAME', 'postgres')
         self._connection = None
     
     def connect(self) -> bool:
         """Establish connection to the database."""
         try:
-            self._connection = mysql.connector.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                database=self.database,
-                autocommit=True
-            )
-            if self._connection.is_connected():
-                logger.info(f"Connected to MySQL database: {self.database}")
+            if self.database_url:
+                # Use DATABASE_URL if available (for Supabase)
+                self._connection = psycopg2.connect(self.database_url)
+            else:
+                # Use individual connection parameters
+                self._connection = psycopg2.connect(
+                    host=self.host,
+                    port=self.port,
+                    user=self.user,
+                    password=self.password,
+                    database=self.database
+                )
+            
+            if self._connection:
+                self._connection.autocommit = True
+                logger.info(f"Connected to PostgreSQL database: {self.database}")
                 return True
-        except Error as e:
-            logger.error(f"Error connecting to MySQL: {e}")
+        except PgError as e:
+            logger.error(f"Error connecting to PostgreSQL: {e}")
             return False
         return False
     
     def disconnect(self):
         """Close database connection."""
-        if self._connection and self._connection.is_connected():
+        if self._connection and not self._connection.closed:
             self._connection.close()
-            logger.info("MySQL connection closed")
+            logger.info("PostgreSQL connection closed")
     
     def is_connected(self) -> bool:
         """Check if database connection is active."""
-        return self._connection and self._connection.is_connected()
+        return self._connection and not self._connection.closed
     
     def ensure_connection(self):
         """Ensure database connection is active, reconnect if necessary."""
         if not self.is_connected():
-            self.connect()
+            if not self.connect():
+                raise Exception("Failed to establish database connection")
     
     @handle_database_errors
     def execute_query(self, query: str, params: Optional[tuple] = None) -> pd.DataFrame:
         """Execute a SELECT query and return results as DataFrame."""
-        self.ensure_connection()
         try:
-            cursor = self._connection.cursor(dictionary=True)
+            self.ensure_connection()
+            if not self._connection:
+                logger.error("Database connection is None after ensure_connection")
+                return pd.DataFrame()
+                
+            cursor = self._connection.cursor(cursor_factory=RealDictCursor)
             cursor.execute(query, params)
             results = cursor.fetchall()
             cursor.close()
@@ -90,16 +103,23 @@ class DatabaseManager:
     
     def execute_insert(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute an INSERT query and return the last insert ID."""
-        self.ensure_connection()
-        cursor = self._connection.cursor()
         try:
+            self.ensure_connection()
+            if not self._connection:
+                logger.error("Database connection is None after ensure_connection")
+                return 0
+            cursor = self._connection.cursor()
             cursor.execute(query, params)
-            return cursor.lastrowid
-        except Error as e:
+            return cursor.fetchone()[0] if cursor.description else 0
+        except PgError as e:
             logger.error(f"Error executing insert: {e}")
             raise
+        except Exception as e:
+            logger.error(f"Database error in execute_insert: {e}")
+            return 0
         finally:
-            cursor.close()
+            if 'cursor' in locals():
+                cursor.close()
     
     def execute_many(self, query: str, params_list: List[tuple]) -> int:
         """Execute a query with multiple parameter sets."""
@@ -108,7 +128,7 @@ class DatabaseManager:
         try:
             cursor.executemany(query, params_list)
             return cursor.rowcount
-        except Error as e:
+        except PgError as e:
             logger.error(f"Error executing batch insert: {e}")
             raise
         finally:
@@ -124,10 +144,10 @@ class DatabaseManager:
         query = """
         INSERT INTO signal_raw (asof_date, ticker, signal_name, value, metadata, created_at)
         VALUES (%s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            value = VALUES(value),
-            metadata = VALUES(metadata),
-            created_at = VALUES(created_at)
+        ON CONFLICT (asof_date, ticker, signal_name) DO UPDATE SET 
+            value = EXCLUDED.value,
+            metadata = EXCLUDED.metadata,
+            created_at = EXCLUDED.created_at
         """
         
         params_list = []
@@ -188,11 +208,11 @@ class DatabaseManager:
         query = """
         INSERT INTO scores_combined (asof_date, ticker, score, method, params, created_at)
         VALUES (%s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            score = VALUES(score),
-            method = VALUES(method),
-            params = VALUES(params),
-            created_at = VALUES(created_at)
+        ON CONFLICT (asof_date, ticker, method) DO UPDATE SET 
+            score = EXCLUDED.score,
+            method = EXCLUDED.method,
+            params = EXCLUDED.params,
+            created_at = EXCLUDED.created_at
         """
         
         params_list = []
@@ -273,14 +293,14 @@ class DatabaseManager:
         query = """
         INSERT INTO portfolios (run_id, universe_id, asof_date, method, params, cash, total_value, notes, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            universe_id = VALUES(universe_id),
-            method = VALUES(method),
-            params = VALUES(params),
-            cash = VALUES(cash),
-            total_value = VALUES(total_value),
-            notes = VALUES(notes),
-            created_at = VALUES(created_at)
+        ON CONFLICT (run_id, asof_date) DO UPDATE SET
+            universe_id = EXCLUDED.universe_id,
+            method = EXCLUDED.method,
+            params = EXCLUDED.params,
+            cash = EXCLUDED.cash,
+            total_value = EXCLUDED.total_value,
+            notes = EXCLUDED.notes,
+            created_at = EXCLUDED.created_at
         """
         
         params_json = None
@@ -365,10 +385,10 @@ class DatabaseManager:
         query = """
         INSERT INTO portfolio_positions (portfolio_id, ticker, weight, price_used, created_at)
         VALUES (%s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            weight = VALUES(weight),
-            price_used = VALUES(price_used),
-            created_at = VALUES(created_at)
+        ON CONFLICT (portfolio_id, ticker) DO UPDATE SET 
+            weight = EXCLUDED.weight,
+            price_used = EXCLUDED.price_used,
+            created_at = EXCLUDED.created_at
         """
         
         params_list = []
@@ -409,16 +429,16 @@ class DatabaseManager:
         query = """
         INSERT INTO backtests (run_id, name, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            name = VALUES(name),
-            start_date = VALUES(start_date),
-            end_date = VALUES(end_date),
-            frequency = VALUES(frequency),
-            universe_id = VALUES(universe_id),
-            universe = VALUES(universe),
-            benchmark = VALUES(benchmark),
-            params = VALUES(params),
-            created_at = VALUES(created_at)
+        ON CONFLICT (run_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            start_date = EXCLUDED.start_date,
+            end_date = EXCLUDED.end_date,
+            frequency = EXCLUDED.frequency,
+            universe_id = EXCLUDED.universe_id,
+            universe = EXCLUDED.universe,
+            benchmark = EXCLUDED.benchmark,
+            params = EXCLUDED.params,
+            created_at = EXCLUDED.created_at
         """
         
         universe_json = None
@@ -528,10 +548,10 @@ class DatabaseManager:
         query = """
         INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl)
         VALUES (%s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-            nav = VALUES(nav),
-            benchmark_nav = VALUES(benchmark_nav),
-            pnl = VALUES(pnl)
+        ON CONFLICT (run_id, date) DO UPDATE SET 
+            nav = EXCLUDED.nav,
+            benchmark_nav = EXCLUDED.benchmark_nav,
+            pnl = EXCLUDED.pnl
         """
         
         params_list = []
@@ -576,9 +596,9 @@ class DatabaseManager:
         query = """
         INSERT INTO universes (name, description, created_at, updated_at)
         VALUES (%s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            description = VALUES(description),
-            updated_at = VALUES(updated_at)
+        ON CONFLICT (name) DO UPDATE SET
+            description = EXCLUDED.description,
+            updated_at = EXCLUDED.updated_at
         """
         
         params = (
@@ -637,7 +657,7 @@ class DatabaseManager:
         try:
             cursor.execute(query, (universe_id,))
             return cursor.rowcount > 0
-        except Error as e:
+        except PgError as e:
             logger.error(f"Error deleting universe {universe_id}: {e}")
             raise
         finally:
@@ -650,8 +670,8 @@ class DatabaseManager:
         query = """
         INSERT INTO universe_tickers (universe_id, ticker, added_at)
         VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            added_at = VALUES(added_at)
+        ON CONFLICT (universe_id, ticker) DO UPDATE SET
+            added_at = EXCLUDED.added_at
         """
         
         params = (
@@ -670,8 +690,8 @@ class DatabaseManager:
         query = """
         INSERT INTO universe_tickers (universe_id, ticker, added_at)
         VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            added_at = VALUES(added_at)
+        ON CONFLICT (universe_id, ticker) DO UPDATE SET
+            added_at = EXCLUDED.added_at
         """
         
         params_list = []
@@ -697,7 +717,7 @@ class DatabaseManager:
         try:
             cursor.execute(query, (universe_id, ticker))
             return cursor.rowcount > 0
-        except Error as e:
+        except PgError as e:
             logger.error(f"Error deleting ticker {ticker} from universe {universe_id}: {e}")
             raise
         finally:
@@ -711,7 +731,7 @@ class DatabaseManager:
         try:
             cursor.execute(query, (universe_id,))
             return cursor.rowcount
-        except Error as e:
+        except PgError as e:
             logger.error(f"Error deleting all tickers from universe {universe_id}: {e}")
             raise
         finally:
@@ -727,7 +747,7 @@ class DatabaseManager:
         try:
             cursor.execute(query)
             return cursor.rowcount
-        except Error as e:
+        except PgError as e:
             logger.error(f"Error clearing table {table_name}: {e}")
             raise
         finally:

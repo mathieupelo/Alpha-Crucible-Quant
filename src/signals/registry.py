@@ -13,7 +13,7 @@ from pathlib import Path
 # Add src to path to import database manager
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database import DatabaseManager
+from src.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

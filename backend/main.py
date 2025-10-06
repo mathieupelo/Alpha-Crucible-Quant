@@ -7,9 +7,10 @@ Main FastAPI application providing REST API endpoints for the quantitative tradi
 import sys
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.middleware.base import BaseHTTPMiddleware
 import logging
 
 # Add src to path to import existing modules
@@ -31,14 +32,15 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
-# CORS middleware for React frontend
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],  # React dev servers
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Include API routers
 app.include_router(backtests.router, prefix="/api", tags=["backtests"])
@@ -62,6 +64,19 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "alpha-crucible-api"}
+
+@app.get("/health/db")
+async def health_check_db():
+    """Database health check endpoint."""
+    try:
+        from services.database_service import DatabaseService
+        db_service = DatabaseService()
+        if db_service.is_connected():
+            return {"status": "healthy", "database": "connected"}
+        else:
+            return {"status": "degraded", "database": "disconnected"}
+    except Exception as e:
+        return {"status": "unhealthy", "database": "error", "error": str(e)}
 
 # Global exception handler
 @app.exception_handler(Exception)

@@ -25,7 +25,6 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Divider,
-  Grid,
   Tooltip,
   CircularProgress,
 } from '@mui/material';
@@ -41,7 +40,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 
 import { universeApi } from '@/services/api';
-import { Universe, UniverseTicker, TickerValidation } from '@/types';
+import { TickerValidation } from '@/types';
 
 const UniverseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -71,7 +70,7 @@ const UniverseDetail: React.FC = () => {
   // Fetch universe tickers
   const {
     data: tickersData,
-    isLoading: tickersLoading,
+    // isLoading: tickersLoading,
     error: tickersError,
   } = useQuery(['universe-tickers', universeId], () => universeApi.getUniverseTickers(universeId), {
     enabled: !!universeId,
@@ -93,19 +92,19 @@ const UniverseDetail: React.FC = () => {
   );
 
   // Remove ticker mutation
-  const removeTickerMutation = useMutation(
-    (ticker: string) => universeApi.removeUniverseTicker(universeId, ticker),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['universe-tickers', universeId]);
-        setTickerToDelete(null);
-        setDeleteDialogOpen(false);
-      },
-      onError: (error: any) => {
-        setError(error.response?.data?.detail || 'Failed to remove ticker');
-      },
-    }
-  );
+  // const removeTickerMutation = useMutation(
+  //   (ticker: string) => universeApi.removeUniverseTicker(universeId, ticker),
+  //   {
+  //     onSuccess: () => {
+  //       queryClient.invalidateQueries(['universe-tickers', universeId]);
+  //       setTickerToDelete(null);
+  //       setDeleteDialogOpen(false);
+  //     },
+  //     onError: (error: any) => {
+  //       setError(error.response?.data?.detail || 'Failed to remove ticker');
+  //     },
+  //   }
+  // );
 
   // Validate tickers mutation
   const validateTickersMutation = useMutation(universeApi.validateTickers, {

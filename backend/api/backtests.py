@@ -26,6 +26,8 @@ db_service = DatabaseService()
 async def check_backtest_name(name: str = Query(..., description="Backtest name to check")):
     """Check if a backtest name already exists."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         exists = db_service.check_backtest_name_exists(name)
         return {
             "name": name,

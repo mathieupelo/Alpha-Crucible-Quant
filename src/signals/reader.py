@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Any, Tuple
 import pandas as pd
 import numpy as np
 
-from database import DatabaseManager
+from src.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

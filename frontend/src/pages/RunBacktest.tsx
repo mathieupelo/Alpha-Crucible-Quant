@@ -3,7 +3,7 @@
  * Allows users to configure and run backtests with preflight checks
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,7 +21,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  StepContent,
   Chip,
   List,
   ListItem,
@@ -29,9 +28,6 @@ import {
   ListItemIcon,
   Divider,
   CircularProgress,
-  Skeleton,
-  FormControlLabel,
-  Checkbox,
   FormHelperText,
 } from '@mui/material';
 import {
@@ -48,7 +44,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import { backtestApi, universeApi, signalApi } from '@/services/api';
-import { BacktestCreateRequest, Universe, Signal } from '@/types';
+import { BacktestCreateRequest } from '@/types';
 
 interface PreflightResult {
   isValid: boolean;
@@ -352,7 +348,7 @@ const RunBacktest: React.FC = () => {
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Stepper activeStep={activeStep} orientation="horizontal">
-              {steps.map((label, index) => (
+              {steps.map((label) => (
                 <Step key={label}>
                   <StepLabel>{label}</StepLabel>
                 </Step>

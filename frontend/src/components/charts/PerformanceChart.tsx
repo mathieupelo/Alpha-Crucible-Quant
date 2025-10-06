@@ -3,7 +3,7 @@
  * Displays portfolio performance over time using Recharts
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -198,7 +198,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   }
 
   return (
-    <Box sx={{ width: '100%', height }}>
+    <Box sx={{ width: '100%', height: height || 400 }}>
       {/* Chart Controls */}
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -252,20 +252,20 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
       </Box>
 
       {/* Loading and Error States */}
-      {showMarketOverlay && marketOverlayLoading && (
+      {showMarketOverlay && marketOverlayLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 50 }}>
           <CircularProgress size={24} />
           <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
             Loading market overlay...
           </Typography>
         </Box>
-      )}
+      ) : null}
       
-      {showMarketOverlay && marketOverlayError && (
+      {showMarketOverlay && marketOverlayError ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Couldn't load market overlay.
         </Alert>
-      )}
+      ) : null}
       
       <ResponsiveContainer width="100%" height="100%">
         <LineChart

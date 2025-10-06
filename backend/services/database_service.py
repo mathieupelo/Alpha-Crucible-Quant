@@ -16,8 +16,8 @@ import logging
 # Add src to path to import existing modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
-from database import DatabaseManager
-from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
+from src.database import DatabaseManager
+from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse
@@ -31,8 +31,27 @@ class DatabaseService:
     def __init__(self):
         """Initialize database service."""
         self.db_manager = DatabaseManager()
-        if not self.db_manager.connect():
-            raise Exception("Failed to connect to database")
+        self._connected = False
+        # Don't fail at initialization - connect lazily
+        try:
+            self._connected = self.db_manager.connect()
+        except Exception as e:
+            print(f"Warning: Database connection failed at initialization: {e}")
+            self._connected = False
+    
+    def is_connected(self) -> bool:
+        """Check if database is connected."""
+        return self._connected
+    
+    def ensure_connection(self) -> bool:
+        """Ensure database connection is established."""
+        if not self._connected:
+            try:
+                self._connected = self.db_manager.connect()
+            except Exception as e:
+                print(f"Failed to connect to database: {e}")
+                return False
+        return self._connected
     
     def _parse_json_field(self, value: Any) -> Any:
         """Parse JSON string fields to dictionaries."""

@@ -24,11 +24,20 @@ import {
 } from '@/types';
 
 // Create axios instance with base configuration
+// Use ngrok URL if we're running on ngrok domain, otherwise use localhost
+const getBaseURL = () => {
+  if (window.location.hostname.includes('ngrok-free.dev')) {
+    return `${window.location.protocol}//${window.location.hostname}/api`;
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: getBaseURL(),
   timeout: 60000, // Increased to 30 seconds for ticker validation
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true', // Bypass ngrok browser warning
   },
 });
 

@@ -1,60 +1,46 @@
 @echo off
-REM Alpha Crucible Quant - Docker Deployment Script for Windows
-REM This script deploys the application using Docker containers
-
-echo Alpha Crucible Quant - Docker Deployment
-echo ======================================
+echo ========================================
+echo   Alpha Crucible Quant - Deploy Script
+echo ========================================
 echo.
 
-REM Change to project root directory
-cd /d "%~dp0.."
-
-REM Check if Docker is running
-docker version >nul 2>&1
+echo [1/4] Stopping and removing existing containers...
+docker-compose down -v
 if %errorlevel% neq 0 (
-    echo Error: Docker is not running or not installed!
-    echo Please start Docker Desktop and try again.
+    echo ERROR: Failed to stop containers
     pause
     exit /b 1
 )
 
-REM Check if .env file exists
-if not exist .env (
-    echo Error: .env file not found in project root!
-    echo Please copy .env_template to .env and configure your settings.
-    echo Current directory: %CD%
-    pause
-    exit /b 1
+echo [2/4] Removing existing images...
+docker-compose down --rmi all
+if %errorlevel% neq 0 (
+    echo WARNING: Failed to remove some images (this is usually OK)
 )
 
-echo Building and starting Docker containers...
-echo.
-
-REM Stop any existing containers
-echo Stopping existing containers...
-docker-compose down
-
-REM Build and start containers
-echo Building and starting new containers...
+echo [3/4] Building and starting fresh containers...
 docker-compose up --build -d
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to build/start containers
+    pause
+    exit /b 1
+)
 
-REM Check if containers started successfully
-timeout /t 10 /nobreak >nul
-
-echo.
-echo Checking container status...
+echo [4/4] Checking container status...
+timeout /t 5 /nobreak >nul
 docker-compose ps
 
 echo.
-echo Deployment completed!
+echo ========================================
+echo   Deployment Complete!
+echo ========================================
 echo.
 echo Your application is now running at:
-echo - Frontend: http://localhost:3000
-echo - Backend API: http://localhost:8000
-echo - Nginx Proxy: http://localhost:80
+echo   Frontend: http://localhost/
+echo   API:      http://localhost:8000/api
+echo   Health:   http://localhost:8000/health
 echo.
 echo To view logs: docker-compose logs -f
-echo To stop: docker-compose down
+echo To stop:     docker-compose down
 echo.
-
 pause

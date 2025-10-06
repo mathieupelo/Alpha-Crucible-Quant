@@ -76,7 +76,7 @@ async def create_backtest(request: BacktestCreateRequest):
         src_path = Path(__file__).parent.parent.parent / 'src'
         sys.path.insert(0, str(src_path))
         
-        from backtest.config import BacktestConfig
+        from src.backtest.config import BacktestConfig
         config = BacktestConfig(
             start_date=request.start_date,
             end_date=request.end_date,
@@ -99,7 +99,7 @@ async def create_backtest(request: BacktestCreateRequest):
         )
         
         # Run the backtest
-        from backtest.engine import BacktestEngine
+        from src.backtest.engine import BacktestEngine
         engine = BacktestEngine()
         
         # Get universe tickers

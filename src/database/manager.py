@@ -110,7 +110,15 @@ class DatabaseManager:
                 return 0
             cursor = self._connection.cursor()
             cursor.execute(query, params)
-            return cursor.fetchone()[0] if cursor.description else 0
+            self._connection.commit()
+            
+            # Check if query has RETURNING clause
+            if cursor.description:
+                result = cursor.fetchone()
+                return result[0] if result else 0
+            else:
+                # Fallback to lastrowid if no RETURNING clause
+                return cursor.lastrowid if hasattr(cursor, 'lastrowid') else 0
         except PgError as e:
             logger.error(f"Error executing insert: {e}")
             raise
@@ -301,6 +309,7 @@ class DatabaseManager:
             total_value = EXCLUDED.total_value,
             notes = EXCLUDED.notes,
             created_at = EXCLUDED.created_at
+        RETURNING id
         """
         
         params_json = None

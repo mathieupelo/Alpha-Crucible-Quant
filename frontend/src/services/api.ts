@@ -34,7 +34,7 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 60000, // Increased to 30 seconds for ticker validation
+  timeout: 600000, // Increased to 5 minutes for backtest execution
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true', // Bypass ngrok browser warning

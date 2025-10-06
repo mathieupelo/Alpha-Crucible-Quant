@@ -1,55 +1,44 @@
 #!/bin/bash
-# Alpha Crucible Quant - Docker Deployment Script for Linux/Mac
-# This script deploys the application using Docker containers
 
-echo "Alpha Crucible Quant - Docker Deployment"
-echo "======================================"
+echo "========================================"
+echo "  Alpha Crucible Quant - Deploy Script"
+echo "========================================"
 echo
 
-# Change to project root directory
-cd "$(dirname "$0")/.."
-
-# Check if Docker is running
-if ! docker version >/dev/null 2>&1; then
-    echo "Error: Docker is not running or not installed!"
-    echo "Please start Docker and try again."
+echo "[1/4] Stopping and removing existing containers..."
+docker-compose down -v
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to stop containers"
     exit 1
 fi
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-    echo "Error: .env file not found in project root!"
-    echo "Please copy .env_template to .env and configure your settings."
-    echo "Current directory: $(pwd)"
-    exit 1
+echo "[2/4] Removing existing images..."
+docker-compose down --rmi all
+if [ $? -ne 0 ]; then
+    echo "WARNING: Failed to remove some images (this is usually OK)"
 fi
 
-echo "Building and starting Docker containers..."
-echo
-
-# Stop any existing containers
-echo "Stopping existing containers..."
-docker-compose down
-
-# Build and start containers
-echo "Building and starting new containers..."
+echo "[3/4] Building and starting fresh containers..."
 docker-compose up --build -d
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to build/start containers"
+    exit 1
+fi
 
-# Check if containers started successfully
-sleep 10
-
-echo
-echo "Checking container status..."
+echo "[4/4] Checking container status..."
+sleep 5
 docker-compose ps
 
 echo
-echo "Deployment completed!"
+echo "========================================"
+echo "  Deployment Complete!"
+echo "========================================"
 echo
 echo "Your application is now running at:"
-echo "- Frontend: http://localhost:3000"
-echo "- Backend API: http://localhost:8000"
-echo "- Nginx Proxy: http://localhost:80"
+echo "  Frontend: http://localhost/"
+echo "  API:      http://localhost:8000/api"
+echo "  Health:   http://localhost:8000/health"
 echo
 echo "To view logs: docker-compose logs -f"
-echo "To stop: docker-compose down"
+echo "To stop:     docker-compose down"
 echo

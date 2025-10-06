@@ -13,10 +13,10 @@ import numpy as np
 
 from .config import BacktestConfig
 from .models import BacktestResult
-from signals import SignalReader
-from portfolio import PortfolioService
-from database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
-from utils import PriceFetcher, DateUtils, TradingCalendar
+from src.signals import SignalReader
+from src.portfolio import PortfolioService
+from src.database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
+from src.utils import PriceFetcher, DateUtils, TradingCalendar
 
 logger = logging.getLogger(__name__)
 
@@ -1479,7 +1479,7 @@ class BacktestEngine:
                 
                 # Store combined scores in database
                 try:
-                    from database import ScoreCombined
+                    from src.database import ScoreCombined
                     score_objects = []
                     for _, row in df.iterrows():
                         score_obj = ScoreCombined(

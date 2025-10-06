@@ -6,7 +6,7 @@ Defines configuration parameters for backtesting strategies.
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 @dataclass
@@ -61,14 +61,17 @@ class BacktestConfig:
     max_lookback_days: int = 756
     """Maximum lookback period for price data (default: 3 years)"""
     
-    signal_weights: Optional[dict] = None
+    signals: Optional[List[str]] = None
+    """List of signal names to use for backtesting"""
+    
+    signal_weights: Optional[Dict[str, float]] = None
     """Weights for combining signals (optional)"""
     
     signal_combination_method: str = 'equal_weight'
-    """Method for combining signals ('equal_weight', 'weighted', 'zscore') (default: equal_weight)"""
+    """Method for combining signals ('equal_weight', 'weighted', 'custom')"""
     
     forward_fill_signals: bool = True
-    """Whether to forward fill missing signal scores with latest available values (default: True)"""
+    """Whether to forward fill missing signal values"""
     
     def __post_init__(self):
         """Validate configuration parameters."""

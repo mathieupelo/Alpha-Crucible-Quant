@@ -127,7 +127,7 @@ class PortfolioService:
             'tickers': tickers,
             'method': 'combined_scores',
             'method_params': None,
-            'weights': dict(zip(tickers, portfolio_weights)),
+            'weights': {ticker: float(weight) for ticker, weight in zip(tickers, portfolio_weights)},
             'status': 'success'
         }
     

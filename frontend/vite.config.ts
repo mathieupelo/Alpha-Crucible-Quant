@@ -24,5 +24,8 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
+  // Force cache busting in development
+  define: {
+    __APP_VERSION__: JSON.stringify(Date.now().toString())
+  }
 })
-

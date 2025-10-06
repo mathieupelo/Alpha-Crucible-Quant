@@ -10,7 +10,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.middleware.base import BaseHTTPMiddleware
 import logging
 
 # Add src to path to import existing modules

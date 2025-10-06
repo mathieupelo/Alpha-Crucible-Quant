@@ -112,40 +112,32 @@ async def get_portfolio_scores(portfolio_id: int):
 
 @router.get("/signal-types")
 async def get_available_signal_types():
-    """Get list of available signal types."""
+    """Get list of available signal types from the database."""
     try:
-        # For now, return a simple list of common signal types
-        # This avoids complex import issues
-        signal_types = [
-            {
-                "signal_id": "momentum",
-                "name": "Momentum",
-                "parameters": {},
-                "min_lookback": 5,
-                "max_lookback": 252
-            },
-            {
-                "signal_id": "mean_reversion",
-                "name": "Mean Reversion",
-                "parameters": {},
-                "min_lookback": 5,
-                "max_lookback": 252
-            },
-            {
-                "signal_id": "volatility",
-                "name": "Volatility",
-                "parameters": {},
-                "min_lookback": 5,
-                "max_lookback": 252
-            },
-            {
-                "signal_id": "sentiment",
-                "name": "Sentiment",
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        # Query distinct signal names from the database
+        query = "SELECT DISTINCT signal_name FROM signal_raw ORDER BY signal_name"
+        signals_df = db_service.db_manager.execute_query(query)
+        
+        if signals_df.empty:
+            return {
+                "signal_types": [],
+                "total": 0
+            }
+        
+        # Convert database results to API format
+        signal_types = []
+        for _, row in signals_df.iterrows():
+            signal_name = row['signal_name']
+            signal_types.append({
+                "signal_id": signal_name.lower().replace('_', '_'),
+                "name": signal_name,
                 "parameters": {},
                 "min_lookback": 1,
-                "max_lookback": 30
-            }
-        ]
+                "max_lookback": 252
+            })
         
         return {
             "signal_types": signal_types,

@@ -20,9 +20,9 @@ if errorlevel 1 (
   echo   Killed ngrok processes
 )
 
-REM 2) Kill processes using ports 80, 8000, 4040
-echo [2/6] Killing processes using ports 80, 8000, 4040...
-for %%p in (80 8000 4040) do (
+REM 2) Kill processes using ports 8080, 8000, 4040
+echo [2/6] Killing processes using ports 8080, 8000, 4040...
+for %%p in (8080 8000 4040) do (
   for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%%p') do (
     if not "%%a"=="0" (
       taskkill /F /PID %%a >nul 2>&1
@@ -74,6 +74,9 @@ echo ==============================================
 echo.
 echo You can now run: scripts\prepare_and_start_ngrok.bat
 echo.
+echo Press any key to close this window...
+pause >nul
 
 endlocal
 exit /b 0
+

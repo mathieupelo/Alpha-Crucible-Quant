@@ -30,6 +30,8 @@ async def get_backtest_nav(
 ):
     """Get NAV data for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:

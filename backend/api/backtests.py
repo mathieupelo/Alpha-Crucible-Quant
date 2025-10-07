@@ -138,6 +138,8 @@ async def get_backtests(
 ):
     """Get all backtests with pagination."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         result = db_service.get_all_backtests(page=page, size=size)
         return BacktestListResponse(**result)
     except Exception as e:
@@ -149,6 +151,8 @@ async def get_backtests(
 async def get_backtest(run_id: str):
     """Get specific backtest by run ID."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
             raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
@@ -164,6 +168,8 @@ async def get_backtest(run_id: str):
 async def get_backtest_metrics(run_id: str):
     """Get performance metrics for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
@@ -185,6 +191,8 @@ async def get_backtest_metrics(run_id: str):
 async def get_backtest_portfolios(run_id: str):
     """Get all portfolios for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         portfolios = db_service.get_backtest_portfolios(run_id)
         return {
             "portfolios": portfolios,
@@ -206,6 +214,8 @@ async def get_backtest_signals(
 ):
     """Get raw signals for a backtest period."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
@@ -234,6 +244,8 @@ async def get_backtest_scores(
 ):
     """Get combined scores for a backtest period."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:

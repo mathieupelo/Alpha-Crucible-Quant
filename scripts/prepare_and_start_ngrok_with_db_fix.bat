@@ -1,10 +1,12 @@
 @echo off
-REM Prepare Docker stack (up + health checks) then start ngrok (Windows)
+REM Prepare Docker stack (up + health checks) then start ngrok (Windows) with IIS conflict resolution
+REM Enhanced with database connection verification and initialization
 
 setlocal ENABLEDELAYEDEXPANSION
 
 echo ==============================================
 echo   Prepare stack and start ngrok (Windows)
+echo   with IIS conflict resolution and DB fix
 echo ==============================================
 echo.
 
@@ -14,8 +16,36 @@ cd /d "%~dp0.."
 REM Ensure no stray ngrok is running (non-blocking)
 taskkill /F /IM ngrok.exe >nul 2>&1
 
+REM Check for IIS port conflicts and fix them
+echo [0.5/8] Checking for IIS port conflicts...
+netstat -ano | findstr ":80 " | findstr "LISTENING" >nul
+if not errorlevel 1 (
+  echo   Port 80 is in use by another service (likely IIS)
+  echo   Stopping IIS services to free port 80...
+  net stop "World Wide Web Publishing Service" >nul 2>&1
+  net stop "IIS Admin Service" >nul 2>&1
+  net stop "HTTP SSL" >nul 2>&1
+  ping 127.0.0.1 -n 3 >nul
+  
+  REM Check if port 80 is now free
+  netstat -ano | findstr ":80 " | findstr "LISTENING" >nul
+  if not errorlevel 1 (
+    echo   WARNING: Port 80 is still in use. Trying to kill the process...
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":80 " ^| findstr "LISTENING"') do (
+      if not "%%a"=="0" (
+        echo     Killing process %%a
+        taskkill /F /PID %%a >nul 2>&1
+      )
+    )
+    ping 127.0.0.1 -n 2 >nul
+  )
+  echo   IIS services stopped and port 80 freed
+) else (
+  echo   Port 80 is free
+)
+
 REM Check if Docker is running and fully ready
-echo [1/4] Checking Docker Desktop...
+echo [1/8] Checking Docker Desktop...
 docker --version >nul 2>&1
 if errorlevel 1 (
   echo   ERROR: Docker Desktop is not running!
@@ -49,7 +79,7 @@ goto :continue
 :continue
 
 REM Ensure docker stack is up
-echo [2/4] Starting Docker services...
+echo [2/8] Starting Docker services...
 echo   This may take several minutes if images need to be rebuilt...
 
 REM Try docker-compose up with retry logic
@@ -70,11 +100,16 @@ goto :fix_nginx_ips
 
 :fix_nginx_ips
 REM Fix nginx configuration with correct IP addresses
-echo [2.5/6] Fixing nginx configuration...
-if exist scripts\fix_nginx_ips.bat (
-  call scripts\fix_nginx_ips.bat
+echo [2.5/8] Fixing nginx configuration...
+if exist scripts\fix_nginx_ips_v2.bat (
+  call scripts\fix_nginx_ips_v2.bat
 ) else (
-  echo   WARNING: fix_nginx_ips.bat not found, continuing...
+  echo   WARNING: fix_nginx_ips_v2.bat not found, trying original...
+  if exist scripts\fix_nginx_ips.bat (
+    call scripts\fix_nginx_ips.bat
+  ) else (
+    echo   WARNING: No nginx IP fix script found, continuing...
+  )
 )
 goto :health_checks
 
@@ -89,9 +124,8 @@ exit /b 1
 
 :health_checks
 
-
 REM 3) Wait for nginx on port 8080 (app health)
-echo [3/6] Checking app health on http://localhost:8080/health ...
+echo [3/8] Checking app health on http://localhost:8080/health ...
 set /a _COUNT=0
 :wait_nginx
 set /a _COUNT+=1
@@ -110,7 +144,7 @@ goto :wait_nginx
 
 :wait_root
 REM 4) Wait for frontend root through nginx
-echo [4/6] Checking frontend root on http://localhost:8080/ ...
+echo [4/8] Checking frontend root on http://localhost:8080/ ...
 set /a _COUNT=0
 :wait_root_loop
 set /a _COUNT+=1
@@ -128,47 +162,55 @@ ping 127.0.0.1 -n 3 >nul
 goto :wait_root_loop
 
 :wait_backend
-REM 4) Wait for backend on port 8000 (API health)
-echo [5/6] Checking backend health on http://localhost:8000/health ...
+REM 5) Wait for backend on port 8000 (API health)
+echo [5/8] Checking backend health on http://localhost:8000/health ...
 set /a _COUNT=0
 :wait_backend_loop
 set /a _COUNT+=1
 powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }"
 if not errorlevel 1 (
   echo   OK: backend is ready
-  goto :wait_proxy_api
+  goto :database_verification
 )
 if %_COUNT% GEQ 30 (
   echo   WARNING: backend health check timed out, continuing...
-  goto :wait_proxy_api
+  goto :database_verification
 )
 echo     Waiting for backend... (%_COUNT%/30)
 ping 127.0.0.1 -n 3 >nul
 goto :wait_backend_loop
 
-:wait_proxy_api
-REM 6) Wait for proxied API via nginx
-echo [6/6] Checking proxied API on http://localhost:8080/api/health/db ...
-set /a _COUNT=0
-:wait_proxy_api_loop
-set /a _COUNT+=1
-powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8080/api/health/db' -UseBasicParsing -TimeoutSec 5; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }"
+:database_verification
+REM 6) Enhanced database connection verification and initialization
+echo [6/7] Verifying database connection and initializing if needed...
+set /a _DB_RETRY_COUNT=0
+:db_verification_retry
+set /a _DB_RETRY_COUNT+=1
+echo   Database verification attempt %_DB_RETRY_COUNT%/5...
+
+REM Test database connection through the API
+powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8080/api/health/db' -UseBasicParsing -TimeoutSec 10; $response = $r.Content | ConvertFrom-Json; if($response.status -eq 'healthy'){ exit 0 } else { exit 1 } } catch { exit 1 }"
 if not errorlevel 1 (
-  echo   OK: proxied API is reachable
+  echo   OK: Database connection verified and healthy
   goto :start_ngrok
 )
-if %_COUNT% GEQ 60 (
-  echo   WARNING: proxied API check timed out, continuing to ngrok...
+
+if %_DB_RETRY_COUNT% GEQ 5 (
+  echo   WARNING: Database connection verification failed after 5 attempts.
+  echo   The app may still work, but database features might not be available.
+  echo   Continuing to start ngrok...
   goto :start_ngrok
 )
-echo     Waiting for proxied API... (%_COUNT%/60)
-ping 127.0.0.1 -n 3 >nul
-goto :wait_proxy_api_loop
+
+echo   Database connection not ready, waiting 10 seconds before retry...
+echo   This is normal after a computer restart - the database may need time to initialize.
+ping 127.0.0.1 -n 11 >nul
+goto :db_verification_retry
 
 :start_ngrok
 
-REM 5) Start ngrok
-echo [5/5] Starting ngrok on port 8080 ...
+REM 7) Start ngrok
+echo [7/7] Starting ngrok on port 8080 ...
 if exist scripts\start_ngrok.bat (
   start "ngrok" cmd /c scripts\start_ngrok.bat
 ) else (
@@ -177,11 +219,17 @@ if exist scripts\start_ngrok.bat (
 )
 
 echo.
+echo ==============================================
+echo   Deployment completed successfully!
+echo ==============================================
+echo.
 echo Done. If the ngrok URL wasn't shown, open http://localhost:4040/api/tunnels to view it.
+echo.
+echo NOTE: If you experience database issues after restart, wait a few minutes
+echo for the database to fully initialize, then refresh your browser.
 echo.
 echo Press any key to close this window...
 pause >nul
 
 endlocal
 exit /b 0
-

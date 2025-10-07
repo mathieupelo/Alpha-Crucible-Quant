@@ -31,6 +31,14 @@ class DatabaseManager:
                  database: Optional[str] = None, database_url: Optional[str] = None):
         """Initialize database manager with connection parameters."""
         self.database_url = database_url or os.getenv('DATABASE_URL')
+        # Ensure sslmode=require exactly once when using DATABASE_URL (Supabase requires SSL)
+        if self.database_url:
+            url_lower = self.database_url.lower()
+            has_query = '?' in self.database_url
+            has_ssl = 'sslmode=' in url_lower
+            if not has_ssl:
+                separator = '&' if has_query else '?'
+                self.database_url = f"{self.database_url}{separator}sslmode=require"
         self.host = host or os.getenv('DB_HOST', '127.0.0.1')
         self.port = port or int(os.getenv('DB_PORT', '5432'))
         self.user = user or os.getenv('DB_USER', 'postgres')
@@ -41,9 +49,18 @@ class DatabaseManager:
     def connect(self) -> bool:
         """Establish connection to the database."""
         try:
+            # Connection hardening for Supabase (and remote Postgres)
+            common_kwargs = {
+                "connect_timeout": 10,
+                # Enable TCP keepalives so idle connections don't die silently
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+            }
             if self.database_url:
                 # Use DATABASE_URL if available (for Supabase)
-                self._connection = psycopg2.connect(self.database_url)
+                self._connection = psycopg2.connect(self.database_url, **common_kwargs)
             else:
                 # Use individual connection parameters
                 self._connection = psycopg2.connect(
@@ -51,7 +68,9 @@ class DatabaseManager:
                     port=self.port,
                     user=self.user,
                     password=self.password,
-                    database=self.database
+                    database=self.database,
+                    sslmode="require",
+                    **common_kwargs
                 )
             
             if self._connection:
@@ -98,7 +117,21 @@ class DatabaseManager:
             
             return pd.DataFrame(results)
         except Exception as e:
-            logger.error(f"Database error in execute_query: {e}")
+            # Handle intermittent SSL EOF / network blips by one-time reconnect and retry
+            err_msg = str(e)
+            logger.error(f"Database error in execute_query: {err_msg}")
+            if "SSL SYSCALL error: EOF detected" in err_msg or "server closed the connection unexpectedly" in err_msg:
+                try:
+                    logger.info("Attempting to reconnect and retry query after connection drop")
+                    self.disconnect()
+                    if self.connect():
+                        cursor = self._connection.cursor(cursor_factory=RealDictCursor)
+                        cursor.execute(query, params)
+                        results = cursor.fetchall()
+                        cursor.close()
+                        return pd.DataFrame(results) if results else pd.DataFrame()
+                except Exception as e2:
+                    logger.error(f"Retry after reconnect failed: {e2}")
             return pd.DataFrame()
     
     def execute_insert(self, query: str, params: Optional[tuple] = None) -> int:

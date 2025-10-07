@@ -36,6 +36,8 @@ ticker_validator = TickerValidationService(
 async def get_universes():
     """Get all universes."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universes = db_service.get_all_universes()
         return UniverseListResponse(
             universes=[UniverseResponse(**universe) for universe in universes],
@@ -50,6 +52,8 @@ async def get_universes():
 async def get_universe(universe_id: int):
     """Get a specific universe by ID."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
@@ -65,6 +69,8 @@ async def get_universe(universe_id: int):
 async def create_universe(request: UniverseCreateRequest):
     """Create a new universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universe = db_service.create_universe(
             name=request.name,
             description=request.description
@@ -81,6 +87,8 @@ async def create_universe(request: UniverseCreateRequest):
 async def update_universe(universe_id: int, request: UniverseUpdateRequest):
     """Update an existing universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universe = db_service.update_universe(
             universe_id=universe_id,
             name=request.name,
@@ -102,6 +110,8 @@ async def update_universe(universe_id: int, request: UniverseUpdateRequest):
 async def delete_universe(universe_id: int):
     """Delete a universe and all its tickers."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         success = db_service.delete_universe(universe_id)
         if not success:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
@@ -117,6 +127,8 @@ async def delete_universe(universe_id: int):
 async def get_universe_tickers(universe_id: int):
     """Get all tickers for a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if universe exists
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
@@ -139,6 +151,8 @@ async def get_universe_tickers(universe_id: int):
 async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdateRequest):
     """Update all tickers for a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if universe exists
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
@@ -162,6 +176,8 @@ async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdat
 async def add_universe_ticker(universe_id: int, ticker: str = Query(..., description="Ticker symbol to add")):
     """Add a single ticker to a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         ticker_data = db_service.add_universe_ticker(universe_id, ticker)
         return UniverseTickerResponse(**ticker_data)
     except ValueError as e:
@@ -175,6 +191,8 @@ async def add_universe_ticker(universe_id: int, ticker: str = Query(..., descrip
 async def remove_universe_ticker(universe_id: int, ticker: str):
     """Remove a ticker from a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         success = db_service.remove_universe_ticker(universe_id, ticker)
         if not success:
             raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found in universe {universe_id}")

@@ -48,10 +48,10 @@ REM Wait a moment for processes to stop
 ping 127.0.0.1 -n 3 >nul
 
 REM Start Ngrok tunnel
-echo Starting Ngrok tunnel on port 80...
+echo Starting Ngrok tunnel on port 8080...
 echo Your app will be accessible via the public URL shown below.
 echo.
 echo Ngrok is running in the background. Check the URL above.
 echo To stop ngrok, run: scripts\kill_ngrok.bat
 echo.
-ngrok http 80 --log=stdout
+ngrok http 8080 --log=stdout

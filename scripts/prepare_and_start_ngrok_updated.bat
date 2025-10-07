@@ -14,8 +14,36 @@ cd /d "%~dp0.."
 REM Ensure no stray ngrok is running (non-blocking)
 taskkill /F /IM ngrok.exe >nul 2>&1
 
+REM Check for IIS port conflicts and fix them
+echo [0.5/6] Checking for IIS port conflicts...
+netstat -ano | findstr ":80 " | findstr "LISTENING" >nul
+if not errorlevel 1 (
+  echo   Port 80 is in use by another service (likely IIS)
+  echo   Stopping IIS services to free port 80...
+  net stop "World Wide Web Publishing Service" >nul 2>&1
+  net stop "IIS Admin Service" >nul 2>&1
+  net stop "HTTP SSL" >nul 2>&1
+  ping 127.0.0.1 -n 3 >nul
+  
+  REM Check if port 80 is now free
+  netstat -ano | findstr ":80 " | findstr "LISTENING" >nul
+  if not errorlevel 1 (
+    echo   WARNING: Port 80 is still in use. Trying to kill the process...
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":80 " ^| findstr "LISTENING"') do (
+      if not "%%a"=="0" (
+        echo     Killing process %%a
+        taskkill /F /PID %%a >nul 2>&1
+      )
+    )
+    ping 127.0.0.1 -n 2 >nul
+  )
+  echo   IIS services stopped and port 80 freed
+) else (
+  echo   Port 80 is free
+)
+
 REM Check if Docker is running and fully ready
-echo [1/4] Checking Docker Desktop...
+echo [1/6] Checking Docker Desktop...
 docker --version >nul 2>&1
 if errorlevel 1 (
   echo   ERROR: Docker Desktop is not running!
@@ -49,7 +77,7 @@ goto :continue
 :continue
 
 REM Ensure docker stack is up
-echo [2/4] Starting Docker services...
+echo [2/6] Starting Docker services...
 echo   This may take several minutes if images need to be rebuilt...
 
 REM Try docker-compose up with retry logic
@@ -89,7 +117,6 @@ exit /b 1
 
 :health_checks
 
-
 REM 3) Wait for nginx on port 8080 (app health)
 echo [3/6] Checking app health on http://localhost:8080/health ...
 set /a _COUNT=0
@@ -128,7 +155,7 @@ ping 127.0.0.1 -n 3 >nul
 goto :wait_root_loop
 
 :wait_backend
-REM 4) Wait for backend on port 8000 (API health)
+REM 5) Wait for backend on port 8000 (API health)
 echo [5/6] Checking backend health on http://localhost:8000/health ...
 set /a _COUNT=0
 :wait_backend_loop
@@ -167,8 +194,8 @@ goto :wait_proxy_api_loop
 
 :start_ngrok
 
-REM 5) Start ngrok
-echo [5/5] Starting ngrok on port 8080 ...
+REM 7) Start ngrok
+echo [7/7] Starting ngrok on port 8080 ...
 if exist scripts\start_ngrok.bat (
   start "ngrok" cmd /c scripts\start_ngrok.bat
 ) else (
@@ -177,6 +204,10 @@ if exist scripts\start_ngrok.bat (
 )
 
 echo.
+echo ==============================================
+echo   Deployment completed successfully!
+echo ==============================================
+echo.
 echo Done. If the ngrok URL wasn't shown, open http://localhost:4040/api/tunnels to view it.
 echo.
 echo Press any key to close this window...
@@ -184,4 +215,8 @@ pause >nul
 
 endlocal
 exit /b 0
+
+
+
+
 

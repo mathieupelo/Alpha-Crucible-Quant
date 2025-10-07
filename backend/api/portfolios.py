@@ -24,6 +24,8 @@ db_service = DatabaseService()
 async def get_portfolio(portfolio_id: int):
     """Get specific portfolio by ID."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         portfolio = db_service.get_portfolio_details(portfolio_id)
         if portfolio is None:
             raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")
@@ -39,6 +41,8 @@ async def get_portfolio(portfolio_id: int):
 async def get_portfolio_positions(portfolio_id: int):
     """Get all positions for a portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         portfolio = db_service.get_portfolio_details(portfolio_id)
         if portfolio is None:
             raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")
@@ -90,6 +94,8 @@ async def get_portfolio_scores(portfolio_id: int):
 async def get_portfolio_universe_tickers(portfolio_id: int):
     """Get all universe tickers for a portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         portfolio = db_service.get_portfolio_details(portfolio_id)
         if portfolio is None:
             raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")

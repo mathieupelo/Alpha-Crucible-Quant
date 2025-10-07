@@ -31,6 +31,8 @@ async def get_signals(
 ):
     """Get raw signals with optional filtering."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Get signals from database service
         signals = db_service.get_signals_raw(
             tickers=tickers,
@@ -84,6 +86,8 @@ async def get_scores(
 async def get_portfolio_signals(portfolio_id: int):
     """Get signal scores for a specific portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         signals = db_service.get_portfolio_signals(portfolio_id)
         return {
             "signals": signals,
@@ -99,6 +103,8 @@ async def get_portfolio_signals(portfolio_id: int):
 async def get_portfolio_scores(portfolio_id: int):
     """Get combined scores for a specific portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         scores = db_service.get_portfolio_scores(portfolio_id)
         return {
             "scores": scores,

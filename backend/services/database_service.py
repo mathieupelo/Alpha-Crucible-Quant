@@ -41,15 +41,20 @@ class DatabaseService:
     
     def is_connected(self) -> bool:
         """Check if database is connected."""
-        return self._connected
+        if not self._connected:
+            return False
+        # Actually test the connection by calling the database manager's is_connected method
+        return self.db_manager.is_connected()
     
     def ensure_connection(self) -> bool:
         """Ensure database connection is established."""
-        if not self._connected:
+        # Check if we have a valid connection
+        if not self.is_connected():
             try:
                 self._connected = self.db_manager.connect()
             except Exception as e:
                 print(f"Failed to connect to database: {e}")
+                self._connected = False
                 return False
         return self._connected
     

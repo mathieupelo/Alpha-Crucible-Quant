@@ -162,11 +162,11 @@ goto :wait_root_loop
 
 :wait_backend
 REM 5) Wait for backend on port 8000 (API health)
-echo [5/7] Checking backend health on http://localhost:8000/health ...
+echo [5/7] Checking backend health on http://localhost:8000/api/health ...
 set /a _COUNT=0
 :wait_backend_loop
 set /a _COUNT+=1
-powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }"
+powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8000/api/health' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }"
 if not errorlevel 1 (
   echo   OK: backend is ready
   goto :wait_proxy_api

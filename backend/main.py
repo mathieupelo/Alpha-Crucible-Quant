@@ -59,12 +59,12 @@ async def root():
         "status": "running"
     }
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "alpha-crucible-api"}
 
-@app.get("/health/db")
+@app.get("/api/health/db")
 async def health_check_db():
     """Database health check endpoint."""
     try:

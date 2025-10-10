@@ -39,7 +39,7 @@ echo.
 echo Deployment completed!
 echo.
 echo Next steps:
-echo 1. For external access, run: scripts\start_ngrok.bat
+echo 1. For external access, run: scripts\prepare_and_start_ngrok_final.bat
 echo 2. Your app will be available at the Ngrok URL shown
 echo 3. To view logs: docker-compose logs -f
 echo.

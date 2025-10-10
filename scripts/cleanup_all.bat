@@ -72,7 +72,7 @@ echo ==============================================
 echo   Cleanup completed successfully
 echo ==============================================
 echo.
-echo You can now run: scripts\prepare_and_start_ngrok.bat
+echo You can now run: scripts\prepare_and_start_ngrok_final.bat
 echo.
 echo Press any key to close this window...
 pause >nul

@@ -45,6 +45,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import { backtestApi, universeApi, signalApi } from '@/services/api';
 import { BacktestCreateRequest } from '@/types';
+import Logo from '@/components/common/Logo';
 
 interface PreflightResult {
   isValid: boolean;
@@ -336,9 +337,12 @@ const RunBacktest: React.FC = () => {
       <Box>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Run Backtest
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Logo size="medium" showText={false} clickable={true} />
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              Run Backtest
+            </Typography>
+          </Box>
           <Typography variant="body1" color="text.secondary">
             Configure and execute a quantitative trading strategy backtest
           </Typography>

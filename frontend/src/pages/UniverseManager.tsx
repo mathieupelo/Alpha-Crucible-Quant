@@ -33,6 +33,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 
 import { universeApi } from '@/services/api';
 import { Universe, UniverseCreateRequest } from '@/types';
+import Logo from '@/components/common/Logo';
 
 const UniverseManager: React.FC = () => {
   const navigate = useNavigate();
@@ -132,9 +133,12 @@ const UniverseManager: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Universe Manager
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Logo size="medium" showText={false} clickable={true} />
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              Universe Manager
+            </Typography>
+          </Box>
           <Typography variant="body1" color="text.secondary">
             Create and manage universes of tickers for your trading strategies
           </Typography>

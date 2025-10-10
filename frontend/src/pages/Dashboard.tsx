@@ -31,6 +31,7 @@ import { backtestApi, navApi } from '@/services/api';
 import { Backtest } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
+import Logo from '@/components/common/Logo';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -87,9 +88,12 @@ const Dashboard: React.FC = () => {
     <Box>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-          Dashboard
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Logo size="medium" showText={false} clickable={true} />
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+            Dashboard
+          </Typography>
+        </Box>
         <Typography variant="body1" color="text.secondary">
           Monitor and analyze your quantitative trading strategies
         </Typography>

@@ -21,6 +21,7 @@ import {
   TrendingUp as TrendingUpIcon,
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
+import Logo from '@/components/common/Logo';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -69,9 +70,9 @@ const Home: React.FC = () => {
       <Box sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
-            Alpha Crucible Quant
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+            <Logo size="xlarge" showText={true} clickable={false} />
+          </Box>
           <Typography variant="h5" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
             Advanced quantitative trading platform for strategy development, backtesting, and portfolio management
           </Typography>

@@ -18,11 +18,11 @@ import {
   Home as HomeIcon,
   Dashboard as DashboardIcon,
   Group as GroupIcon,
-  Analytics as AnalyticsIcon,
   PlayArrow as PlayArrowIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import Logo from './Logo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -60,24 +60,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       >
         <Toolbar>
           <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-            <AnalyticsIcon sx={{ mr: 2, color: 'primary.main' }} />
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{ 
-                fontWeight: 700,
-                color: 'text.primary',
-                letterSpacing: '-0.025em',
-                cursor: 'pointer',
-              }}
-              onClick={() => navigate('/')}
-            >
-              Alpha Crucible Quant
-            </Typography>
+            <Logo size="medium" showText={true} />
             <Typography
               variant="body2"
               sx={{ 
-                ml: 2,
+                ml: 3,
                 color: 'text.secondary',
                 fontSize: '0.875rem',
               }}
@@ -125,7 +112,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Box
         component="footer"
         sx={{
-          py: 2,
+          py: 3,
           px: 2,
           mt: 'auto',
           backgroundColor: 'background.paper',
@@ -134,14 +121,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }}
       >
         <Container maxWidth="xl">
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            align="center"
-            sx={{ fontSize: '0.875rem' }}
-          >
-            © 2025 Alpha Crucible Quant. Built with React, FastAPI, and Material-UI.
-          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <Logo size="small" showText={true} variant="minimal" clickable={true} />
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              align="center"
+              sx={{ fontSize: '0.875rem' }}
+            >
+              © 2025 Alpha Crucible Quant. Built with React, FastAPI, and Material-UI.
+            </Typography>
+          </Box>
         </Container>
       </Box>
     </Box>

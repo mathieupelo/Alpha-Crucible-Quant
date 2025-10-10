@@ -1,0 +1,10 @@
+My project is a signal-building framework for quantitative investing. It focuses on implementing, scoring, and backtesting sector-specific trading signals, starting with video game and movie industry stocks. The framework generates portfolios on a monthly or weekly basis using signal scores across a defined universe of tickers to evaluate performance and optimize combinations.
+
+The architecture is organized as follows:
+
+Main repository (alpha-crucible-quant): Handles all backend logic such as backtesting, portfolio optimization, combining signal scores, and fetching data from Supabase. It also includes a frontend app for monitoring and control. Everything is Dockerized and deployed through ngrok for now.
+
+Signal repositories (sentiment-signals, sentiment-reddit, etc.): Each one is responsible for calculating and writing signal scores to the database. For example, sentiment-signals focuses on general sentiment data, while sentiment-reddit captures Reddit-based sentiment. More signal modules will be added later.
+
+## If you require any other info before implementing let me know now and Ill provide it ##
+## If you have any questions, ask me now before implementing ##

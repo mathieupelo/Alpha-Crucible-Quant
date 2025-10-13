@@ -42,7 +42,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true', // Bypass ngrok browser warning
-    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || 'dev-key-change-in-production'}`,
+    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || 'my-awesome-key-123'}`,
   },
 });
 

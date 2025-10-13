@@ -35,10 +35,12 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { universeApi } from '@/services/api';
 import { Universe, UniverseCreateRequest, UniverseUpdateRequest } from '@/types';
 import Logo from '@/components/common/Logo';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const UniverseManager: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isDarkMode } = useTheme();
   
   // State for dialogs
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -211,6 +213,16 @@ const UniverseManager: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={() => setCreateDialogOpen(true)}
           size="large"
+          sx={{
+            background: isDarkMode
+              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+              : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+            '&:hover': {
+              background: isDarkMode
+                ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                : 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+            }
+          }}
         >
           Create Universe
         </Button>
@@ -263,7 +275,7 @@ const UniverseManager: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleOpenEditDialog(universe)}
-                          color="primary"
+                          sx={{ color: isDarkMode ? '#10b981' : '#059669' }}
                         >
                           <EditIcon />
                         </IconButton>
@@ -272,7 +284,7 @@ const UniverseManager: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleViewUniverse(universe)}
-                          color="primary"
+                          sx={{ color: isDarkMode ? '#10b981' : '#059669' }}
                         >
                           <ViewIcon />
                         </IconButton>
@@ -294,7 +306,13 @@ const UniverseManager: React.FC = () => {
                     <Chip
                       icon={<GroupIcon />}
                       label={`${universe.ticker_count} tickers`}
-                      color="primary"
+                      sx={{
+                        color: isDarkMode ? '#10b981' : '#059669',
+                        borderColor: isDarkMode ? '#10b981' : '#059669',
+                        '&:hover': {
+                          backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(5, 150, 105, 0.05)',
+                        }
+                      }}
                       variant="outlined"
                       size="small"
                     />
@@ -333,6 +351,16 @@ const UniverseManager: React.FC = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setCreateDialogOpen(true)}
+            sx={{
+              background: isDarkMode
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              '&:hover': {
+                background: isDarkMode
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  : 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+              }
+            }}
           >
             Create Universe
           </Button>
@@ -340,7 +368,25 @@ const UniverseManager: React.FC = () => {
       )}
 
       {/* Create Universe Dialog */}
-      <Dialog open={createDialogOpen} onClose={handleCloseDialogs} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={createDialogOpen} 
+        onClose={handleCloseDialogs} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: isDarkMode
+              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            border: isDarkMode
+              ? '1px solid rgba(148, 163, 184, 0.3)'
+              : '1px solid rgba(148, 163, 184, 0.4)',
+            boxShadow: isDarkMode
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+          }
+        }}
+      >
         <DialogTitle>Create New Universe</DialogTitle>
         <DialogContent>
           {error && (
@@ -377,6 +423,16 @@ const UniverseManager: React.FC = () => {
             onClick={handleCreateUniverse}
             variant="contained"
             disabled={createUniverseMutation.isLoading}
+            sx={{
+              background: isDarkMode
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              '&:hover': {
+                background: isDarkMode
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  : 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+              }
+            }}
           >
             {createUniverseMutation.isLoading ? 'Creating...' : 'Create'}
           </Button>
@@ -384,7 +440,25 @@ const UniverseManager: React.FC = () => {
       </Dialog>
 
       {/* Edit Universe Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleCloseDialogs} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={handleCloseDialogs} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: isDarkMode
+              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            border: isDarkMode
+              ? '1px solid rgba(148, 163, 184, 0.3)'
+              : '1px solid rgba(148, 163, 184, 0.4)',
+            boxShadow: isDarkMode
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+          }
+        }}
+      >
         <DialogTitle>Edit Universe</DialogTitle>
         <DialogContent>
           {error && (
@@ -421,6 +495,16 @@ const UniverseManager: React.FC = () => {
             onClick={handleUpdateUniverse}
             variant="contained"
             disabled={updateUniverseMutation.isLoading}
+            sx={{
+              background: isDarkMode
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              '&:hover': {
+                background: isDarkMode
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  : 'linear-gradient(135deg, #047857 0%, #065f46 100%)',
+              }
+            }}
           >
             {updateUniverseMutation.isLoading ? 'Saving...' : 'Save Changes'}
           </Button>
@@ -428,7 +512,23 @@ const UniverseManager: React.FC = () => {
       </Dialog>
 
       {/* Delete Universe Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCloseDialogs}>
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={handleCloseDialogs}
+        PaperProps={{
+          sx: {
+            background: isDarkMode
+              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            border: isDarkMode
+              ? '1px solid rgba(148, 163, 184, 0.3)'
+              : '1px solid rgba(148, 163, 184, 0.4)',
+            boxShadow: isDarkMode
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+          }
+        }}
+      >
         <DialogTitle>Delete Universe</DialogTitle>
         <DialogContent>
           <Typography>

@@ -283,13 +283,12 @@ const BacktestDetail: React.FC = () => {
             Performance Overview
           </Typography>
           {navLoading ? (
-            <Skeleton variant="rectangular" height={400} />
+            <Skeleton variant="rectangular" height={450} />
           ) : (
             <PerformanceChart
               data={navData?.nav_data || []}
-              height={400}
+              height={450}
               showBenchmark={true}
-              showTrendLine={true}
               backtestStartDate={backtest.start_date}
               backtestEndDate={backtest.end_date}
             />

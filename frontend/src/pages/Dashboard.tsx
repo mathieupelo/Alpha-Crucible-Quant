@@ -18,33 +18,26 @@ import {
   Chip,
   Skeleton,
   Alert,
-  IconButton,
-  Snackbar,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   ShowChart as ShowChartIcon,
   Assessment as AssessmentIcon,
   Speed as SpeedIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery } from 'react-query';
 
 import { backtestApi, navApi } from '@/services/api';
 import { Backtest } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
 import Logo from '@/components/common/Logo';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { isDarkMode } = useTheme();
   const [selectedBacktest, setSelectedBacktest] = useState<string>('');
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({ open: false, message: '', severity: 'success' });
 
   // Fetch backtests
   const {
@@ -85,48 +78,6 @@ const Dashboard: React.FC = () => {
     navigate(`/backtest/${backtest.run_id}`);
   };
 
-  // Delete backtest mutation
-  const deleteBacktestMutation = useMutation(
-    (runId: string) => backtestApi.deleteBacktest(runId),
-    {
-      onSuccess: (data) => {
-        setSnackbar({
-          open: true,
-          message: data.message,
-          severity: 'success'
-        });
-        // Refresh the backtests list
-        queryClient.invalidateQueries('backtests');
-        // Clear selected backtest if it was deleted
-        if (selectedBacktest === data.run_id) {
-          setSelectedBacktest('');
-        }
-      },
-      onError: (error: any) => {
-        setSnackbar({
-          open: true,
-          message: error.response?.data?.detail || error.message || 'Failed to delete backtest',
-          severity: 'error'
-        });
-      },
-    }
-  );
-
-  const handleDeleteBacktest = (backtest: Backtest, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent card click
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the backtest "${backtest.name || backtest.run_id}"?\n\nThis will permanently delete:\n- The backtest configuration\n- All portfolio data\n- All NAV data\n- All associated positions\n\nThis action cannot be undone.`
-    );
-    
-    if (confirmed) {
-      deleteBacktestMutation.mutate(backtest.run_id);
-    }
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   if (backtestsError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -157,12 +108,66 @@ const Dashboard: React.FC = () => {
             Select Backtest
           </Typography>
           <FormControl fullWidth>
-            <InputLabel shrink={!!selectedBacktest}>Choose a backtest to analyze</InputLabel>
+            <InputLabel 
+              shrink={!!selectedBacktest}
+              sx={{
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                '&.Mui-focused': {
+                  color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                }
+              }}
+            >
+              Choose a backtest to analyze
+            </InputLabel>
             <Select
               value={selectedBacktest}
               onChange={(e) => handleBacktestChange(e.target.value)}
               disabled={backtestsLoading}
               label="Choose a backtest to analyze"
+              sx={{
+                '& .MuiSelect-select': {
+                  py: 2,
+                },
+                background: isDarkMode
+                  ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                  : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    background: isDarkMode
+                      ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                      : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                    border: isDarkMode
+                      ? '1px solid rgba(148, 163, 184, 0.3)'
+                      : '1px solid rgba(148, 163, 184, 0.4)',
+                    boxShadow: isDarkMode
+                      ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                      : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                    '& .MuiMenuItem-root': {
+                      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                      '&:hover': {
+                        backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                        '&:hover': {
+                          backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.15)',
+                        },
+                      },
+                    },
+                  },
+                },
+              }}
             >
               {backtestsData?.backtests.map((backtest) => (
                 <MenuItem key={backtest.run_id} value={backtest.run_id}>
@@ -240,12 +245,14 @@ const Dashboard: React.FC = () => {
               Performance Overview
             </Typography>
             {navLoading ? (
-              <Skeleton variant="rectangular" height={400} />
+              <Skeleton variant="rectangular" height={500} />
             ) : (
               <PerformanceChart
                 data={navData?.nav_data || []}
-                height={400}
-                showTrendLine={true}
+                height={500}
+                showBenchmark={true}
+                backtestStartDate={backtestsData?.backtests.find(b => b.run_id === selectedBacktest)?.start_date}
+                backtestEndDate={backtestsData?.backtests.find(b => b.run_id === selectedBacktest)?.end_date}
               />
             )}
           </CardContent>
@@ -272,9 +279,20 @@ const Dashboard: React.FC = () => {
                     sx={{
                       cursor: 'pointer',
                       transition: 'all 0.2s ease-in-out',
+                      background: isDarkMode 
+                        ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                        : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                      border: isDarkMode 
+                        ? '1px solid rgba(148, 163, 184, 0.3)'
+                        : '1px solid rgba(148, 163, 184, 0.4)',
+                      boxShadow: isDarkMode 
+                        ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                        : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
                       '&:hover': {
                         transform: 'translateY(-2px)',
-                        boxShadow: 4,
+                        boxShadow: isDarkMode 
+                          ? '0 12px 40px 0 rgba(0, 0, 0, 0.6), 0 8px 24px 0 rgba(0, 0, 0, 0.5)'
+                          : '0 12px 40px 0 rgba(0, 0, 0, 0.25), 0 8px 24px 0 rgba(0, 0, 0, 0.2)',
                       },
                     }}
                     onClick={() => handleBacktestClick(backtest)}
@@ -284,30 +302,12 @@ const Dashboard: React.FC = () => {
                         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
                           {backtest.name || backtest.run_id}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip 
-                            label={backtest.frequency} 
-                            size="small" 
-                            color="primary" 
-                            variant="outlined"
-                          />
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={(e) => handleDeleteBacktest(backtest, e)}
-                            disabled={deleteBacktestMutation.isLoading}
-                            sx={{
-                              opacity: 0.7,
-                              '&:hover': {
-                                opacity: 1,
-                                backgroundColor: 'error.light',
-                                color: 'white'
-                              }
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
+                        <Chip 
+                          label={backtest.frequency} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
                       </Box>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
                         {backtest.start_date} to {backtest.end_date}
@@ -326,22 +326,6 @@ const Dashboard: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

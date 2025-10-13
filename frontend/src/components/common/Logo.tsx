@@ -6,6 +6,7 @@
 import React from 'react';
 import { Box, BoxProps } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface LogoProps extends Omit<BoxProps, 'onClick'> {
   size?: 'small' | 'medium' | 'large' | 'xlarge';
@@ -23,6 +24,7 @@ const Logo: React.FC<LogoProps> = ({
   ...props
 }) => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
 
   const sizeMap = {
     small: { width: 32, height: 32 },
@@ -65,7 +67,7 @@ const Logo: React.FC<LogoProps> = ({
     <Box sx={logoStyles} onClick={handleClick} {...props}>
       <Box
         component="img"
-        src="/logo/AC logo.png"
+        src={isDarkMode ? "/logo/AC logo.png" : "/logo/AC logo_dark.png"}
         alt="Alpha Crucible Quant Logo"
         sx={imageStyles}
       />
@@ -109,7 +111,7 @@ const Logo: React.FC<LogoProps> = ({
             letterSpacing: '-0.025em',
           }}
         >
-          AC Quant
+          Quant
         </Box>
       )}
     </Box>

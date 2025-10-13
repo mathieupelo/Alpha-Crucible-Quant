@@ -4,7 +4,6 @@ Database Service
 Service layer for database operations and data processing.
 """
 
-import sys
 import os
 import json
 from pathlib import Path
@@ -12,9 +11,6 @@ from typing import List, Optional, Dict, Any
 from datetime import date, datetime
 import pandas as pd
 import logging
-
-# Add src to path to import existing modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 from src.database import DatabaseManager
 from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
@@ -36,7 +32,7 @@ class DatabaseService:
         try:
             self._connected = self.db_manager.connect()
         except Exception as e:
-            print(f"Warning: Database connection failed at initialization: {e}")
+            logger.warning(f"Database connection failed at initialization: {e}")
             self._connected = False
     
     def is_connected(self) -> bool:
@@ -53,7 +49,7 @@ class DatabaseService:
             try:
                 self._connected = self.db_manager.connect()
             except Exception as e:
-                print(f"Failed to connect to database: {e}")
+                logger.error(f"Failed to connect to database: {e}")
                 self._connected = False
                 return False
         return self._connected

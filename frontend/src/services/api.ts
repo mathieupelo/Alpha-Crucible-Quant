@@ -29,6 +29,10 @@ const getBaseURL = () => {
   if (window.location.hostname.includes('ngrok-free.dev')) {
     return `${window.location.protocol}//${window.location.hostname}/api`;
   }
+  // Use relative URL to go through nginx proxy when accessing via localhost:8080
+  if (window.location.port === '8080' || window.location.hostname === 'localhost') {
+    return '/api';
+  }
   return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 };
 
@@ -38,6 +42,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true', // Bypass ngrok browser warning
+    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || 'dev-key-change-in-production'}`,
   },
 });
 

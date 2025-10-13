@@ -82,7 +82,7 @@ class DatabaseManager:
             return False
         return False
     
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Close database connection."""
         if self._connection and not self._connection.closed:
             self._connection.close()
@@ -92,7 +92,7 @@ class DatabaseManager:
         """Check if database connection is active."""
         return self._connection and not self._connection.closed
     
-    def ensure_connection(self):
+    def ensure_connection(self) -> None:
         """Ensure database connection is active, reconnect if necessary."""
         if not self.is_connected():
             if not self.connect():
@@ -800,11 +800,11 @@ class DatabaseManager:
         query = f"DESCRIBE {table_name}"
         return self.execute_query(query)
     
-    def __enter__(self):
+    def __enter__(self) -> 'DatabaseManager':
         """Context manager entry."""
         self.connect()
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[object]) -> None:
         """Context manager exit."""
         self.disconnect()

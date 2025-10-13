@@ -48,6 +48,7 @@ This system is part of a two-repository architecture:
 - Docker and Docker Compose
 - Node.js 18+ (for development)
 - Python 3.11+ (for development)
+- PostgreSQL database (Supabase recommended)
 
 ### **Option 1: Docker Deployment (Recommended)**
 
@@ -67,6 +68,7 @@ docker-compose up -d
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/api/docs
+# Nginx Proxy: http://localhost:8080
 ```
 
 ### **Option 2: Development Setup**

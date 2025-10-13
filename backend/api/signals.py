@@ -10,9 +10,6 @@ from datetime import date
 import logging
 
 from models import SignalResponse, ScoreResponse, ErrorResponse
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)

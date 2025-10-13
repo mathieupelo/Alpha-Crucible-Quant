@@ -124,7 +124,7 @@ class BacktestConfig:
         """
         if database_manager is None:
             # Import here to avoid circular imports
-            from database import DatabaseManager
+            from src.database import DatabaseManager
             database_manager = DatabaseManager()
         
         # Check if universe exists

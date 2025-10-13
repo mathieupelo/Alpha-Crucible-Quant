@@ -14,6 +14,7 @@ services:
       - DB_NAME=${DB_NAME}
       - PYTHONPATH=${PYTHONPATH}
       - NODE_ENV=${NODE_ENV}
+      - API_KEY=${API_KEY}
     ports:
       - "8000:8000"
     networks:
@@ -34,9 +35,11 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         - VITE_API_URL=${API_BASE_URL}/api
+        - VITE_API_KEY=${API_KEY}
     container_name: alpha-crucible-frontend
     environment:
       - NODE_ENV=${NODE_ENV}
+      - VITE_API_KEY=${API_KEY}
     ports:
       - "3000:3000"
     depends_on:

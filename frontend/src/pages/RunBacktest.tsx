@@ -227,16 +227,32 @@ const RunBacktest: React.FC = () => {
         errors.push(`Invalid tickers found: ${invalidTickers.map(t => t.ticker).join(', ')}`);
       }
 
-      // 4. Generate rebalancing dates (simplified - would need proper trading calendar logic)
+      // 4. Generate rebalancing dates based on selected frequency
       if (formData.start_date && formData.end_date) {
         const startDate = new Date(formData.start_date);
         const endDate = new Date(formData.end_date);
+        const frequency = formData.rebalancing_frequency || 'monthly';
         
-        // Simple monthly rebalancing for now
         const current = new Date(startDate);
-        while (current <= endDate) {
-          rebalancingDates.push(current.toISOString().split('T')[0]);
-          current.setMonth(current.getMonth() + 1);
+        
+        if (frequency === 'weekly') {
+          // Weekly rebalancing - every 7 days
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 7);
+          }
+        } else if (frequency === 'monthly') {
+          // Monthly rebalancing - first day of each month
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setMonth(current.getMonth() + 1);
+          }
+        } else if (frequency === 'quarterly') {
+          // Quarterly rebalancing - every 3 months
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setMonth(current.getMonth() + 3);
+          }
         }
       }
 

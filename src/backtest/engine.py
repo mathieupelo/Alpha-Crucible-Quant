@@ -271,7 +271,7 @@ class BacktestEngine:
     
     def _get_rebalancing_dates(self, config: BacktestConfig) -> List[date]:
         """
-        Get rebalancing dates (first trading day of each month) between start and end dates.
+        Get rebalancing dates based on frequency between start and end dates.
         
         Args:
             config: Backtesting configuration
@@ -279,7 +279,9 @@ class BacktestEngine:
         Returns:
             List of rebalancing dates
         """
-        return self.trading_calendar.get_rebalancing_dates(config.start_date, config.end_date)
+        return self.trading_calendar.get_rebalancing_dates(
+            config.start_date, config.end_date, config.rebalancing_frequency
+        )
     
     def _fetch_signal_scores(self, tickers: List[str], signals: List[str], 
                            rebalancing_dates: List[date], config: BacktestConfig) -> pd.DataFrame:
@@ -534,8 +536,10 @@ class BacktestEngine:
         logger.info(f"Found {len(trading_days)} trading days")
         
         # Get rebalancing dates
-        rebalancing_dates = self.trading_calendar.get_rebalancing_dates(config.start_date, config.end_date)
-        logger.info(f"Found {len(rebalancing_dates)} rebalancing dates")
+        rebalancing_dates = self.trading_calendar.get_rebalancing_dates(
+            config.start_date, config.end_date, config.rebalancing_frequency
+        )
+        logger.info(f"Found {len(rebalancing_dates)} rebalancing dates for {config.rebalancing_frequency} frequency")
         
         # Ensure signal scores exist for all rebalancing dates
         rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(

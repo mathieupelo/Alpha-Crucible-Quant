@@ -246,43 +246,93 @@ class TradingCalendar:
         first_day = date(year, month, 1)
         return self.get_next_trading_day(first_day - timedelta(days=1))
     
-    def get_rebalancing_dates(self, start_date: date, end_date: date) -> List[date]:
+    def get_rebalancing_dates(self, start_date: date, end_date: date, frequency: str = 'monthly') -> List[date]:
         """
-        Get rebalancing dates (first trading day of each month) between start and end dates.
+        Get rebalancing dates based on frequency between start and end dates.
         
         Args:
             start_date: Start date
             end_date: End date
+            frequency: Rebalancing frequency ('daily', 'weekly', 'monthly', 'quarterly')
             
         Returns:
             List of rebalancing dates
         """
         rebalancing_dates = []
-        current_date = start_date
         
-        # Get the first trading day of the start month
-        first_rebalance = self.get_first_trading_day_of_month(start_date.year, start_date.month)
-        if first_rebalance >= start_date:
-            rebalancing_dates.append(first_rebalance)
+        if frequency == 'daily':
+            # Daily rebalancing - every trading day
+            return self.get_trading_days(start_date, end_date)
         
-        # Add first trading day of each subsequent month
-        current_month = start_date.month
-        current_year = start_date.year
+        elif frequency == 'weekly':
+            # Weekly rebalancing - every 7 days, adjusted to trading days
+            current_date = start_date
+            while current_date <= end_date:
+                if self.is_trading_day(current_date):
+                    rebalancing_dates.append(current_date)
+                current_date += timedelta(days=7)
         
-        while True:
-            # Move to next month
-            if current_month == 12:
-                current_month = 1
-                current_year += 1
-            else:
-                current_month += 1
+        elif frequency == 'monthly':
+            # Monthly rebalancing - first trading day of each month
+            current_date = start_date
             
-            rebalance_date = self.get_first_trading_day_of_month(current_year, current_month)
+            # Get the first trading day of the start month
+            first_rebalance = self.get_first_trading_day_of_month(start_date.year, start_date.month)
+            if first_rebalance >= start_date:
+                rebalancing_dates.append(first_rebalance)
             
-            if rebalance_date > end_date:
-                break
+            # Add first trading day of each subsequent month
+            current_month = start_date.month
+            current_year = start_date.year
             
-            rebalancing_dates.append(rebalance_date)
+            while True:
+                # Move to next month
+                if current_month == 12:
+                    current_month = 1
+                    current_year += 1
+                else:
+                    current_month += 1
+                
+                rebalance_date = self.get_first_trading_day_of_month(current_year, current_month)
+                
+                if rebalance_date > end_date:
+                    break
+                
+                rebalancing_dates.append(rebalance_date)
+        
+        elif frequency == 'quarterly':
+            # Quarterly rebalancing - first trading day of each quarter
+            current_date = start_date
+            
+            # Get the first trading day of the start quarter
+            start_quarter = ((start_date.month - 1) // 3) + 1
+            start_quarter_month = (start_quarter - 1) * 3 + 1
+            first_rebalance = self.get_first_trading_day_of_month(start_date.year, start_quarter_month)
+            if first_rebalance >= start_date:
+                rebalancing_dates.append(first_rebalance)
+            
+            # Add first trading day of each subsequent quarter
+            current_quarter = start_quarter
+            current_year = start_date.year
+            
+            while True:
+                # Move to next quarter
+                if current_quarter == 4:
+                    current_quarter = 1
+                    current_year += 1
+                else:
+                    current_quarter += 1
+                
+                quarter_month = (current_quarter - 1) * 3 + 1
+                rebalance_date = self.get_first_trading_day_of_month(current_year, quarter_month)
+                
+                if rebalance_date > end_date:
+                    break
+                
+                rebalancing_dates.append(rebalance_date)
+        
+        else:
+            raise ValueError(f"Unknown rebalancing frequency: {frequency}")
         
         return rebalancing_dates
     

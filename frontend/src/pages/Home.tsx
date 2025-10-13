@@ -34,10 +34,10 @@ const Home: React.FC = () => {
 
   const navigationCards = [
     {
-      title: 'Dashboard',
+      title: 'Backtest Manager',
       description: 'View and analyze your quantitative trading strategies',
       icon: <AnalyticsIcon sx={{ fontSize: 48 }} />,
-      path: '/dashboard',
+      path: '/backtest',
       color: 'primary' as const,
       features: ['Performance Metrics', 'Portfolio Analysis', 'Risk Assessment'],
       gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'

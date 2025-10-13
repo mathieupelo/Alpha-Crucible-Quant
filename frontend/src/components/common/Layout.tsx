@@ -40,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navigationItems = [
     { path: '/', label: 'Home', icon: <HomeIcon /> },
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
+    { path: '/backtest', label: 'Backtest Manager', icon: <DashboardIcon /> },
     { path: '/run-backtest', label: 'Run Backtest', icon: <PlayArrowIcon /> },
     { path: '/universes', label: 'Universes', icon: <GroupIcon /> },
   ];

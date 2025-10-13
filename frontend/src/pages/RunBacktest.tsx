@@ -340,7 +340,7 @@ const RunBacktest: React.FC = () => {
 
   const handleViewResults = () => {
     if (runResult?.runId) {
-      navigate(`/backtest/${runResult.runId}`);
+      navigate(`/backtest?id=${runResult.runId}`);
     }
   };
 
@@ -863,7 +863,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                   disabled={isValidating}
                 >
                   Cancel
@@ -968,7 +968,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                 >
                   Cancel
                 </Button>
@@ -1041,7 +1041,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                 >
                   Back to Dashboard
                 </Button>

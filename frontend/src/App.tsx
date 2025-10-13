@@ -10,8 +10,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
 
 import Home from '@/pages/Home';
-import Dashboard from '@/pages/Dashboard';
-import BacktestDetail from '@/pages/BacktestDetail';
+import BacktestManager from '@/pages/BacktestManager';
 import UniverseManager from '@/pages/UniverseManager';
 import UniverseDetail from '@/pages/UniverseDetail';
 import RunBacktest from '@/pages/RunBacktest';
@@ -220,6 +219,36 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
           backgroundAttachment: 'fixed',
           minHeight: '100vh',
         },
+        '*': {
+          '&::-webkit-scrollbar': {
+            width: '8px',
+            height: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: isDarkMode ? '#1e293b' : '#f1f5f9',
+            borderRadius: '4px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
+              : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
+            borderRadius: '4px',
+            border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
+            '&:hover': {
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)'
+                : 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)',
+            },
+          },
+          '&::-webkit-scrollbar-corner': {
+            background: isDarkMode ? '#1e293b' : '#f1f5f9',
+          },
+          // Firefox scrollbar styling
+          scrollbarWidth: 'thin',
+          scrollbarColor: isDarkMode 
+            ? '#64748b #1e293b' 
+            : '#94a3b8 #f1f5f9',
+        },
       },
     },
     MuiCard: {
@@ -341,8 +370,7 @@ const App: React.FC = () => {
             <Layout>
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/backtest/:runId" element={<BacktestDetail />} />
+                <Route path="/backtest" element={<BacktestManager />} />
                 <Route path="/run-backtest" element={<RunBacktest />} />
                 <Route path="/universes" element={<UniverseManager />} />
                 <Route path="/universes/:id" element={<UniverseDetail />} />

@@ -733,6 +733,56 @@ class DatabaseService:
             logger.error(f"Error getting raw signals: {e}")
             raise
     
+    def delete_backtest(self, run_id: str) -> bool:
+        """Delete a backtest and all associated data."""
+        try:
+            # Check if backtest exists
+            backtest = self.get_backtest_by_run_id(run_id)
+            if backtest is None:
+                logger.warning(f"Backtest {run_id} not found for deletion")
+                return False
+            
+            # Delete in order to respect foreign key constraints:
+            # 1. Portfolio positions (references portfolios)
+            # 2. Portfolios (references backtests via run_id)
+            # 3. Backtest NAV data (references backtests via run_id)
+            # 4. Backtest itself
+            
+            # Delete portfolio positions for all portfolios of this backtest
+            portfolios = self.get_backtest_portfolios(run_id)
+            for portfolio in portfolios:
+                portfolio_id = portfolio.get('id')
+                if portfolio_id:
+                    self.db_manager.execute_query(
+                        "DELETE FROM portfolio_positions WHERE portfolio_id = %s",
+                        (portfolio_id,)
+                    )
+            
+            # Delete portfolios for this backtest
+            self.db_manager.execute_query(
+                "DELETE FROM portfolios WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            # Delete NAV data for this backtest
+            self.db_manager.execute_query(
+                "DELETE FROM backtest_nav WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            # Delete the backtest itself
+            self.db_manager.execute_query(
+                "DELETE FROM backtests WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            logger.info(f"Successfully deleted backtest {run_id} and all associated data")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting backtest {run_id}: {e}")
+            return False
+    
     def close(self):
         """Close database connection."""
         if self.db_manager:

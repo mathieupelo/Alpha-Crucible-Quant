@@ -277,3 +277,31 @@ async def get_backtest_scores(
         logger.error(f"Error getting scores for {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.delete("/backtests/{run_id}")
+async def delete_backtest(run_id: str):
+    """Delete a backtest and all associated data."""
+    try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        # Check if backtest exists
+        backtest = db_service.get_backtest_by_run_id(run_id)
+        if backtest is None:
+            raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
+        
+        # Delete the backtest and all associated data
+        success = db_service.delete_backtest(run_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete backtest")
+        
+        return {
+            "message": f"Backtest {run_id} and all associated data deleted successfully",
+            "run_id": run_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backtest {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

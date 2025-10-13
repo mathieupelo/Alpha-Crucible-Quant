@@ -21,6 +21,7 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
+  Snackbar,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -29,8 +30,9 @@ import {
   Assessment as AssessmentIcon,
   Speed as SpeedIcon,
   ShowChart as ShowChartIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation } from 'react-query';
 
 import { backtestApi, navApi } from '@/services/api';
 import { Portfolio } from '@/types';
@@ -42,6 +44,11 @@ const BacktestDetail: React.FC = () => {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
 
   // Fetch backtest details
   const {
@@ -102,6 +109,47 @@ const BacktestDetail: React.FC = () => {
     navigate('/');
   };
 
+  // Delete backtest mutation
+  const deleteBacktestMutation = useMutation(
+    (runId: string) => backtestApi.deleteBacktest(runId),
+    {
+      onSuccess: (data) => {
+        setSnackbar({
+          open: true,
+          message: data.message,
+          severity: 'success'
+        });
+        // Redirect to dashboard after successful deletion
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.detail || error.message || 'Failed to delete backtest',
+          severity: 'error'
+        });
+      },
+    }
+  );
+
+  const handleDeleteBacktest = () => {
+    if (!backtest) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the backtest "${backtest.name || backtest.run_id}"?\n\nThis will permanently delete:\n- The backtest configuration\n- All portfolio data\n- All NAV data\n- All associated positions\n\nThis action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      deleteBacktestMutation.mutate(backtest.run_id);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
   if (backtestError || metricsError || portfoliosError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -159,12 +207,29 @@ const BacktestDetail: React.FC = () => {
               Universe: {backtest.universe_name || 'Unknown'}
             </Typography>
           </Box>
-          <Chip 
-            label={backtest.frequency} 
-            color="primary" 
-            variant="outlined"
-            size="medium"
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Chip 
+              label={backtest.frequency} 
+              color="primary" 
+              variant="outlined"
+              size="medium"
+            />
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteBacktest}
+              disabled={deleteBacktestMutation.isLoading}
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'error.light',
+                  color: 'white'
+                }
+              }}
+            >
+              Delete Backtest
+            </Button>
+          </Box>
         </Box>
       </Box>
 
@@ -307,6 +372,22 @@ const BacktestDetail: React.FC = () => {
           onClose={() => setSelectedPortfolio(null)}
         />
       )}
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

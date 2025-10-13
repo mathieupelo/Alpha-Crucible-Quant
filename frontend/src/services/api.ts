@@ -127,6 +127,12 @@ export const backtestApi = {
   checkBacktestName: async (name: string): Promise<{ name: string; exists: boolean; available: boolean }> => {
     const response = await api.get(`/backtests/check-name?name=${encodeURIComponent(name)}`);
     return response.data;
+  },
+
+  // Delete backtest
+  deleteBacktest: async (runId: string): Promise<{ message: string; run_id: string }> => {
+    const response = await api.delete(`/backtests/${runId}`);
+    return response.data;
   }
 };
 

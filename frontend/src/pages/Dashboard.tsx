@@ -18,14 +18,17 @@ import {
   Chip,
   Skeleton,
   Alert,
+  IconButton,
+  Snackbar,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   ShowChart as ShowChartIcon,
   Assessment as AssessmentIcon,
   Speed as SpeedIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 
 import { backtestApi, navApi } from '@/services/api';
 import { Backtest } from '@/types';
@@ -35,7 +38,13 @@ import Logo from '@/components/common/Logo';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedBacktest, setSelectedBacktest] = useState<string>('');
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
 
   // Fetch backtests
   const {
@@ -74,6 +83,48 @@ const Dashboard: React.FC = () => {
 
   const handleBacktestClick = (backtest: Backtest) => {
     navigate(`/backtest/${backtest.run_id}`);
+  };
+
+  // Delete backtest mutation
+  const deleteBacktestMutation = useMutation(
+    (runId: string) => backtestApi.deleteBacktest(runId),
+    {
+      onSuccess: (data) => {
+        setSnackbar({
+          open: true,
+          message: data.message,
+          severity: 'success'
+        });
+        // Refresh the backtests list
+        queryClient.invalidateQueries('backtests');
+        // Clear selected backtest if it was deleted
+        if (selectedBacktest === data.run_id) {
+          setSelectedBacktest('');
+        }
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.detail || error.message || 'Failed to delete backtest',
+          severity: 'error'
+        });
+      },
+    }
+  );
+
+  const handleDeleteBacktest = (backtest: Backtest, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent card click
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the backtest "${backtest.name || backtest.run_id}"?\n\nThis will permanently delete:\n- The backtest configuration\n- All portfolio data\n- All NAV data\n- All associated positions\n\nThis action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      deleteBacktestMutation.mutate(backtest.run_id);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   if (backtestsError) {
@@ -233,12 +284,30 @@ const Dashboard: React.FC = () => {
                         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
                           {backtest.name || backtest.run_id}
                         </Typography>
-                        <Chip 
-                          label={backtest.frequency} 
-                          size="small" 
-                          color="primary" 
-                          variant="outlined"
-                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip 
+                            label={backtest.frequency} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => handleDeleteBacktest(backtest, e)}
+                            disabled={deleteBacktestMutation.isLoading}
+                            sx={{
+                              opacity: 0.7,
+                              '&:hover': {
+                                opacity: 1,
+                                backgroundColor: 'error.light',
+                                color: 'white'
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Box>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
                         {backtest.start_date} to {backtest.end_date}
@@ -257,6 +326,22 @@ const Dashboard: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

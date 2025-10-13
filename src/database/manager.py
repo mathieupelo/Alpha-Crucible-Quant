@@ -652,6 +652,54 @@ class DatabaseManager:
         
         return self.execute_insert(query, params)
     
+    def execute_update(self, query: str, params: Optional[tuple] = None) -> int:
+        """Execute an UPDATE query and return the number of affected rows."""
+        try:
+            self.ensure_connection()
+            if not self._connection:
+                logger.error("Database connection is None after ensure_connection")
+                return 0
+            cursor = self._connection.cursor()
+            cursor.execute(query, params)
+            self._connection.commit()
+            return cursor.rowcount
+        except PgError as e:
+            logger.error(f"Error executing update: {e}")
+            if self._connection:
+                self._connection.rollback()
+            raise
+        except Exception as e:
+            logger.error(f"Database error in execute_update: {e}")
+            if self._connection:
+                self._connection.rollback()
+            return 0
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+    
+    def update_universe(self, universe_id: int, name: str, description: Optional[str] = None, 
+                       updated_at: Optional[datetime] = None) -> bool:
+        """Update an existing universe in the database."""
+        query = """
+        UPDATE universes 
+        SET name = %s, description = %s, updated_at = %s
+        WHERE id = %s
+        """
+        
+        params = (
+            name,
+            description,
+            updated_at or datetime.now(),
+            universe_id
+        )
+        
+        try:
+            rows_affected = self.execute_update(query, params)
+            return rows_affected > 0
+        except Exception as e:
+            logger.error(f"Error updating universe {universe_id}: {e}")
+            raise
+    
     def get_universes(self) -> pd.DataFrame:
         """Retrieve all universes from the database."""
         query = "SELECT * FROM universes ORDER BY created_at DESC"

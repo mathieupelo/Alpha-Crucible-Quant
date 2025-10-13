@@ -124,25 +124,32 @@ class BacktestEngine:
                 return result
             
             # Step 4: Create portfolios for all rebalancing dates
+            logger.info("Creating portfolios for rebalancing dates...")
             portfolios_created = self._create_portfolios_for_dates(
                 signal_scores, rebalancing_dates, tickers, config, run_id, result
             )
             if portfolios_created is None:  # Error occurred
+                logger.error("Portfolio creation failed")
                 return result
+            logger.info(f"Created {len(portfolios_created)} portfolios")
             
             # Step 5: Run simulation using created portfolios
+            logger.info("Running simulation with created portfolios...")
             portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation_with_portfolios(
                 portfolios_created, tickers, config
             )
+            logger.info(f"Simulation completed. Portfolio values: {len(portfolio_values)}, Benchmark values: {len(benchmark_values)}")
             
             # Step 6: Insert backtest in database
             self._store_backtest_results(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
             
             # Calculate and store results
+            logger.info("Finalizing backtest results...")
             self._finalize_backtest_results(
                 result, portfolio_values, benchmark_values, weights_history, 
                 first_rebalance_date, rebalancing_dates, start_time, config
             )
+            logger.info("Backtest results finalized successfully")
             
             return result
             
@@ -495,42 +502,9 @@ class BacktestEngine:
                               benchmark_values: pd.Series, weights_history: pd.DataFrame,
                               first_rebalance_date: date):
         """Store backtest results in database."""
-        try:
-            # Store backtest NAV data
-            nav_objects = []
-            for date, portfolio_value in portfolio_values.items():
-                if pd.isna(portfolio_value):
-                    continue
-                    
-                benchmark_value = benchmark_values.get(date, 0.0)
-                if pd.isna(benchmark_value):
-                    benchmark_value = 0.0
-                
-                # Calculate PnL
-                pnl = 0.0
-                if len(portfolio_values) > 1:
-                    prev_date = portfolio_values.index[portfolio_values.index < date]
-                    if len(prev_date) > 0:
-                        prev_date = prev_date[-1]
-                        prev_portfolio_value = portfolio_values.get(prev_date, portfolio_value)
-                        if prev_portfolio_value > 0:
-                            pnl = portfolio_value - prev_portfolio_value
-                
-                nav_obj = BacktestNav(
-                    run_id=result.backtest_id,
-                    date=date,
-                    nav=float(portfolio_value),
-                    benchmark_nav=float(benchmark_value) if benchmark_value > 0 else None,
-                    pnl=float(pnl)
-                )
-                nav_objects.append(nav_obj)
-            
-            if nav_objects:
-                self.database_manager.store_backtest_nav(nav_objects)
-                logger.info(f"Stored {len(nav_objects)} NAV records")
-            
-        except Exception as e:
-            logger.error(f"Error storing backtest results: {e}")
+        # Note: NAV data and portfolio data are stored in _finalize_backtest_results
+        # via _store_portfolio_data to avoid duplication
+        logger.info(f"Backtest results prepared for {result.backtest_id}")
     
     def _prepare_backtest_data(self, tickers: List[str], signals: List[str], 
                              config: BacktestConfig) -> Tuple[List[date], List[date], Optional[pd.DataFrame], pd.DataFrame]:
@@ -1014,8 +988,14 @@ class BacktestEngine:
                 nav_objects.append(nav_obj)
             
             if nav_objects:
-                self.database_manager.store_backtest_nav(nav_objects)
-                logger.info(f"Stored {len(nav_objects)} NAV records")
+                try:
+                    stored_count = self.database_manager.store_backtest_nav(nav_objects)
+                    logger.info(f"Stored {stored_count} NAV records for backtest {result.backtest_id}")
+                except Exception as e:
+                    logger.error(f"Failed to store NAV data for backtest {result.backtest_id}: {e}")
+                    raise
+            else:
+                logger.warning(f"No NAV data to store for backtest {result.backtest_id}")
             
             # Store portfolios and positions
             for date, weights_row in weights_history.iterrows():

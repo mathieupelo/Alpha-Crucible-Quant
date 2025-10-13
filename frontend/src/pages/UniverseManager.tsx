@@ -28,11 +28,12 @@ import {
   Delete as DeleteIcon,
   Visibility as ViewIcon,
   Group as GroupIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 
 import { universeApi } from '@/services/api';
-import { Universe, UniverseCreateRequest } from '@/types';
+import { Universe, UniverseCreateRequest, UniverseUpdateRequest } from '@/types';
 import Logo from '@/components/common/Logo';
 
 const UniverseManager: React.FC = () => {
@@ -41,6 +42,7 @@ const UniverseManager: React.FC = () => {
   
   // State for dialogs
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
   
@@ -48,6 +50,7 @@ const UniverseManager: React.FC = () => {
   const [universeName, setUniverseName] = useState('');
   const [universeDescription, setUniverseDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Fetch universes
   const {
@@ -64,11 +67,31 @@ const UniverseManager: React.FC = () => {
       setUniverseName('');
       setUniverseDescription('');
       setError(null);
+      setSuccessMessage('Universe created successfully!');
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to create universe');
     },
   });
+
+  // Update universe mutation
+  const updateUniverseMutation = useMutation(
+    ({ universeId, request }: { universeId: number; request: UniverseUpdateRequest }) =>
+      universeApi.updateUniverse(universeId, request),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('universes');
+        setEditDialogOpen(false);
+        setUniverseName('');
+        setUniverseDescription('');
+        setError(null);
+        setSuccessMessage('Universe updated successfully!');
+      },
+      onError: (error: any) => {
+        setError(error.response?.data?.detail || 'Failed to update universe');
+      },
+    }
+  );
 
   // Delete universe mutation
   const deleteUniverseMutation = useMutation(universeApi.deleteUniverse, {
@@ -96,6 +119,25 @@ const UniverseManager: React.FC = () => {
     createUniverseMutation.mutate(request);
   };
 
+  const handleUpdateUniverse = () => {
+    if (!selectedUniverse) return;
+    
+    if (!universeName.trim()) {
+      setError('Universe name is required');
+      return;
+    }
+
+    const request: UniverseUpdateRequest = {
+      name: universeName.trim(),
+      description: universeDescription.trim() || undefined,
+    };
+
+    updateUniverseMutation.mutate({
+      universeId: selectedUniverse.id,
+      request
+    });
+  };
+
   const handleDeleteUniverse = () => {
     if (selectedUniverse) {
       deleteUniverseMutation.mutate(selectedUniverse.id);
@@ -106,6 +148,14 @@ const UniverseManager: React.FC = () => {
     navigate(`/universes/${universe.id}`);
   };
 
+  const handleOpenEditDialog = (universe: Universe) => {
+    setSelectedUniverse(universe);
+    setUniverseName(universe.name);
+    setUniverseDescription(universe.description || '');
+    setError(null);
+    setEditDialogOpen(true);
+  };
+
   const handleOpenDeleteDialog = (universe: Universe) => {
     setSelectedUniverse(universe);
     setDeleteDialogOpen(true);
@@ -113,11 +163,13 @@ const UniverseManager: React.FC = () => {
 
   const handleCloseDialogs = () => {
     setCreateDialogOpen(false);
+    setEditDialogOpen(false);
     setDeleteDialogOpen(false);
     setSelectedUniverse(null);
     setUniverseName('');
     setUniverseDescription('');
     setError(null);
+    setSuccessMessage(null);
   };
 
   if (fetchError) {
@@ -130,6 +182,17 @@ const UniverseManager: React.FC = () => {
 
   return (
     <Box>
+      {/* Success Message */}
+      {successMessage && (
+        <Alert 
+          severity="success" 
+          sx={{ mb: 2 }} 
+          onClose={() => setSuccessMessage(null)}
+        >
+          {successMessage}
+        </Alert>
+      )}
+
       {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
@@ -196,6 +259,15 @@ const UniverseManager: React.FC = () => {
                       )}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Tooltip title="Edit Universe">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEditDialog(universe)}
+                          color="primary"
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="View Details">
                         <IconButton
                           size="small"
@@ -307,6 +379,50 @@ const UniverseManager: React.FC = () => {
             disabled={createUniverseMutation.isLoading}
           >
             {createUniverseMutation.isLoading ? 'Creating...' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Universe Dialog */}
+      <Dialog open={editDialogOpen} onClose={handleCloseDialogs} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Universe</DialogTitle>
+        <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Universe Name"
+            fullWidth
+            variant="outlined"
+            value={universeName}
+            onChange={(e) => setUniverseName(e.target.value)}
+            sx={{ mb: 2 }}
+            error={!!error && !universeName.trim()}
+            helperText={error && !universeName.trim() ? 'Universe name is required' : ''}
+          />
+          <TextField
+            margin="dense"
+            label="Description (Optional)"
+            fullWidth
+            multiline
+            rows={3}
+            variant="outlined"
+            value={universeDescription}
+            onChange={(e) => setUniverseDescription(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialogs}>Cancel</Button>
+          <Button
+            onClick={handleUpdateUniverse}
+            variant="contained"
+            disabled={updateUniverseMutation.isLoading}
+          >
+            {updateUniverseMutation.isLoading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>

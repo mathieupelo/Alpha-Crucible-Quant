@@ -149,6 +149,7 @@ class DatabaseService:
             nav_df = self.db_manager.get_backtest_nav(run_id, start_date, end_date)
             
             if nav_df.empty:
+                logger.warning(f"No NAV data found in database for backtest {run_id}")
                 return []
             
             # Transform field names to match Pydantic model
@@ -404,6 +405,7 @@ class DatabaseService:
             # Get NAV data
             nav_data = self.get_backtest_nav(run_id)
             if not nav_data:
+                logger.warning(f"No NAV data found for backtest {run_id}")
                 return None
             
             # Convert to DataFrame for calculations
@@ -571,27 +573,36 @@ class DatabaseService:
                 if existing:
                     raise ValueError(f"Universe '{name}' already exists")
             
-            # Update fields
-            if name:
-                universe.name = name
-            if description is not None:
-                universe.description = description
+            # Use the new name or keep the existing one
+            updated_name = name if name else universe.name
+            updated_description = description if description is not None else universe.description
             
-            universe.updated_at = datetime.now()
+            # Update the universe in the database
+            success = self.db_manager.update_universe(
+                universe_id=universe_id,
+                name=updated_name,
+                description=updated_description,
+                updated_at=datetime.now()
+            )
             
-            # Store updated universe
-            self.db_manager.store_universe(universe)
+            if not success:
+                raise ValueError(f"Failed to update universe {universe_id}")
+            
+            # Get the updated universe
+            updated_universe = self.db_manager.get_universe_by_id(universe_id)
+            if updated_universe is None:
+                raise ValueError(f"Failed to retrieve updated universe {universe_id}")
             
             # Get ticker count
             tickers_df = self.db_manager.get_universe_tickers(universe_id)
             ticker_count = len(tickers_df)
             
             return {
-                "id": universe.id,
-                "name": universe.name,
-                "description": universe.description,
-                "created_at": universe.created_at,
-                "updated_at": universe.updated_at,
+                "id": updated_universe.id,
+                "name": updated_universe.name,
+                "description": updated_universe.description,
+                "created_at": updated_universe.created_at,
+                "updated_at": updated_universe.updated_at,
                 "ticker_count": ticker_count
             }
             

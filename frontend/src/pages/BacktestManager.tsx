@@ -130,9 +130,28 @@ const BacktestManager: React.FC = () => {
     }
   );
 
-  // Auto-select most recent backtest on first load
+  // Initialize selected backtest from URL or auto-select most recent
   useEffect(() => {
-    if (backtestsData?.backtests && !selectedBacktestId) {
+    const urlId = searchParams.get('id');
+    
+    if (urlId && backtestsData?.backtests) {
+      // Check if URL backtest exists in the data
+      const backtestExists = backtestsData.backtests.some(b => b.run_id === urlId);
+      if (backtestExists && urlId !== selectedBacktestId) {
+        setSelectedBacktestId(urlId);
+        localStorage.setItem('selected-backtest-id', urlId);
+      } else if (!backtestExists) {
+        // URL backtest doesn't exist, auto-select most recent
+        const mostRecent = backtestsData.backtests
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        if (mostRecent && mostRecent.run_id !== selectedBacktestId) {
+          setSelectedBacktestId(mostRecent.run_id);
+          localStorage.setItem('selected-backtest-id', mostRecent.run_id);
+          setSearchParams({ id: mostRecent.run_id });
+        }
+      }
+    } else if (!urlId && backtestsData?.backtests && !selectedBacktestId) {
+      // No URL ID and no selected backtest, auto-select most recent
       const mostRecent = backtestsData.backtests
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
       if (mostRecent) {
@@ -141,23 +160,7 @@ const BacktestManager: React.FC = () => {
         setSearchParams({ id: mostRecent.run_id });
       }
     }
-  }, [backtestsData, selectedBacktestId, setSearchParams]);
-
-  // Update URL when backtest selection changes
-  useEffect(() => {
-    if (selectedBacktestId) {
-      setSearchParams({ id: selectedBacktestId });
-      localStorage.setItem('selected-backtest-id', selectedBacktestId);
-    }
-  }, [selectedBacktestId, setSearchParams]);
-
-  // Update selected backtest from URL
-  useEffect(() => {
-    const urlId = searchParams.get('id');
-    if (urlId && urlId !== selectedBacktestId) {
-      setSelectedBacktestId(urlId);
-    }
-  }, [searchParams, selectedBacktestId]);
+  }, [backtestsData, searchParams, selectedBacktestId, setSearchParams]);
 
   // Persist sidebar state
   useEffect(() => {
@@ -166,6 +169,8 @@ const BacktestManager: React.FC = () => {
 
   const handleBacktestSelect = (backtest: Backtest) => {
     setSelectedBacktestId(backtest.run_id);
+    localStorage.setItem('selected-backtest-id', backtest.run_id);
+    setSearchParams({ id: backtest.run_id });
   };
 
   const handlePortfolioClick = (portfolio: Portfolio) => {

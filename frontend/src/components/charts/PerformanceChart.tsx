@@ -452,23 +452,23 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
                   />
                 )}
                 {showTrendLine && (
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="trend"
                     stroke="#f59e0b"
+                    fill="none"
                     strokeWidth={3}
-                    dot={false}
                     strokeDasharray="8 4"
                     name="Trend Line"
                   />
                 )}
                 {showMarketOverlay && (
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="marketOverlay"
                     stroke="#ef4444"
+                    fill="none"
                     strokeWidth={3}
-                    dot={false}
                     strokeDasharray="2 2"
                     name={`${marketSymbol} Overlay`}
                   />

@@ -31,7 +31,7 @@ git clone <repository-url>
 cd Alpha-Crucible-Quant
 
 # Create environment file
-cp env.example .env
+cp .env_template .env
 # Edit .env with your database credentials
 
 # Start all services
@@ -100,7 +100,7 @@ python scripts/setup_database.py
 #### Docker Production Setup
 ```bash
 # Create production environment file
-cp env.example .env.production
+cp .env_template .env.production
 
 # Update environment variables for production
 # DB_PASSWORD=secure_password

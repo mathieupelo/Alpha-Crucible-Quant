@@ -9,7 +9,7 @@
 cd "Alpha-Crucible-Quant"
 
 # Setup environment
-cp env.example .env
+cp .env_template .env
 # Edit .env with your database credentials
 
 # Start all services with Docker Compose

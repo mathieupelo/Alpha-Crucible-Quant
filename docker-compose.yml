@@ -1,5 +1,5 @@
 services:
-  # FastAPI Backend !
+  # FastAPI Backend
   backend:
     build:
       context: .
@@ -71,15 +71,4 @@ services:
 networks:
   alpha-crucible-network:
     driver: bridge
-    enable_ipv6: true
-    driver_opts:
-      com.docker.network.bridge.enable_icc: "true"
-      com.docker.network.bridge.enable_ip_masquerade: "true"
-      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
-          gateway: 172.18.0.1
-        - subnet: 2001:db8::/64
-          gateway: 2001:db8::1
 

@@ -17,8 +17,7 @@ from src.signals import SignalReader
 from src.portfolio import PortfolioService
 from src.database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
 from src.utils import PriceFetcher, DateUtils, TradingCalendar
-from src.utils.exceptions import BacktestError, SignalError
-from src.utils.error_handler import validate_signal_scores_completeness
+from src.utils.error_handling import BacktestError, SignalError, validate_signal_scores_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -1158,8 +1157,7 @@ class BacktestEngine:
         if show_plots:
             plt.show()
         
-        return figures
-    
+        return figures    
     def _combine_signals_to_scores(self, raw_signals: pd.DataFrame, tickers: List[str], 
                                   signals: List[str], config: BacktestConfig) -> pd.DataFrame:
         """
@@ -1262,3 +1260,4 @@ class BacktestEngine:
         except Exception as e:
             logger.error(f"Error combining signals: {e}")
             return pd.DataFrame()
+

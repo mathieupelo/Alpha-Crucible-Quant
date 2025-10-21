@@ -16,8 +16,7 @@ from security.input_validation import (
 )
 from models import BacktestResponse, BacktestListResponse, BacktestMetricsResponse, ErrorResponse, BacktestCreateRequest
 from services.database_service import DatabaseService
-from src.utils.error_handler import handle_api_errors
-from src.utils.exceptions import ValidationError, BacktestError
+from src.utils.error_handling import handle_api_errors, ValidationError, BacktestError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

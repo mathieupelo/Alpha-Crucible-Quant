@@ -5,8 +5,6 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,8 +24,6 @@ import {
   Select, 
   MenuItem, 
   InputLabel,
-  Button,
-  ButtonGroup,
   Stack,
 } from '@mui/material';
 import { format, parseISO } from 'date-fns';
@@ -57,7 +53,6 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
   const [showTrendLine, setShowTrendLine] = useState(true); // Enable by default
   const [showMarketOverlay, setShowMarketOverlay] = useState(true); // Enable by default
   const [marketSymbol, setMarketSymbol] = useState('SPY');
-  const [showAreaFill, setShowAreaFill] = useState(true); // Enable area chart by default
 
 
   // Get the starting value for normalization
@@ -195,36 +190,6 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
             : 'rgba(148, 163, 184, 0.2)',
         }}>
           <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap" useFlexGap>
-            {/* Chart Type Toggle */}
-            <ButtonGroup size="small" variant="outlined">
-              <Button 
-                variant={!showAreaFill ? "contained" : "outlined"}
-                onClick={() => setShowAreaFill(false)}
-                sx={{ 
-                  background: !showAreaFill ? (isDarkMode ? '#2563eb' : '#1d4ed8') : 'transparent',
-                  color: !showAreaFill ? 'white' : (isDarkMode ? '#94a3b8' : '#64748b'),
-                  '&:hover': {
-                    background: !showAreaFill ? (isDarkMode ? '#1d4ed8' : '#1e40af') : (isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(29, 78, 216, 0.1)'),
-                  }
-                }}
-              >
-                Line Chart
-              </Button>
-              <Button 
-                variant={showAreaFill ? "contained" : "outlined"}
-                onClick={() => setShowAreaFill(true)}
-                sx={{ 
-                  background: showAreaFill ? (isDarkMode ? '#2563eb' : '#1d4ed8') : 'transparent',
-                  color: showAreaFill ? 'white' : (isDarkMode ? '#94a3b8' : '#64748b'),
-                  '&:hover': {
-                    background: showAreaFill ? (isDarkMode ? '#1d4ed8' : '#1e40af') : (isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(29, 78, 216, 0.1)'),
-                  }
-                }}
-              >
-                Area Chart
-              </Button>
-            </ButtonGroup>
-
             {/* Trend Line Toggle */}
             <FormControlLabel
               control={
@@ -370,220 +335,110 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
             : '0 8px 32px rgba(0, 0, 0, 0.1)',
         }}>
           <ResponsiveContainer width="100%" height={height ? height - 40 : 360}>
-            {showAreaFill ? (
-              <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <defs>
-                  <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="benchmarkGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke={isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'}
-                />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(value) => {
-                    try {
-                      return format(parseISO(value), 'MMM dd');
-                    } catch {
-                      return value;
-                    }
-                  }}
-                  stroke={isDarkMode ? '#94a3b8' : '#64748b'}
-                  fontSize={12}
-                  fontWeight={500}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `$${value.toLocaleString()}`}
-                  stroke={isDarkMode ? '#94a3b8' : '#64748b'}
-                  fontSize={12}
-                  fontWeight={500}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    border: 'none',
-                    borderRadius: 12,
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                  }}
-                  labelFormatter={(label) => {
-                    try {
-                      return format(parseISO(label), 'MMM dd, yyyy');
-                    } catch {
-                      return label;
-                    }
-                  }}
-                  formatter={(value, name) => [
-                    `$${Number(value).toFixed(2)}`, 
-                    name === 'portfolio' ? 'Portfolio' : name === 'benchmark' ? 'Benchmark' : name === 'trend' ? 'Trend Line' : name === 'marketOverlay' ? `${marketSymbol} Overlay` : name
-                  ]}
-                />
-                <Legend 
-                  wrapperStyle={{
-                    paddingTop: '20px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}
-                />
+            <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <defs>
+                <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05}/>
+                </linearGradient>
+                <linearGradient id="benchmarkGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke={isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'}
+              />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(value) => {
+                  try {
+                    return format(parseISO(value), 'MMM dd');
+                  } catch {
+                    return value;
+                  }
+                }}
+                stroke={isDarkMode ? '#94a3b8' : '#64748b'}
+                fontSize={12}
+                fontWeight={500}
+              />
+              <YAxis 
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+                stroke={isDarkMode ? '#94a3b8' : '#64748b'}
+                fontSize={12}
+                fontWeight={500}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                  border: 'none',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                }}
+                labelFormatter={(label) => {
+                  try {
+                    return format(parseISO(label), 'MMM dd, yyyy');
+                  } catch {
+                    return label;
+                  }
+                }}
+                formatter={(value, name) => [
+                  `$${Number(value).toFixed(2)}`, 
+                  name === 'portfolio' ? 'Portfolio' : name === 'benchmark' ? 'Benchmark' : name === 'trend' ? 'Trend Line' : name === 'marketOverlay' ? `${marketSymbol} Overlay` : name
+                ]}
+              />
+              <Legend 
+                wrapperStyle={{
+                  paddingTop: '20px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="portfolio"
+                stroke="#2563eb"
+                fill="url(#portfolioGradient)"
+                strokeWidth={3}
+                name="Portfolio"
+              />
+              {showBenchmark && (
                 <Area
                   type="monotone"
-                  dataKey="portfolio"
-                  stroke="#2563eb"
-                  fill="url(#portfolioGradient)"
+                  dataKey="benchmark"
+                  stroke="#10b981"
+                  fill="url(#benchmarkGradient)"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Benchmark"
+                />
+              )}
+              {showTrendLine && (
+                <Area
+                  type="monotone"
+                  dataKey="trend"
+                  stroke="#f59e0b"
+                  fill="none"
                   strokeWidth={3}
-                  name="Portfolio"
+                  strokeDasharray="8 4"
+                  name="Trend Line"
                 />
-                {showBenchmark && (
-                  <Area
-                    type="monotone"
-                    dataKey="benchmark"
-                    stroke="#10b981"
-                    fill="url(#benchmarkGradient)"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Benchmark"
-                  />
-                )}
-                {showTrendLine && (
-                  <Area
-                    type="monotone"
-                    dataKey="trend"
-                    stroke="#f59e0b"
-                    fill="none"
-                    strokeWidth={3}
-                    strokeDasharray="8 4"
-                    name="Trend Line"
-                  />
-                )}
-                {showMarketOverlay && (
-                  <Area
-                    type="monotone"
-                    dataKey="marketOverlay"
-                    stroke="#ef4444"
-                    fill="none"
-                    strokeWidth={3}
-                    strokeDasharray="2 2"
-                    name={`${marketSymbol} Overlay`}
-                  />
-                )}
-              </AreaChart>
-            ) : (
-              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <defs>
-                  <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="benchmarkGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-          <CartesianGrid 
-            strokeDasharray="3 3" 
-                  stroke={isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'}
-          />
-          <XAxis
-            dataKey="date"
-                  tickFormatter={(value) => {
-                    try {
-                      return format(parseISO(value), 'MMM dd');
-                    } catch {
-                      return value;
-                    }
-                  }}
-                  stroke={isDarkMode ? '#94a3b8' : '#64748b'}
-            fontSize={12}
-                  fontWeight={500}
-          />
-          <YAxis
-            tickFormatter={(value) => `$${value.toLocaleString()}`}
-                  stroke={isDarkMode ? '#94a3b8' : '#64748b'}
-            fontSize={12}
-                  fontWeight={500}
-          />
-          <Tooltip
-            contentStyle={{
-                    background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    border: 'none',
-                    borderRadius: 12,
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                  }}
-                  labelFormatter={(label) => {
-                    try {
-                      return format(parseISO(label), 'MMM dd, yyyy');
-                    } catch {
-                      return label;
-                    }
-                  }}
-                  formatter={(value, name) => [
-                    `$${Number(value).toFixed(2)}`, 
-                    name === 'portfolio' ? 'Portfolio' : name === 'benchmark' ? 'Benchmark' : name === 'trend' ? 'Trend Line' : name === 'marketOverlay' ? `${marketSymbol} Overlay` : name
-                  ]}
+              )}
+              {showMarketOverlay && (
+                <Area
+                  type="monotone"
+                  dataKey="marketOverlay"
+                  stroke="#ef4444"
+                  fill="none"
+                  strokeWidth={3}
+                  strokeDasharray="2 2"
+                  name={`${marketSymbol} Overlay`}
                 />
-                <Legend 
-                  wrapperStyle={{
-                    paddingTop: '20px',
-                    fontSize: '14px',
-              fontWeight: 600,
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="portfolio"
-                  stroke="#2563eb"
-            strokeWidth={3}
-            dot={false}
-                  name="Portfolio"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-          {showBenchmark && (
-            <Line
-              type="monotone"
-              dataKey="benchmark"
-                    stroke="#10b981"
-              strokeWidth={2}
-              dot={false}
-              strokeDasharray="5 5"
-                    name="Benchmark"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-          {showTrendLine && (
-            <Line
-              type="monotone"
-              dataKey="trend"
-                    stroke="#f59e0b"
-              strokeWidth={3}
-              dot={false}
-              strokeDasharray="8 4"
-                    name="Trend Line"
-                  />
-                )}
-                {showMarketOverlay && (
-                  <Line
-                    type="monotone"
-                    dataKey="marketOverlay"
-                    stroke="#ef4444"
-                    strokeWidth={3}
-                    dot={false}
-                    strokeDasharray="2 2"
-                    name={`${marketSymbol} Overlay`}
-            />
-          )}
-        </LineChart>
-            )}
-      </ResponsiveContainer>
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
         </Box>
       </motion.div>
       

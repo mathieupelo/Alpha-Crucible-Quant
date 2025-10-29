@@ -299,3 +299,6 @@ $RECYCLE.BIN/
 .directory
 .Trash-*
 .nfs*
+
+__pycache__/
+*.pyc

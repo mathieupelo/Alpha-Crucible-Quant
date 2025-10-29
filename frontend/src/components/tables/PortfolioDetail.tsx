@@ -35,6 +35,7 @@ import { useQuery } from 'react-query';
 
 import { portfolioApi } from '@/services/api';
 import { Portfolio, Position } from '@/types';
+import { useTheme as useCustomTheme } from '@/contexts/ThemeContext';
 
 interface PortfolioDetailProps {
   portfolio: Portfolio;
@@ -63,6 +64,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other })
 
 const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose }) => {
   const [tabValue, setTabValue] = useState(0);
+  const { isDarkMode } = useCustomTheme();
 
   // Fetch detailed portfolio data
   const {
@@ -163,7 +165,25 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
   }
 
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="lg" fullWidth>
+    <Dialog 
+      open={true} 
+      onClose={onClose} 
+      maxWidth="lg" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          background: isDarkMode 
+            ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+            : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+          border: isDarkMode 
+            ? '1px solid rgba(148, 163, 184, 0.3)'
+            : '1px solid rgba(148, 163, 184, 0.4)',
+          boxShadow: isDarkMode 
+            ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+            : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+        }
+      }}
+    >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
@@ -265,10 +285,42 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Ticker</TableCell>
-                    <TableCell align="right">Weight</TableCell>
-                    <TableCell align="right">Price Used</TableCell>
-                    <TableCell align="right">Value</TableCell>
+                    <TableCell sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Ticker
+                    </TableCell>
+                    <TableCell align="right" sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Weight
+                    </TableCell>
+                    <TableCell align="right" sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Price Used
+                    </TableCell>
+                    <TableCell align="right" sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Value
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -342,8 +394,24 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                     <Table stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>Ticker</TableCell>
-                          <TableCell align="right">Signal Scores</TableCell>
+                          <TableCell sx={{ 
+                            position: 'sticky', 
+                            top: 0, 
+                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                            zIndex: 1,
+                            fontWeight: 600
+                          }}>
+                            Ticker
+                          </TableCell>
+                          <TableCell align="right" sx={{ 
+                            position: 'sticky', 
+                            top: 0, 
+                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                            zIndex: 1,
+                            fontWeight: 600
+                          }}>
+                            Signal Scores
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -379,9 +447,23 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Ticker</TableCell>
+                        <TableCell sx={{ 
+                          position: 'sticky', 
+                          top: 0, 
+                          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                          zIndex: 1,
+                          fontWeight: 600
+                        }}>
+                          Ticker
+                        </TableCell>
                         {sortedSignals.map((signalName) => (
-                          <TableCell key={signalName} align="right">
+                          <TableCell key={signalName} align="right" sx={{ 
+                            position: 'sticky', 
+                            top: 0, 
+                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                            zIndex: 1,
+                            fontWeight: 600
+                          }}>
                             {signalName}
                           </TableCell>
                         ))}
@@ -421,8 +503,24 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Ticker</TableCell>
-                    <TableCell align="right">Signal Scores</TableCell>
+                    <TableCell sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Ticker
+                    </TableCell>
+                    <TableCell align="right" sx={{ 
+                      position: 'sticky', 
+                      top: 0, 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      zIndex: 1,
+                      fontWeight: 600
+                    }}>
+                      Signal Scores
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -457,9 +555,33 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ portfolio, onClose })
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Ticker</TableCell>
-                  <TableCell align="right">Combined Score</TableCell>
-                  <TableCell align="right">Method</TableCell>
+                  <TableCell sx={{ 
+                    position: 'sticky', 
+                    top: 0, 
+                    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    zIndex: 1,
+                    fontWeight: 600
+                  }}>
+                    Ticker
+                  </TableCell>
+                  <TableCell align="right" sx={{ 
+                    position: 'sticky', 
+                    top: 0, 
+                    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    zIndex: 1,
+                    fontWeight: 600
+                  }}>
+                    Combined Score
+                  </TableCell>
+                  <TableCell align="right" sx={{ 
+                    position: 'sticky', 
+                    top: 0, 
+                    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                    zIndex: 1,
+                    fontWeight: 600
+                  }}>
+                    Method
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

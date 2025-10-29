@@ -10,9 +10,6 @@ from datetime import date
 import logging
 
 from models import SignalResponse, ScoreResponse, ErrorResponse
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +28,8 @@ async def get_signals(
 ):
     """Get raw signals with optional filtering."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Get signals from database service
         signals = db_service.get_signals_raw(
             tickers=tickers,
@@ -84,6 +83,8 @@ async def get_scores(
 async def get_portfolio_signals(portfolio_id: int):
     """Get signal scores for a specific portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         signals = db_service.get_portfolio_signals(portfolio_id)
         return {
             "signals": signals,
@@ -99,6 +100,8 @@ async def get_portfolio_signals(portfolio_id: int):
 async def get_portfolio_scores(portfolio_id: int):
     """Get combined scores for a specific portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         scores = db_service.get_portfolio_scores(portfolio_id)
         return {
             "scores": scores,
@@ -112,37 +115,36 @@ async def get_portfolio_scores(portfolio_id: int):
 
 @router.get("/signal-types")
 async def get_available_signal_types():
-    """Get list of available signal types."""
+    """Get list of available signal types from the database."""
     try:
-        # Get available signal types from the signal registry
-        import sys
-        import os
-        from pathlib import Path
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         
-        # Add src to path
-        src_path = Path(__file__).parent.parent.parent / 'src'
-        sys.path.insert(0, str(src_path))
+        # Query distinct signal names from the database
+        query = "SELECT DISTINCT signal_name FROM signal_raw ORDER BY signal_name"
+        signals_df = db_service.db_manager.execute_query(query)
         
-        from signals.registry import SignalRegistry
-        registry = SignalRegistry()
-        available_signals = registry.get_available_signals()
+        if signals_df.empty:
+            return {
+                "signal_types": [],
+                "total": 0
+            }
         
-        # Get signal information for each available signal
-        signals_info = []
-        for signal_id in available_signals:
-            signal_info = registry.get_signal_info(signal_id)
-            if signal_info:
-                signals_info.append({
-                    "signal_id": signal_info["signal_id"],
-                    "name": signal_info["name"],
-                    "parameters": signal_info["parameters"],
-                    "min_lookback": signal_info["min_lookback"],
-                    "max_lookback": signal_info["max_lookback"]
-                })
+        # Convert database results to API format
+        signal_types = []
+        for _, row in signals_df.iterrows():
+            signal_name = row['signal_name']
+            signal_types.append({
+                "signal_id": signal_name.lower().replace('_', '_'),
+                "name": signal_name,
+                "parameters": {},
+                "min_lookback": 1,
+                "max_lookback": 252
+            })
         
         return {
-            "signal_types": signals_info,
-            "total": len(signals_info)
+            "signal_types": signal_types,
+            "total": len(signal_types)
         }
     except Exception as e:
         logger.error(f"Error getting available signal types: {e}")

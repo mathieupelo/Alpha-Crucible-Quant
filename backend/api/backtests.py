@@ -4,16 +4,19 @@ Backtest API Routes
 FastAPI routes for backtest-related endpoints.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional, List
 from datetime import date
 import logging
-
-from models import BacktestResponse, BacktestListResponse, BacktestMetricsResponse, ErrorResponse, BacktestCreateRequest
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from security.input_validation import (
+    validate_ticker, validate_date_range, validate_pagination,
+    sanitize_string, validate_ticker_list, validate_numeric_range
+)
+from models import BacktestResponse, BacktestListResponse, BacktestMetricsResponse, ErrorResponse, BacktestCreateRequest
 from services.database_service import DatabaseService
+from src.utils.error_handling import handle_api_errors, ValidationError, BacktestError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,55 +29,59 @@ db_service = DatabaseService()
 async def check_backtest_name(name: str = Query(..., description="Backtest name to check")):
     """Check if a backtest name already exists."""
     try:
-        exists = db_service.check_backtest_name_exists(name)
+        # Validate and sanitize input
+        sanitized_name = sanitize_string(name, max_length=255)
+        if not sanitized_name:
+            raise HTTPException(status_code=400, detail="Backtest name cannot be empty")
+        
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        exists = db_service.check_backtest_name_exists(sanitized_name)
         return {
-            "name": name,
+            "name": sanitized_name,
             "exists": exists,
             "available": not exists
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error checking backtest name {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/backtests", response_model=BacktestResponse)
+@handle_api_errors
 async def create_backtest(request: BacktestCreateRequest):
     """Create a new backtest with universe validation."""
     try:
         # Check if backtest name already exists (race condition protection)
         if request.name and db_service.check_backtest_name_exists(request.name):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Backtest name '{request.name}' already exists. Please choose a different name."
+            raise ValidationError(
+                f"Backtest name '{request.name}' already exists. Please choose a different name.",
+                error_code="DUPLICATE_NAME"
             )
         
         # Validate universe exists and has minimum tickers
         universe = db_service.get_universe_by_id(request.universe_id)
         if universe is None:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Universe with ID {request.universe_id} not found"
+            raise ValidationError(
+                f"Universe with ID {request.universe_id} not found",
+                error_code="UNIVERSE_NOT_FOUND"
             )
         
         # Check ticker count
         tickers = db_service.get_universe_tickers(request.universe_id)
         if len(tickers) < 5:
-            raise HTTPException(
-                status_code=400,
-                detail=f"The selected universe '{universe['name']}' must contain at least 5 tickers. "
-                       f"Please add more tickers or choose another universe. "
-                       f"Current ticker count: {len(tickers)}"
+            raise ValidationError(
+                f"The selected universe '{universe['name']}' must contain at least 5 tickers. "
+                f"Please add more tickers or choose another universe. "
+                f"Current ticker count: {len(tickers)}",
+                error_code="INSUFFICIENT_TICKERS"
             )
         
         # Create backtest configuration
-        import sys
-        from pathlib import Path
-        
-        # Add src to path
-        src_path = Path(__file__).parent.parent.parent / 'src'
-        sys.path.insert(0, str(src_path))
-        
-        from backtest.config import BacktestConfig
+        from src.backtest.config import BacktestConfig
         config = BacktestConfig(
             start_date=request.start_date,
             end_date=request.end_date,
@@ -97,7 +104,7 @@ async def create_backtest(request: BacktestCreateRequest):
         )
         
         # Run the backtest
-        from backtest.engine import BacktestEngine
+        from src.backtest.engine import BacktestEngine
         engine = BacktestEngine()
         
         # Get universe tickers
@@ -116,17 +123,17 @@ async def create_backtest(request: BacktestCreateRequest):
         # Get the created backtest from database
         backtest = db_service.get_backtest_by_run_id(result.backtest_id)
         if backtest is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve created backtest")
+            raise BacktestError("Failed to retrieve created backtest", error_code="RETRIEVAL_FAILED")
         
         return BacktestResponse(**backtest)
         
-    except HTTPException:
-        raise
+    except (ValidationError, BacktestError):
+        raise  # These will be handled by the decorator
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ValidationError(f"Invalid input: {str(e)}", error_code="INVALID_INPUT")
     except Exception as e:
-        logger.error(f"Error creating backtest: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error creating backtest: {e}")
+        raise BacktestError(f"Backtest creation failed: {str(e)}", error_code="CREATION_FAILED")
 
 
 @router.get("/backtests", response_model=BacktestListResponse)
@@ -136,8 +143,16 @@ async def get_backtests(
 ):
     """Get all backtests with pagination."""
     try:
+        # Validate pagination parameters
+        page, size = validate_pagination(page, size)
+        
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
         result = db_service.get_all_backtests(page=page, size=size)
         return BacktestListResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting backtests: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -147,6 +162,8 @@ async def get_backtests(
 async def get_backtest(run_id: str):
     """Get specific backtest by run ID."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
             raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
@@ -162,6 +179,8 @@ async def get_backtest(run_id: str):
 async def get_backtest_metrics(run_id: str):
     """Get performance metrics for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
@@ -183,6 +202,8 @@ async def get_backtest_metrics(run_id: str):
 async def get_backtest_portfolios(run_id: str):
     """Get all portfolios for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         portfolios = db_service.get_backtest_portfolios(run_id)
         return {
             "portfolios": portfolios,
@@ -204,6 +225,8 @@ async def get_backtest_signals(
 ):
     """Get raw signals for a backtest period."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
@@ -232,6 +255,8 @@ async def get_backtest_scores(
 ):
     """Get combined scores for a backtest period."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:
@@ -249,5 +274,33 @@ async def get_backtest_scores(
         raise
     except Exception as e:
         logger.error(f"Error getting scores for {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/backtests/{run_id}")
+async def delete_backtest(run_id: str):
+    """Delete a backtest and all associated data."""
+    try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        # Check if backtest exists
+        backtest = db_service.get_backtest_by_run_id(run_id)
+        if backtest is None:
+            raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
+        
+        # Delete the backtest and all associated data
+        success = db_service.delete_backtest(run_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete backtest")
+        
+        return {
+            "message": f"Backtest {run_id} and all associated data deleted successfully",
+            "run_id": run_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backtest {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

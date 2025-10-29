@@ -223,7 +223,7 @@ User Request → Frontend → API Endpoint → Database Query → Response → U
 - `YFINANCE_RETRIES`: yfinance retries (default: 3)
 
 ### Configuration Files
-- `env.example`: Environment variable template
+- `.env_template`: Environment variable template
 - `requirements.txt`: Python dependencies
 - `pyproject.toml`: Project configuration
 

@@ -31,9 +31,12 @@ import { backtestApi, navApi } from '@/services/api';
 import { Backtest } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
+import Logo from '@/components/common/Logo';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
   const [selectedBacktest, setSelectedBacktest] = useState<string>('');
 
   // Fetch backtests
@@ -87,9 +90,12 @@ const Dashboard: React.FC = () => {
     <Box>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-          Dashboard
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Logo size="medium" showText={false} clickable={true} />
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+            Dashboard
+          </Typography>
+        </Box>
         <Typography variant="body1" color="text.secondary">
           Monitor and analyze your quantitative trading strategies
         </Typography>
@@ -102,12 +108,66 @@ const Dashboard: React.FC = () => {
             Select Backtest
           </Typography>
           <FormControl fullWidth>
-            <InputLabel shrink={!!selectedBacktest}>Choose a backtest to analyze</InputLabel>
+            <InputLabel 
+              shrink={!!selectedBacktest}
+              sx={{
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                '&.Mui-focused': {
+                  color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                }
+              }}
+            >
+              Choose a backtest to analyze
+            </InputLabel>
             <Select
               value={selectedBacktest}
               onChange={(e) => handleBacktestChange(e.target.value)}
               disabled={backtestsLoading}
               label="Choose a backtest to analyze"
+              sx={{
+                '& .MuiSelect-select': {
+                  py: 2,
+                },
+                background: isDarkMode
+                  ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                  : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    background: isDarkMode
+                      ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                      : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                    border: isDarkMode
+                      ? '1px solid rgba(148, 163, 184, 0.3)'
+                      : '1px solid rgba(148, 163, 184, 0.4)',
+                    boxShadow: isDarkMode
+                      ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                      : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                    '& .MuiMenuItem-root': {
+                      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                      '&:hover': {
+                        backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                        '&:hover': {
+                          backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.15)',
+                        },
+                      },
+                    },
+                  },
+                },
+              }}
             >
               {backtestsData?.backtests.map((backtest) => (
                 <MenuItem key={backtest.run_id} value={backtest.run_id}>
@@ -185,12 +245,14 @@ const Dashboard: React.FC = () => {
               Performance Overview
             </Typography>
             {navLoading ? (
-              <Skeleton variant="rectangular" height={400} />
+              <Skeleton variant="rectangular" height={500} />
             ) : (
               <PerformanceChart
                 data={navData?.nav_data || []}
-                height={400}
-                showTrendLine={true}
+                height={500}
+                showBenchmark={true}
+                backtestStartDate={backtestsData?.backtests.find(b => b.run_id === selectedBacktest)?.start_date}
+                backtestEndDate={backtestsData?.backtests.find(b => b.run_id === selectedBacktest)?.end_date}
               />
             )}
           </CardContent>
@@ -217,9 +279,20 @@ const Dashboard: React.FC = () => {
                     sx={{
                       cursor: 'pointer',
                       transition: 'all 0.2s ease-in-out',
+                      background: isDarkMode 
+                        ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                        : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                      border: isDarkMode 
+                        ? '1px solid rgba(148, 163, 184, 0.3)'
+                        : '1px solid rgba(148, 163, 184, 0.4)',
+                      boxShadow: isDarkMode 
+                        ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                        : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
                       '&:hover': {
                         transform: 'translateY(-2px)',
-                        boxShadow: 4,
+                        boxShadow: isDarkMode 
+                          ? '0 12px 40px 0 rgba(0, 0, 0, 0.6), 0 8px 24px 0 rgba(0, 0, 0, 0.5)'
+                          : '0 12px 40px 0 rgba(0, 0, 0, 0.25), 0 8px 24px 0 rgba(0, 0, 0, 0.2)',
                       },
                     }}
                     onClick={() => handleBacktestClick(backtest)}

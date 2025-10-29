@@ -1,6 +1,1 @@
-"""
-API Routes
-
-FastAPI route modules for the Alpha Crucible Quant API.
-"""
-
+# Backend API package

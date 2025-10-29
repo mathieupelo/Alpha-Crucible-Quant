@@ -13,10 +13,11 @@ import numpy as np
 
 from .config import BacktestConfig
 from .models import BacktestResult
-from signals import SignalReader
-from portfolio import PortfolioService
-from database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
-from utils import PriceFetcher, DateUtils, TradingCalendar
+from src.signals import SignalReader
+from src.portfolio import PortfolioService
+from src.database import DatabaseManager, Backtest, BacktestNav, Portfolio, PortfolioPosition
+from src.utils import PriceFetcher, DateUtils, TradingCalendar
+from src.utils.error_handling import BacktestError, SignalError, validate_signal_scores_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -114,33 +115,40 @@ class BacktestEngine:
                 return result
             
             # Step 3: Validate signal completeness - fail if any missing
-            missing_signals = self._validate_signal_completeness(tickers, signals, rebalancing_dates)
-            if missing_signals:
-                error_msg = f"Missing signals for {len(missing_signals)} combinations. Backtest failed."
-                logger.error(error_msg)
-                result.error_message = error_msg
+            try:
+                validate_signal_scores_completeness(tickers, signals, rebalancing_dates, self.signal_reader)
+            except SignalError as e:
+                logger.error(f"Signal validation failed: {e}")
+                result.error_message = str(e)
                 return result
             
             # Step 4: Create portfolios for all rebalancing dates
+            logger.info("Creating portfolios for rebalancing dates...")
             portfolios_created = self._create_portfolios_for_dates(
                 signal_scores, rebalancing_dates, tickers, config, run_id, result
             )
             if portfolios_created is None:  # Error occurred
+                logger.error("Portfolio creation failed")
                 return result
+            logger.info(f"Created {len(portfolios_created)} portfolios")
             
             # Step 5: Run simulation using created portfolios
+            logger.info("Running simulation with created portfolios...")
             portfolio_values, benchmark_values, weights_history, first_rebalance_date = self._run_simulation_with_portfolios(
                 portfolios_created, tickers, config
             )
+            logger.info(f"Simulation completed. Portfolio values: {len(portfolio_values)}, Benchmark values: {len(benchmark_values)}")
             
             # Step 6: Insert backtest in database
             self._store_backtest_results(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
             
             # Calculate and store results
+            logger.info("Finalizing backtest results...")
             self._finalize_backtest_results(
                 result, portfolio_values, benchmark_values, weights_history, 
                 first_rebalance_date, rebalancing_dates, start_time, config
             )
+            logger.info("Backtest results finalized successfully")
             
             return result
             
@@ -262,7 +270,7 @@ class BacktestEngine:
     
     def _get_rebalancing_dates(self, config: BacktestConfig) -> List[date]:
         """
-        Get rebalancing dates (first trading day of each month) between start and end dates.
+        Get rebalancing dates based on frequency between start and end dates.
         
         Args:
             config: Backtesting configuration
@@ -270,7 +278,9 @@ class BacktestEngine:
         Returns:
             List of rebalancing dates
         """
-        return self.trading_calendar.get_rebalancing_dates(config.start_date, config.end_date)
+        return self.trading_calendar.get_rebalancing_dates(
+            config.start_date, config.end_date, config.rebalancing_frequency
+        )
     
     def _fetch_signal_scores(self, tickers: List[str], signals: List[str], 
                            rebalancing_dates: List[date], config: BacktestConfig) -> pd.DataFrame:
@@ -354,29 +364,6 @@ class BacktestEngine:
             logger.error(f"Error fetching signal scores: {e}")
             return pd.DataFrame()
     
-    def _validate_signal_completeness(self, tickers: List[str], signals: List[str], 
-                                    rebalancing_dates: List[date]) -> List[str]:
-        """
-        Validate signal completeness for all rebalancing dates.
-        
-        Args:
-            tickers: List of stock ticker symbols
-            signals: List of signal IDs
-            rebalancing_dates: List of rebalancing dates
-            
-        Returns:
-            List of missing signal combinations
-        """
-        missing_signals = []
-        
-        for rebal_date in rebalancing_dates:
-            is_complete, missing = self.signal_reader.validate_signals_complete(
-                tickers, signals, rebal_date
-            )
-            if not is_complete:
-                missing_signals.extend(missing)
-        
-        return missing_signals
     
     def _run_simulation_with_portfolios(self, portfolios_created: List[Dict[str, Any]], 
                                       tickers: List[str], config: BacktestConfig) -> Tuple[pd.Series, pd.Series, pd.DataFrame, date]:
@@ -516,42 +503,9 @@ class BacktestEngine:
                               benchmark_values: pd.Series, weights_history: pd.DataFrame,
                               first_rebalance_date: date):
         """Store backtest results in database."""
-        try:
-            # Store backtest NAV data
-            nav_objects = []
-            for date, portfolio_value in portfolio_values.items():
-                if pd.isna(portfolio_value):
-                    continue
-                    
-                benchmark_value = benchmark_values.get(date, 0.0)
-                if pd.isna(benchmark_value):
-                    benchmark_value = 0.0
-                
-                # Calculate PnL
-                pnl = 0.0
-                if len(portfolio_values) > 1:
-                    prev_date = portfolio_values.index[portfolio_values.index < date]
-                    if len(prev_date) > 0:
-                        prev_date = prev_date[-1]
-                        prev_portfolio_value = portfolio_values.get(prev_date, portfolio_value)
-                        if prev_portfolio_value > 0:
-                            pnl = portfolio_value - prev_portfolio_value
-                
-                nav_obj = BacktestNav(
-                    run_id=result.backtest_id,
-                    date=date,
-                    nav=float(portfolio_value),
-                    benchmark_nav=float(benchmark_value) if benchmark_value > 0 else None,
-                    pnl=float(pnl)
-                )
-                nav_objects.append(nav_obj)
-            
-            if nav_objects:
-                self.database_manager.store_backtest_nav(nav_objects)
-                logger.info(f"Stored {len(nav_objects)} NAV records")
-            
-        except Exception as e:
-            logger.error(f"Error storing backtest results: {e}")
+        # Note: NAV data and portfolio data are stored in _finalize_backtest_results
+        # via _store_portfolio_data to avoid duplication
+        logger.info(f"Backtest results prepared for {result.backtest_id}")
     
     def _prepare_backtest_data(self, tickers: List[str], signals: List[str], 
                              config: BacktestConfig) -> Tuple[List[date], List[date], Optional[pd.DataFrame], pd.DataFrame]:
@@ -581,8 +535,10 @@ class BacktestEngine:
         logger.info(f"Found {len(trading_days)} trading days")
         
         # Get rebalancing dates
-        rebalancing_dates = self.trading_calendar.get_rebalancing_dates(config.start_date, config.end_date)
-        logger.info(f"Found {len(rebalancing_dates)} rebalancing dates")
+        rebalancing_dates = self.trading_calendar.get_rebalancing_dates(
+            config.start_date, config.end_date, config.rebalancing_frequency
+        )
+        logger.info(f"Found {len(rebalancing_dates)} rebalancing dates for {config.rebalancing_frequency} frequency")
         
         # Ensure signal scores exist for all rebalancing dates
         rebalancing_dates = self._ensure_signal_scores_for_rebalancing_dates(
@@ -825,213 +781,7 @@ class BacktestEngine:
             traceback.print_exc()
             return pd.DataFrame()
     
-    def _run_simulation(self, tickers: List[str], signals: List[str], 
-                       signal_scores: pd.DataFrame, price_data: pd.DataFrame,
-                       rebalancing_dates: List[date], config: BacktestConfig) -> Tuple[pd.Series, pd.Series, pd.DataFrame, date]:
-        """Run the backtest simulation."""
-        logger.info("Starting backtest simulation...")
-        
-        # Initialize tracking variables (will be reset at first rebalance date)
-        portfolio_value = 0.0
-        benchmark_value = 0.0
-        
-        portfolio_values = pd.Series(index=price_data.index, dtype=float)
-        benchmark_values = pd.Series(index=price_data.index, dtype=float)
-        weights_history = pd.DataFrame(index=rebalancing_dates, columns=tickers, dtype=float)
-        
-        # Store returns for plotting
-        strategy_returns = pd.Series(index=price_data.index, dtype=float)
-        benchmark_returns = pd.Series(index=price_data.index, dtype=float)
-        
-        current_weights = None
-        benchmark_ready = False
-        
-        # Get benchmark data
-        if config.use_equal_weight_benchmark:
-            # Use equal-weight portfolio of all stocks as benchmark
-            logger.info("Using equal-weight portfolio of all stocks as benchmark")
-            benchmark_data = price_data  # Use the same price data as the strategy
-        else:
-            # Use traditional benchmark ticker (e.g., SPY)
-            benchmark_data = self.price_fetcher.get_price_history(
-                config.benchmark_ticker, config.start_date, config.end_date
-            )
-            
-            # Ensure benchmark data is aligned with price data
-            if benchmark_data is not None and not benchmark_data.empty:
-                # Align benchmark data with price data dates
-                benchmark_data = benchmark_data.reindex(price_data.index, method='ffill')
-            else:
-                logger.warning(f"No benchmark data available for {config.benchmark_ticker}")
-                benchmark_data = pd.DataFrame()
-        
-        # Find the first rebalancing date to ensure both strategy and benchmark start together
-        first_rebalance_date = None
-        for current_date in price_data.index:
-            if current_date >= config.start_date and current_date in rebalancing_dates:
-                # Check if we can actually create a portfolio on this date
-                new_weights = self._rebalance_portfolio(
-                    tickers, signals, signal_scores, price_data, current_date, config
-                )
-                if new_weights is not None:
-                    first_rebalance_date = current_date
-                    break
-        
-        if first_rebalance_date is None:
-            logger.error("No valid rebalancing dates found within the backtest period")
-            return pd.Series(), pd.Series(), pd.DataFrame()
-        
-        logger.info(f"Strategy and benchmark will start on: {first_rebalance_date}")
-        
-        # Reset both portfolio and benchmark values to initial capital at first rebalance date
-        portfolio_value = config.initial_capital
-        benchmark_value = config.initial_capital
-        
-        for i, current_date in enumerate(price_data.index):
-            if current_date < first_rebalance_date:
-                continue
-            
-            # Check if this is a rebalancing date
-            is_rebalance = current_date in rebalancing_dates
-            
-            if is_rebalance:
-                # Rebalance portfolio
-                new_weights = self._rebalance_portfolio(
-                    tickers, signals, signal_scores, price_data, current_date, config
-                )
-                
-                if new_weights is not None:
-                    current_weights = new_weights
-                    weights_history.loc[current_date] = current_weights
-                    
-                    # Calculate transaction costs
-                    if current_weights is not None and len(weights_history) > 1:
-                        prev_weights = weights_history.iloc[-2] if len(weights_history) > 1 else pd.Series(0, index=tickers)
-                        turnover = abs(current_weights - prev_weights).sum()
-                        transaction_cost = turnover * config.transaction_costs
-                        portfolio_value *= (1 - transaction_cost)
-                
-                # Mark that benchmark is ready (no need for benchmark weights since we use SPY directly)
-                benchmark_ready = True
-            
-            # Update portfolio value
-            if current_weights is not None:
-                # Convert weights dict to Series for compatibility
-                weights_series = pd.Series(current_weights)
-                portfolio_return = self._calculate_portfolio_return(
-                    weights_series, price_data, current_date, i
-                )
-                if portfolio_return is not None:
-                    portfolio_value *= (1 + portfolio_return)
-                    strategy_returns.loc[current_date] = portfolio_return
-            
-            # Update benchmark value (only after first rebalance)
-            if benchmark_ready and not benchmark_data.empty and current_date in benchmark_data.index:
-                if config.use_equal_weight_benchmark:
-                    # Calculate equal-weight portfolio return
-                    benchmark_return = self._calculate_equal_weight_return(
-                        tickers, benchmark_data, current_date, i
-                    )
-                else:
-                    # Calculate traditional benchmark return (e.g., SPY)
-                    benchmark_return = self._calculate_benchmark_return(
-                        benchmark_data, current_date, i
-                    )
-                
-                if benchmark_return is not None:
-                    benchmark_value *= (1 + benchmark_return)
-                    benchmark_returns.loc[current_date] = benchmark_return
-            
-            # Store values (only from first rebalance date onwards)
-            portfolio_values.loc[current_date] = portfolio_value
-            benchmark_values.loc[current_date] = benchmark_value
-            
-            # Progress logging
-            if i % 50 == 0:
-                logger.info(f"Processed {i+1}/{len(price_data)} days, portfolio value: ${portfolio_value:,.2f}")
-        
-        logger.info("Backtest simulation completed")
-        
-        # Filter portfolio and benchmark values to only include data from first rebalance date onwards
-        portfolio_values = portfolio_values[portfolio_values.index >= first_rebalance_date].dropna()
-        benchmark_values = benchmark_values[benchmark_values.index >= first_rebalance_date].dropna()
-        
-        # Store returns data for plotting
-        self.strategy_returns = strategy_returns.dropna()
-        self.benchmark_returns = benchmark_returns.dropna()
-        self._use_equal_weight_benchmark = config.use_equal_weight_benchmark
-        
-        # Store portfolio history for plotting
-        for date_idx, date in enumerate(weights_history.index):
-            if not weights_history.loc[date].isna().all():
-                self.portfolio_history.append({
-                    'date': date,
-                    'positions': weights_history.loc[date].to_dict()
-                })
-        
-        return portfolio_values, benchmark_values, weights_history, first_rebalance_date
     
-    def _rebalance_portfolio(self, tickers: List[str], signals: List[str],
-                           signal_scores: pd.DataFrame, price_data: pd.DataFrame,
-                           current_date: date, config: BacktestConfig) -> Optional[pd.Series]:
-        """Rebalance portfolio on a specific date."""
-        try:
-            # Get signal scores for current date
-            if current_date not in signal_scores.index:
-                # Try to find the latest available date before current_date
-                available_dates = signal_scores.index[signal_scores.index <= current_date]
-                if len(available_dates) == 0:
-                    logger.warning(f"No signal scores available for {current_date} or earlier")
-                    return None
-                
-                # Use the latest available date
-                latest_date = available_dates[-1]
-                logger.info(f"No signal scores for {current_date}, using latest available from {latest_date}")
-                date_scores = signal_scores.loc[latest_date]
-            else:
-                date_scores = signal_scores.loc[current_date]
-            
-            # Use combined scores directly (already combined from database)
-            combined_scores = {}
-            for ticker in tickers:
-                try:
-                    if ticker in date_scores.index:
-                        score = date_scores[ticker]
-                        # Handle both scalar and Series values
-                        if isinstance(score, pd.Series):
-                            # If it's a Series, take the first non-null value
-                            score = score.dropna().iloc[0] if not score.dropna().empty else np.nan
-                        
-                        if not pd.isna(score):
-                            combined_scores[ticker] = float(score)
-                        else:
-                            combined_scores[ticker] = 0.0
-                    else:
-                        combined_scores[ticker] = 0.0
-                except Exception as e:
-                    logger.warning(f"Error getting score for {ticker}: {e}")
-                    combined_scores[ticker] = 0.0
-            
-            if not combined_scores:
-                logger.warning(f"No valid signal scores for {current_date}")
-                return None
-            
-            # Get price history for optimization
-            lookback_start = current_date - timedelta(days=config.min_lookback_days)
-            price_history = price_data[price_data.index >= lookback_start]
-            
-            if price_history.empty:
-                logger.warning(f"Insufficient price history for {current_date}")
-                return None
-            
-            # This method is no longer used in the new architecture
-            # Portfolio solving is now handled by PortfolioService
-            logger.warning("_rebalance_portfolio method is deprecated in new architecture")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error rebalancing portfolio on {current_date}: {e}")
-            return None
     
     def _calculate_portfolio_return(self, weights: pd.Series, price_data: pd.DataFrame,
                                   current_date: date, current_index: int) -> Optional[float]:
@@ -1241,8 +991,14 @@ class BacktestEngine:
                 nav_objects.append(nav_obj)
             
             if nav_objects:
-                self.database_manager.store_backtest_nav(nav_objects)
-                logger.info(f"Stored {len(nav_objects)} NAV records")
+                try:
+                    stored_count = self.database_manager.store_backtest_nav(nav_objects)
+                    logger.info(f"Stored {stored_count} NAV records for backtest {result.backtest_id}")
+                except Exception as e:
+                    logger.error(f"Failed to store NAV data for backtest {result.backtest_id}: {e}")
+                    raise
+            else:
+                logger.warning(f"No NAV data to store for backtest {result.backtest_id}")
             
             # Store portfolios and positions
             for date, weights_row in weights_history.iterrows():
@@ -1401,8 +1157,7 @@ class BacktestEngine:
         if show_plots:
             plt.show()
         
-        return figures
-    
+        return figures    
     def _combine_signals_to_scores(self, raw_signals: pd.DataFrame, tickers: List[str], 
                                   signals: List[str], config: BacktestConfig) -> pd.DataFrame:
         """
@@ -1479,7 +1234,7 @@ class BacktestEngine:
                 
                 # Store combined scores in database
                 try:
-                    from database import ScoreCombined
+                    from src.database import ScoreCombined
                     score_objects = []
                     for _, row in df.iterrows():
                         score_obj = ScoreCombined(
@@ -1505,3 +1260,4 @@ class BacktestEngine:
         except Exception as e:
             logger.error(f"Error combining signals: {e}")
             return pd.DataFrame()
+

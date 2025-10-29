@@ -4,7 +4,6 @@ Database Service
 Service layer for database operations and data processing.
 """
 
-import sys
 import os
 import json
 from pathlib import Path
@@ -13,11 +12,8 @@ from datetime import date, datetime
 import pandas as pd
 import logging
 
-# Add src to path to import existing modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
-
-from database import DatabaseManager
-from database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
+from src.database import DatabaseManager
+from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse
@@ -31,8 +27,32 @@ class DatabaseService:
     def __init__(self):
         """Initialize database service."""
         self.db_manager = DatabaseManager()
-        if not self.db_manager.connect():
-            raise Exception("Failed to connect to database")
+        self._connected = False
+        # Don't fail at initialization - connect lazily
+        try:
+            self._connected = self.db_manager.connect()
+        except Exception as e:
+            logger.warning(f"Database connection failed at initialization: {e}")
+            self._connected = False
+    
+    def is_connected(self) -> bool:
+        """Check if database is connected."""
+        if not self._connected:
+            return False
+        # Actually test the connection by calling the database manager's is_connected method
+        return self.db_manager.is_connected()
+    
+    def ensure_connection(self) -> bool:
+        """Ensure database connection is established."""
+        # Check if we have a valid connection
+        if not self.is_connected():
+            try:
+                self._connected = self.db_manager.connect()
+            except Exception as e:
+                logger.error(f"Failed to connect to database: {e}")
+                self._connected = False
+                return False
+        return self._connected
     
     def _parse_json_field(self, value: Any) -> Any:
         """Parse JSON string fields to dictionaries."""
@@ -129,6 +149,7 @@ class DatabaseService:
             nav_df = self.db_manager.get_backtest_nav(run_id, start_date, end_date)
             
             if nav_df.empty:
+                logger.warning(f"No NAV data found in database for backtest {run_id}")
                 return []
             
             # Transform field names to match Pydantic model
@@ -384,6 +405,7 @@ class DatabaseService:
             # Get NAV data
             nav_data = self.get_backtest_nav(run_id)
             if not nav_data:
+                logger.warning(f"No NAV data found for backtest {run_id}")
                 return None
             
             # Convert to DataFrame for calculations
@@ -551,27 +573,36 @@ class DatabaseService:
                 if existing:
                     raise ValueError(f"Universe '{name}' already exists")
             
-            # Update fields
-            if name:
-                universe.name = name
-            if description is not None:
-                universe.description = description
+            # Use the new name or keep the existing one
+            updated_name = name if name else universe.name
+            updated_description = description if description is not None else universe.description
             
-            universe.updated_at = datetime.now()
+            # Update the universe in the database
+            success = self.db_manager.update_universe(
+                universe_id=universe_id,
+                name=updated_name,
+                description=updated_description,
+                updated_at=datetime.now()
+            )
             
-            # Store updated universe
-            self.db_manager.store_universe(universe)
+            if not success:
+                raise ValueError(f"Failed to update universe {universe_id}")
+            
+            # Get the updated universe
+            updated_universe = self.db_manager.get_universe_by_id(universe_id)
+            if updated_universe is None:
+                raise ValueError(f"Failed to retrieve updated universe {universe_id}")
             
             # Get ticker count
             tickers_df = self.db_manager.get_universe_tickers(universe_id)
             ticker_count = len(tickers_df)
             
             return {
-                "id": universe.id,
-                "name": universe.name,
-                "description": universe.description,
-                "created_at": universe.created_at,
-                "updated_at": universe.updated_at,
+                "id": updated_universe.id,
+                "name": updated_universe.name,
+                "description": updated_universe.description,
+                "created_at": updated_universe.created_at,
+                "updated_at": updated_universe.updated_at,
                 "ticker_count": ticker_count
             }
             
@@ -712,6 +743,56 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error getting raw signals: {e}")
             raise
+    
+    def delete_backtest(self, run_id: str) -> bool:
+        """Delete a backtest and all associated data."""
+        try:
+            # Check if backtest exists
+            backtest = self.get_backtest_by_run_id(run_id)
+            if backtest is None:
+                logger.warning(f"Backtest {run_id} not found for deletion")
+                return False
+            
+            # Delete in order to respect foreign key constraints:
+            # 1. Portfolio positions (references portfolios)
+            # 2. Portfolios (references backtests via run_id)
+            # 3. Backtest NAV data (references backtests via run_id)
+            # 4. Backtest itself
+            
+            # Delete portfolio positions for all portfolios of this backtest
+            portfolios = self.get_backtest_portfolios(run_id)
+            for portfolio in portfolios:
+                portfolio_id = portfolio.get('id')
+                if portfolio_id:
+                    self.db_manager.execute_query(
+                        "DELETE FROM portfolio_positions WHERE portfolio_id = %s",
+                        (portfolio_id,)
+                    )
+            
+            # Delete portfolios for this backtest
+            self.db_manager.execute_query(
+                "DELETE FROM portfolios WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            # Delete NAV data for this backtest
+            self.db_manager.execute_query(
+                "DELETE FROM backtest_nav WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            # Delete the backtest itself
+            self.db_manager.execute_query(
+                "DELETE FROM backtests WHERE run_id = %s",
+                (run_id,)
+            )
+            
+            logger.info(f"Successfully deleted backtest {run_id} and all associated data")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting backtest {run_id}: {e}")
+            return False
     
     def close(self):
         """Close database connection."""

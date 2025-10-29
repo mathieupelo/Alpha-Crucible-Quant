@@ -3,7 +3,7 @@
  * Allows users to configure and run backtests with preflight checks
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,7 +21,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  StepContent,
   Chip,
   List,
   ListItem,
@@ -29,9 +28,6 @@ import {
   ListItemIcon,
   Divider,
   CircularProgress,
-  Skeleton,
-  FormControlLabel,
-  Checkbox,
   FormHelperText,
 } from '@mui/material';
 import {
@@ -48,7 +44,9 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import { backtestApi, universeApi, signalApi } from '@/services/api';
-import { BacktestCreateRequest, Universe, Signal } from '@/types';
+import { BacktestCreateRequest } from '@/types';
+import Logo from '@/components/common/Logo';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface PreflightResult {
   isValid: boolean;
@@ -60,6 +58,7 @@ interface PreflightResult {
 
 const RunBacktest: React.FC = () => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<Partial<BacktestCreateRequest>>({
     start_date: '2024-01-01',  // Default to a reasonable range within available signals
@@ -230,16 +229,32 @@ const RunBacktest: React.FC = () => {
         errors.push(`Invalid tickers found: ${invalidTickers.map(t => t.ticker).join(', ')}`);
       }
 
-      // 4. Generate rebalancing dates (simplified - would need proper trading calendar logic)
+      // 4. Generate rebalancing dates based on selected frequency
       if (formData.start_date && formData.end_date) {
         const startDate = new Date(formData.start_date);
         const endDate = new Date(formData.end_date);
+        const frequency = formData.rebalancing_frequency || 'monthly';
         
-        // Simple monthly rebalancing for now
         const current = new Date(startDate);
-        while (current <= endDate) {
-          rebalancingDates.push(current.toISOString().split('T')[0]);
-          current.setMonth(current.getMonth() + 1);
+        
+        if (frequency === 'weekly') {
+          // Weekly rebalancing - every 7 days
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 7);
+          }
+        } else if (frequency === 'monthly') {
+          // Monthly rebalancing - first day of each month
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setMonth(current.getMonth() + 1);
+          }
+        } else if (frequency === 'quarterly') {
+          // Quarterly rebalancing - every 3 months
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setMonth(current.getMonth() + 3);
+          }
         }
       }
 
@@ -325,7 +340,7 @@ const RunBacktest: React.FC = () => {
 
   const handleViewResults = () => {
     if (runResult?.runId) {
-      navigate(`/backtest/${runResult.runId}`);
+      navigate(`/backtest?id=${runResult.runId}`);
     }
   };
 
@@ -340,9 +355,12 @@ const RunBacktest: React.FC = () => {
       <Box>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Run Backtest
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Logo size="medium" showText={false} clickable={true} />
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              Run Backtest
+            </Typography>
+          </Box>
           <Typography variant="body1" color="text.secondary">
             Configure and execute a quantitative trading strategy backtest
           </Typography>
@@ -352,7 +370,7 @@ const RunBacktest: React.FC = () => {
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Stepper activeStep={activeStep} orientation="horizontal">
-              {steps.map((label, index) => (
+              {steps.map((label) => (
                 <Step key={label}>
                   <StepLabel>{label}</StepLabel>
                 </Step>
@@ -397,11 +415,64 @@ const RunBacktest: React.FC = () => {
                 {/* Universe Selection */}
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth required>
-                    <InputLabel>Universe</InputLabel>
+                    <InputLabel 
+                      sx={{
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        '&.Mui-focused': {
+                          color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        }
+                      }}
+                    >
+                      Universe
+                    </InputLabel>
                     <Select
                       value={formData.universe_id || ''}
                       onChange={(e) => handleInputChange('universe_id', e.target.value)}
                       disabled={universesLoading}
+                      sx={{
+                        '& .MuiSelect-select': {
+                          py: 2,
+                        },
+                        background: isDarkMode
+                          ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                          : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                      }}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            border: isDarkMode
+                              ? '1px solid rgba(148, 163, 184, 0.3)'
+                              : '1px solid rgba(148, 163, 184, 0.4)',
+                            boxShadow: isDarkMode
+                              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                            '& .MuiMenuItem-root': {
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              '&:hover': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                              },
+                              '&.Mui-selected': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                                '&:hover': {
+                                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.15)',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      }}
                     >
                       {universesData?.universes.map((universe) => (
                         <MenuItem key={universe.id} value={universe.id}>
@@ -427,7 +498,66 @@ const RunBacktest: React.FC = () => {
                     label="Start Date"
                     value={formData.start_date ? new Date(formData.start_date) : null}
                     onChange={(date) => handleInputChange('start_date', date?.toISOString().split('T')[0])}
-                    slotProps={{ textField: { fullWidth: true, required: true } }}
+                    slotProps={{ 
+                      textField: { 
+                        fullWidth: true, 
+                        required: true,
+                        sx: {
+                          '& .MuiOutlinedInput-root': {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            },
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: isDarkMode ? '#94a3b8' : '#64748b',
+                            '&.Mui-focused': {
+                              color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            }
+                          },
+                        }
+                      },
+                      popper: {
+                        sx: {
+                          '& .MuiPaper-root': {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            border: isDarkMode
+                              ? '1px solid rgba(148, 163, 184, 0.3)'
+                              : '1px solid rgba(148, 163, 184, 0.4)',
+                            boxShadow: isDarkMode
+                              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                            '& .MuiPickersCalendarHeader-root': {
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            },
+                            '& .MuiDayCalendar-root': {
+                              '& .MuiPickersDay-root': {
+                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                '&:hover': {
+                                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                                },
+                                '&.Mui-selected': {
+                                  backgroundColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                                  '&:hover': {
+                                    backgroundColor: isDarkMode ? '#1d4ed8' : '#1e40af',
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    }}
                   />
                 </Grid>
 
@@ -436,7 +566,66 @@ const RunBacktest: React.FC = () => {
                     label="End Date"
                     value={formData.end_date ? new Date(formData.end_date) : null}
                     onChange={(date) => handleInputChange('end_date', date?.toISOString().split('T')[0])}
-                    slotProps={{ textField: { fullWidth: true, required: true } }}
+                    slotProps={{ 
+                      textField: { 
+                        fullWidth: true, 
+                        required: true,
+                        sx: {
+                          '& .MuiOutlinedInput-root': {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            },
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: isDarkMode ? '#94a3b8' : '#64748b',
+                            '&.Mui-focused': {
+                              color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                            }
+                          },
+                        }
+                      },
+                      popper: {
+                        sx: {
+                          '& .MuiPaper-root': {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            border: isDarkMode
+                              ? '1px solid rgba(148, 163, 184, 0.3)'
+                              : '1px solid rgba(148, 163, 184, 0.4)',
+                            boxShadow: isDarkMode
+                              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                            '& .MuiPickersCalendarHeader-root': {
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            },
+                            '& .MuiDayCalendar-root': {
+                              '& .MuiPickersDay-root': {
+                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                '&:hover': {
+                                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                                },
+                                '&.Mui-selected': {
+                                  backgroundColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                                  '&:hover': {
+                                    backgroundColor: isDarkMode ? '#1d4ed8' : '#1e40af',
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    }}
                     minDate={formData.start_date ? new Date(formData.start_date) : undefined}
                   />
                 </Grid>
@@ -444,10 +633,63 @@ const RunBacktest: React.FC = () => {
                 {/* Rebalancing Frequency */}
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth required>
-                    <InputLabel>Rebalancing Frequency</InputLabel>
+                    <InputLabel 
+                      sx={{
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        '&.Mui-focused': {
+                          color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        }
+                      }}
+                    >
+                      Rebalancing Frequency
+                    </InputLabel>
                     <Select
                       value={formData.rebalancing_frequency || 'monthly'}
                       onChange={(e) => handleInputChange('rebalancing_frequency', e.target.value)}
+                      sx={{
+                        '& .MuiSelect-select': {
+                          py: 2,
+                        },
+                        background: isDarkMode
+                          ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                          : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                      }}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            border: isDarkMode
+                              ? '1px solid rgba(148, 163, 184, 0.3)'
+                              : '1px solid rgba(148, 163, 184, 0.4)',
+                            boxShadow: isDarkMode
+                              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                            '& .MuiMenuItem-root': {
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              '&:hover': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                              },
+                              '&.Mui-selected': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                                '&:hover': {
+                                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.15)',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      }}
                     >
                       <MenuItem value="weekly">Weekly</MenuItem>
                       <MenuItem value="monthly">Monthly</MenuItem>
@@ -473,7 +715,16 @@ const RunBacktest: React.FC = () => {
                 {/* Signals Selection */}
                 <Grid item xs={12}>
                   <FormControl fullWidth required>
-                    <InputLabel>Signals</InputLabel>
+                    <InputLabel 
+                      sx={{
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        '&.Mui-focused': {
+                          color: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        }
+                      }}
+                    >
+                      Signals
+                    </InputLabel>
                     <Select
                       multiple
                       value={formData.signals || []}
@@ -486,6 +737,50 @@ const RunBacktest: React.FC = () => {
                           ))}
                         </Box>
                       )}
+                      sx={{
+                        '& .MuiSelect-select': {
+                          py: 2,
+                        },
+                        background: isDarkMode
+                          ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                          : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: isDarkMode ? '#2563eb' : '#1d4ed8',
+                        },
+                      }}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: {
+                            background: isDarkMode
+                              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+                              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                            border: isDarkMode
+                              ? '1px solid rgba(148, 163, 184, 0.3)'
+                              : '1px solid rgba(148, 163, 184, 0.4)',
+                            boxShadow: isDarkMode
+                              ? '0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 4px 16px 0 rgba(0, 0, 0, 0.4)'
+                              : '0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 4px 16px 0 rgba(0, 0, 0, 0.15)',
+                            '& .MuiMenuItem-root': {
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              '&:hover': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)',
+                              },
+                              '&.Mui-selected': {
+                                backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                                '&:hover': {
+                                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.15)',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      }}
                     >
                       {signalTypesData?.signal_types.map((signal) => (
                         <MenuItem key={signal.signal_id} value={signal.signal_id}>
@@ -568,7 +863,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                   disabled={isValidating}
                 >
                   Cancel
@@ -673,7 +968,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                 >
                   Cancel
                 </Button>
@@ -746,7 +1041,7 @@ const RunBacktest: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/backtest')}
                 >
                   Back to Dashboard
                 </Button>

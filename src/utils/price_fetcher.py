@@ -33,7 +33,7 @@ class PriceFetcher:
     def __init__(self, timeout: Optional[int] = None, retries: Optional[int] = None):
         """Initialize price fetcher with configuration."""
         # Import here to avoid circular imports
-        from data import RealTimeDataFetcher
+        from src.data import RealTimeDataFetcher
         
         # Configuration constants
         DEFAULT_TIMEOUT_SECONDS = 10
@@ -233,7 +233,7 @@ class PriceFetcherWithFallback(PriceFetcher):
     def __init__(self, timeout: Optional[int] = None, retries: Optional[int] = None):
         """Initialize price fetcher with fallback capabilities."""
         # Import here to avoid circular imports
-        from data import RealTimeDataFetcherWithFallback
+        from src.data import RealTimeDataFetcherWithFallback
         
         self.timeout = timeout or int(os.getenv('YFINANCE_TIMEOUT', '10'))
         self.retries = retries or int(os.getenv('YFINANCE_RETRIES', '3'))

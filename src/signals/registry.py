@@ -7,13 +7,8 @@ instead of using hardcoded values.
 
 from typing import Dict, List, Any, Optional
 import logging
-import sys
-from pathlib import Path
 
-# Add src to path to import database manager
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from database import DatabaseManager
+from ..database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

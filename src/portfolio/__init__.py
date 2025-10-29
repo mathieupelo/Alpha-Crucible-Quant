@@ -1,10 +1,2 @@
-"""
-Portfolio management module.
-
-This module provides portfolio creation and management functionality,
-including signal validation, score combination, and portfolio optimization.
-"""
-
+# Portfolio package
 from .service import PortfolioService
-
-__all__ = ['PortfolioService']

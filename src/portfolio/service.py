@@ -11,11 +11,11 @@ from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
 
-from signals import SignalReader
-from solver import PortfolioSolver
-from database import DatabaseManager, Portfolio, PortfolioPosition
-from utils import TradingCalendar, validate_ticker_list, validate_signal_list
-from utils.error_handling import handle_calculation_errors, handle_database_errors
+from src.signals import SignalReader
+from src.solver import PortfolioSolver
+from src.database import DatabaseManager, Portfolio, PortfolioPosition
+from src.utils import TradingCalendar, validate_ticker_list, validate_signal_list
+from src.utils.error_handling import handle_calculation_errors, handle_database_errors
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class PortfolioService:
             # Create a proper price history for the solver
             # We need at least 30 days of data for mean-variance optimization
             # or we can use score-based allocation which doesn't need price history
-            from solver.config import SolverConfig
+            from src.solver.config import SolverConfig
             
             # Configure solver for score-based allocation
             # Use provided max_weight or default to 0.3

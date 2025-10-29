@@ -8,15 +8,15 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import logging
 
+from security.input_validation import (
+    validate_ticker, sanitize_string, validate_ticker_list
+)
 from models import (
     UniverseResponse, UniverseListResponse, UniverseTickerResponse, 
     UniverseTickerListResponse, TickerValidationResponse,
     UniverseCreateRequest, UniverseUpdateRequest, UniverseTickerUpdateRequest,
     ErrorResponse, SuccessResponse
 )
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from services.database_service import DatabaseService
 from services.ticker_validation_service import TickerValidationService
 
@@ -36,6 +36,8 @@ ticker_validator = TickerValidationService(
 async def get_universes():
     """Get all universes."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universes = db_service.get_all_universes()
         return UniverseListResponse(
             universes=[UniverseResponse(**universe) for universe in universes],
@@ -50,6 +52,8 @@ async def get_universes():
 async def get_universe(universe_id: int):
     """Get a specific universe by ID."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
@@ -65,11 +69,23 @@ async def get_universe(universe_id: int):
 async def create_universe(request: UniverseCreateRequest):
     """Create a new universe."""
     try:
+        # Validate and sanitize inputs
+        sanitized_name = sanitize_string(request.name, max_length=255)
+        sanitized_description = sanitize_string(request.description or "", max_length=1000)
+        
+        if not sanitized_name:
+            raise HTTPException(status_code=400, detail="Universe name cannot be empty")
+        
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
         universe = db_service.create_universe(
-            name=request.name,
-            description=request.description
+            name=sanitized_name,
+            description=sanitized_description if sanitized_description else None
         )
         return UniverseResponse(**universe)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -81,6 +97,8 @@ async def create_universe(request: UniverseCreateRequest):
 async def update_universe(universe_id: int, request: UniverseUpdateRequest):
     """Update an existing universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         universe = db_service.update_universe(
             universe_id=universe_id,
             name=request.name,
@@ -102,6 +120,8 @@ async def update_universe(universe_id: int, request: UniverseUpdateRequest):
 async def delete_universe(universe_id: int):
     """Delete a universe and all its tickers."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         success = db_service.delete_universe(universe_id)
         if not success:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
@@ -117,6 +137,8 @@ async def delete_universe(universe_id: int):
 async def get_universe_tickers(universe_id: int):
     """Get all tickers for a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if universe exists
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
@@ -139,6 +161,8 @@ async def get_universe_tickers(universe_id: int):
 async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdateRequest):
     """Update all tickers for a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if universe exists
         universe = db_service.get_universe_by_id(universe_id)
         if universe is None:
@@ -162,8 +186,16 @@ async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdat
 async def add_universe_ticker(universe_id: int, ticker: str = Query(..., description="Ticker symbol to add")):
     """Add a single ticker to a universe."""
     try:
-        ticker_data = db_service.add_universe_ticker(universe_id, ticker)
+        # Validate ticker
+        validated_ticker = validate_ticker(ticker)
+        
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        ticker_data = db_service.add_universe_ticker(universe_id, validated_ticker)
         return UniverseTickerResponse(**ticker_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -175,6 +207,8 @@ async def add_universe_ticker(universe_id: int, ticker: str = Query(..., descrip
 async def remove_universe_ticker(universe_id: int, ticker: str):
     """Remove a ticker from a universe."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         success = db_service.remove_universe_ticker(universe_id, ticker)
         if not success:
             raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found in universe {universe_id}")
@@ -193,16 +227,18 @@ async def validate_tickers(tickers: List[str]):
         if not tickers:
             return []
         
-        # Clean and deduplicate tickers
-        clean_tickers = list(set(ticker.strip().upper() for ticker in tickers if ticker.strip()))
+        # Validate and sanitize ticker list
+        validated_tickers = validate_ticker_list(tickers)
         
-        if not clean_tickers:
+        if not validated_tickers:
             return []
         
         # Validate tickers with small batch size to avoid rate limiting
-        results = ticker_validator.validate_tickers_batch(clean_tickers, batch_size=2)
+        results = ticker_validator.validate_tickers_batch(validated_tickers, batch_size=2)
         
         return [TickerValidationResponse(**result) for result in results]
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error validating tickers: {e}")
         raise HTTPException(status_code=500, detail=str(e))

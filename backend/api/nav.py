@@ -10,9 +10,6 @@ from datetime import date
 import logging
 
 from models import NavResponse, NavListResponse, ErrorResponse
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
@@ -30,6 +27,8 @@ async def get_backtest_nav(
 ):
     """Get NAV data for a backtest."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         # Check if backtest exists
         backtest = db_service.get_backtest_by_run_id(run_id)
         if backtest is None:

@@ -24,11 +24,25 @@ import {
 } from '@/types';
 
 // Create axios instance with base configuration
+// Use ngrok URL if we're running on ngrok domain, otherwise use localhost
+const getBaseURL = () => {
+  if (window.location.hostname.includes('ngrok-free.dev')) {
+    return `${window.location.protocol}//${window.location.hostname}/api`;
+  }
+  // Use relative URL to go through nginx proxy when accessing via localhost:8080
+  if (window.location.port === '8080' || window.location.hostname === 'localhost') {
+    return '/api';
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
-  timeout: 60000, // Increased to 30 seconds for ticker validation
+  baseURL: getBaseURL(),
+  timeout: 600000, // Increased to 5 minutes for backtest execution
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true', // Bypass ngrok browser warning
+    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || 'my-awesome-key-123'}`,
   },
 });
 
@@ -112,6 +126,12 @@ export const backtestApi = {
   // Check if backtest name exists
   checkBacktestName: async (name: string): Promise<{ name: string; exists: boolean; available: boolean }> => {
     const response = await api.get(`/backtests/check-name?name=${encodeURIComponent(name)}`);
+    return response.data;
+  },
+
+  // Delete backtest
+  deleteBacktest: async (runId: string): Promise<{ message: string; run_id: string }> => {
+    const response = await api.delete(`/backtests/${runId}`);
     return response.data;
   }
 };

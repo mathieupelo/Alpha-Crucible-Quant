@@ -8,15 +8,11 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from datetime import date
 import logging
-import sys
-from pathlib import Path
-
-# Add src to path to import existing modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
-
-from models import ErrorResponse
-from utils.price_fetcher import PriceFetcher
 import pandas as pd
+
+from security.input_validation import validate_ticker, validate_date_range, validate_numeric_range
+from models import ErrorResponse
+from src.utils.price_fetcher import PriceFetcher
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,13 +29,13 @@ async def get_market_data(
 ):
     """Get market data for a symbol over a date range."""
     try:
-        # Validate symbol
-        if not symbol or len(symbol.strip()) == 0:
-            raise HTTPException(status_code=400, detail="Symbol cannot be empty")
+        # Validate and sanitize inputs
+        validated_symbol = validate_ticker(symbol)
+        start_date, end_date = validate_date_range(start_date, end_date)
         
         # Fetch price history
         price_data = price_fetcher.get_price_history(
-            symbol.upper().strip(), 
+            validated_symbol, 
             start_date, 
             end_date
         )
@@ -63,7 +59,7 @@ async def get_market_data(
             })
         
         return {
-            "symbol": symbol.upper(),
+            "symbol": validated_symbol,
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
             "data": market_data,
@@ -86,8 +82,13 @@ async def get_normalized_market_data(
 ):
     """Get normalized market data for a symbol over a date range."""
     try:
+        # Validate inputs
+        validated_symbol = validate_ticker(symbol)
+        start_date, end_date = validate_date_range(start_date, end_date)
+        start_value = validate_numeric_range(start_value, 0.01, 1000000.0, "start_value")
+        
         # Get raw market data
-        market_response = await get_market_data(symbol, start_date, end_date)
+        market_response = await get_market_data(validated_symbol, start_date, end_date)
         market_data = market_response["data"]
         
         if not market_data:
@@ -107,7 +108,7 @@ async def get_normalized_market_data(
             })
         
         return {
-            "symbol": symbol.upper(),
+            "symbol": validated_symbol,
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
             "start_value": start_value,

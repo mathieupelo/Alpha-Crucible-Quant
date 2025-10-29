@@ -26,7 +26,7 @@ if not exist .env.local (
     echo Creating .env.local for development...
     (
         echo VITE_API_URL=http://localhost:8000/api
-        echo VITE_API_KEY=dev-key-change-in-production
+        echo VITE_API_KEY=my-awesome-key-123
     ) > .env.local
     echo Created .env.local with development settings.
     echo.

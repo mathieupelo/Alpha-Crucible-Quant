@@ -157,7 +157,20 @@ class BacktestEngine:
             if 'result' in locals():
                 result.execution_time_seconds = time.time() - start_time
                 result.error_message = str(e)
-            return result
+                return result
+            else:
+                # If result was never created, create a minimal error result
+                from .models import BacktestResult
+                error_result = BacktestResult(
+                    backtest_id=f"error_{int(time.time())}",
+                    start_date=config.start_date,
+                    end_date=config.end_date,
+                    tickers=tickers,
+                    signals=signals,
+                    error_message=str(e),
+                    execution_time_seconds=time.time() - start_time
+                )
+                return error_result
     
     def _initialize_backtest(self, tickers: List[str], signals: List[str], 
                            config: BacktestConfig) -> Tuple[str, BacktestResult]:
@@ -203,10 +216,46 @@ class BacktestEngine:
         
         # Store backtest configuration in database
         try:
-            self.database_manager.store_backtest(backtest_config)
+            # Convert signal names to signal IDs for the signals table
+            signal_ids = []
+            signal_weights_dict = {}
+            if signals:
+                logger.info(f"Converting {len(signals)} signal names to signal IDs...")
+                for signal_name in signals:
+                    try:
+                        signal_obj = self.database_manager.get_signal_by_name(signal_name)
+                        if signal_obj:
+                            signal_ids.append(signal_obj.id)
+                            # Map signal name weights to signal ID weights
+                            weight = config.signal_weights.get(signal_name, 1.0) if config.signal_weights else 1.0
+                            signal_weights_dict[signal_obj.id] = weight
+                            logger.debug(f"Found signal '{signal_name}' -> ID {signal_obj.id}")
+                        else:
+                            # Signal doesn't exist, try to create it
+                            logger.warning(f"Signal '{signal_name}' not found in database, creating it...")
+                            signal_obj = self.database_manager.get_or_create_signal(signal_name)
+                            signal_ids.append(signal_obj.id)
+                            weight = config.signal_weights.get(signal_name, 1.0) if config.signal_weights else 1.0
+                            signal_weights_dict[signal_obj.id] = weight
+                            logger.info(f"Created signal '{signal_name}' -> ID {signal_obj.id}")
+                    except Exception as sig_error:
+                        # If signal lookup fails, log but continue - we'll store backtest without signal relationships
+                        logger.error(f"Error looking up signal '{signal_name}': {sig_error}")
+                        logger.warning(f"Will store backtest without signal relationship for '{signal_name}'")
+            
+            # Store backtest with signal relationships if we have any
+            if signal_ids:
+                logger.info(f"Storing backtest with {len(signal_ids)} signal relationships...")
+                self.database_manager.store_backtest(backtest_config, signal_ids=signal_ids, signal_weights=signal_weights_dict)
+            else:
+                # No signals or couldn't resolve them, store without signal relationships
+                logger.info("Storing backtest without signal relationships (signals parameter was None or empty)")
+                self.database_manager.store_backtest(backtest_config)
             logger.info(f"Stored backtest configuration with run_id: {run_id}")
         except Exception as e:
             logger.error(f"Error storing backtest configuration: {e}")
+            logger.exception("Full exception traceback:")
+            raise  # Re-raise to be caught by outer exception handler
         
         # Initialize result
         result = BacktestResult(

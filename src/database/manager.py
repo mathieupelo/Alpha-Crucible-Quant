@@ -14,7 +14,7 @@ from psycopg2 import Error as PgError
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
-from .models import SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, Universe, UniverseTicker, DataFrameConverter
+from .models import Signal, SignalRaw, ScoreCombined, Portfolio, PortfolioPosition, Backtest, BacktestNav, BacktestSignal, Universe, UniverseTicker, DataFrameConverter
 from src.utils.error_handling import handle_database_errors, retry_on_failure
 
 # Load environment variables
@@ -175,6 +175,117 @@ class DatabaseManager:
         finally:
             cursor.close()
     
+    # Signal Operations
+    
+    def store_signal(self, signal: Signal) -> int:
+        """Store a signal definition in the database."""
+        query = """
+        INSERT INTO signals (name, description, enabled, parameters, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (name) DO UPDATE SET
+            description = EXCLUDED.description,
+            enabled = EXCLUDED.enabled,
+            parameters = EXCLUDED.parameters,
+            updated_at = EXCLUDED.updated_at
+        RETURNING id
+        """
+        
+        parameters_json = None
+        if signal.parameters:
+            import json
+            parameters_json = json.dumps(signal.parameters)
+        
+        params = (
+            signal.name,
+            signal.description,
+            signal.enabled,
+            parameters_json,
+            signal.created_at or datetime.now(),
+            signal.updated_at or datetime.now()
+        )
+        
+        return self.execute_insert(query, params)
+    
+    def get_signal_by_name(self, name: str) -> Optional[Signal]:
+        """Get a signal by its name."""
+        query = "SELECT * FROM signals WHERE name = %s"
+        df = self.execute_query(query, (name,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        parameters = None
+        if row.get('parameters'):
+            import json
+            try:
+                parameters = json.loads(row['parameters'])
+            except (json.JSONDecodeError, TypeError):
+                parameters = None
+        
+        return Signal(
+            id=int(row['id']),
+            name=str(row['name']),
+            description=str(row.get('description')) if pd.notna(row.get('description')) else None,
+            enabled=bool(row.get('enabled', True)),
+            parameters=parameters,
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def get_signal_by_id(self, signal_id: int) -> Optional[Signal]:
+        """Get a signal by its ID."""
+        query = "SELECT * FROM signals WHERE id = %s"
+        df = self.execute_query(query, (signal_id,))
+        
+        if df.empty:
+            return None
+        
+        row = df.iloc[0]
+        parameters = None
+        if row.get('parameters'):
+            import json
+            try:
+                parameters = json.loads(row['parameters'])
+            except (json.JSONDecodeError, TypeError):
+                parameters = None
+        
+        return Signal(
+            id=int(row['id']),
+            name=str(row['name']),
+            description=str(row.get('description')) if pd.notna(row.get('description')) else None,
+            enabled=bool(row.get('enabled', True)),
+            parameters=parameters,
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
+        )
+    
+    def get_all_signals(self, enabled_only: bool = False) -> pd.DataFrame:
+        """Get all signals from the database."""
+        if enabled_only:
+            query = "SELECT * FROM signals WHERE enabled = TRUE ORDER BY name"
+        else:
+            query = "SELECT * FROM signals ORDER BY name"
+        return self.execute_query(query)
+    
+    def get_or_create_signal(self, name: str, description: Optional[str] = None) -> Signal:
+        """Get an existing signal or create a new one."""
+        signal = self.get_signal_by_name(name)
+        if signal:
+            return signal
+        
+        # Create new signal
+        new_signal = Signal(
+            name=name,
+            description=description or f"Signal: {name}",
+            enabled=True,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        signal_id = self.store_signal(new_signal)
+        new_signal.id = signal_id
+        return new_signal
+    
     # Signal Raw Operations
     
     def store_signals_raw(self, signals: List[SignalRaw]) -> int:
@@ -182,10 +293,11 @@ class DatabaseManager:
         if not signals:
             return 0
         
+        # Use signal_id if available, otherwise look up by signal_name
         query = """
-        INSERT INTO signal_raw (asof_date, ticker, signal_name, value, metadata, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT (asof_date, ticker, signal_name) DO UPDATE SET 
+        INSERT INTO signal_raw (asof_date, ticker, signal_id, signal_name, value, metadata, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (asof_date, ticker, signal_id) DO UPDATE SET 
             value = EXCLUDED.value,
             metadata = EXCLUDED.metadata,
             created_at = EXCLUDED.created_at
@@ -198,10 +310,25 @@ class DatabaseManager:
                 import json
                 metadata_json = json.dumps(signal.metadata)
             
+            # Resolve signal_id if only signal_name is provided
+            signal_id = signal.signal_id
+            signal_name = signal.signal_name
+            
+            if not signal_id and signal_name:
+                # Look up signal_id from signal_name
+                signal_obj = self.get_signal_by_name(signal_name)
+                if signal_obj:
+                    signal_id = signal_obj.id
+                else:
+                    # Create signal if it doesn't exist
+                    signal_obj = self.get_or_create_signal(signal_name)
+                    signal_id = signal_obj.id
+            
             params_list.append((
                 signal.asof_date,
                 signal.ticker,
-                signal.signal_name,
+                signal_id,
+                signal_name,
                 signal.value,
                 metadata_json,
                 signal.created_at or datetime.now()
@@ -211,31 +338,52 @@ class DatabaseManager:
     
     def get_signals_raw(self, tickers: Optional[List[str]] = None,
                        signal_names: Optional[List[str]] = None,
+                       signal_ids: Optional[List[int]] = None,
                        start_date: Optional[date] = None,
                        end_date: Optional[date] = None) -> pd.DataFrame:
         """Retrieve raw signals from the database."""
-        query = "SELECT * FROM signal_raw WHERE 1=1"
+        query = """
+        SELECT sr.*, s.name as signal_name_display, s.description as signal_description
+        FROM signal_raw sr
+        LEFT JOIN signals s ON sr.signal_id = s.id
+        WHERE 1=1
+        """
         params = []
         
         if tickers:
             placeholders = ','.join(['%s'] * len(tickers))
-            query += f" AND ticker IN ({placeholders})"
+            query += f" AND sr.ticker IN ({placeholders})"
             params.extend(tickers)
         
-        if signal_names:
-            placeholders = ','.join(['%s'] * len(signal_names))
-            query += f" AND signal_name IN ({placeholders})"
-            params.extend(signal_names)
+        if signal_ids:
+            placeholders = ','.join(['%s'] * len(signal_ids))
+            query += f" AND sr.signal_id IN ({placeholders})"
+            params.extend(signal_ids)
+        elif signal_names:
+            # Look up signal_ids from signal_names
+            signal_id_list = []
+            for signal_name in signal_names:
+                signal_obj = self.get_signal_by_name(signal_name)
+                if signal_obj:
+                    signal_id_list.append(signal_obj.id)
+            
+            if signal_id_list:
+                placeholders = ','.join(['%s'] * len(signal_id_list))
+                query += f" AND sr.signal_id IN ({placeholders})"
+                params.extend(signal_id_list)
+            else:
+                # Return empty if no signals found
+                return pd.DataFrame()
         
         if start_date:
-            query += " AND asof_date >= %s"
+            query += " AND sr.asof_date >= %s"
             params.append(start_date)
         
         if end_date:
-            query += " AND asof_date <= %s"
+            query += " AND sr.asof_date <= %s"
             params.append(end_date)
         
-        query += " ORDER BY asof_date, ticker, signal_name"
+        query += " ORDER BY sr.asof_date, sr.ticker, s.name"
         
         return self.execute_query(query, tuple(params) if params else None)
     
@@ -464,9 +612,62 @@ class DatabaseManager:
         
         return self.execute_query(query, tuple(params) if params else None)
     
+    # Backtest Signal Operations
+    
+    def store_backtest_signals(self, backtest_signals: List[BacktestSignal]) -> int:
+        """Store backtest-signal relationships."""
+        if not backtest_signals:
+            return 0
+        
+        query = """
+        INSERT INTO backtest_signals (run_id, signal_id, weight, created_at)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (run_id, signal_id) DO UPDATE SET 
+            weight = EXCLUDED.weight,
+            created_at = EXCLUDED.created_at
+        """
+        
+        params_list = []
+        for bs in backtest_signals:
+            params_list.append((
+                bs.run_id,
+                bs.signal_id,
+                bs.weight,
+                bs.created_at or datetime.now()
+            ))
+        
+        return self.execute_many(query, params_list)
+    
+    def get_backtest_signals(self, run_id: str) -> pd.DataFrame:
+        """Get all signals associated with a backtest."""
+        query = """
+        SELECT bs.*, s.name as signal_name, s.description as signal_description, s.enabled
+        FROM backtest_signals bs
+        JOIN signals s ON bs.signal_id = s.id
+        WHERE bs.run_id = %s
+        ORDER BY s.name
+        """
+        return self.execute_query(query, (run_id,))
+    
+    def delete_backtest_signals(self, run_id: str) -> int:
+        """Delete all signal relationships for a backtest."""
+        query = "DELETE FROM backtest_signals WHERE run_id = %s"
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute(query, (run_id,))
+            self._connection.commit()
+            return cursor.rowcount
+        except PgError as e:
+            logger.error(f"Error deleting backtest signals for {run_id}: {e}")
+            self._connection.rollback()
+            raise
+        finally:
+            cursor.close()
+    
     # Backtest Operations
     
-    def store_backtest(self, backtest: Backtest) -> int:
+    def store_backtest(self, backtest: Backtest, signal_ids: Optional[List[int]] = None, signal_weights: Optional[Dict[int, float]] = None) -> int:
         """Store a backtest configuration in the database."""
         query = """
         INSERT INTO backtests (run_id, name, start_date, end_date, frequency, universe_id, universe, benchmark, params, created_at)
@@ -481,6 +682,7 @@ class DatabaseManager:
             benchmark = EXCLUDED.benchmark,
             params = EXCLUDED.params,
             created_at = EXCLUDED.created_at
+        RETURNING id
         """
         
         universe_json = None
@@ -506,7 +708,24 @@ class DatabaseManager:
             backtest.created_at or datetime.now()
         )
         
-        return self.execute_insert(query, params)
+        backtest_id = self.execute_insert(query, params)
+        
+        # Store backtest-signal relationships if provided
+        if signal_ids:
+            backtest_signals = []
+            for signal_id in signal_ids:
+                weight = signal_weights.get(signal_id, 1.0) if signal_weights else 1.0
+                backtest_signals.append(BacktestSignal(
+                    run_id=backtest.run_id,
+                    signal_id=signal_id,
+                    weight=weight,
+                    created_at=datetime.now()
+                ))
+            
+            if backtest_signals:
+                self.store_backtest_signals(backtest_signals)
+        
+        return backtest_id
     
     def get_backtests(self, run_id: Optional[str] = None,
                      start_date: Optional[date] = None,
@@ -541,7 +760,7 @@ class DatabaseManager:
         count = int(result.iloc[0]['count'])
         return count > 0
     
-    def get_backtest_by_run_id(self, run_id: str) -> Optional[Backtest]:
+    def get_backtest_by_run_id(self, run_id: str, include_signals: bool = True) -> Optional[Backtest]:
         """Get a specific backtest by run_id."""
         query = "SELECT * FROM backtests WHERE run_id = %s"
         df = self.execute_query(query, (run_id,))
@@ -566,7 +785,7 @@ class DatabaseManager:
             except (json.JSONDecodeError, TypeError):
                 params = None
         
-        return Backtest(
+        backtest = Backtest(
             id=row['id'],
             run_id=row['run_id'],
             start_date=row['start_date'],
@@ -579,6 +798,19 @@ class DatabaseManager:
             params=params,
             created_at=row.get('created_at')
         )
+        
+        # Optionally include signal information in params
+        if include_signals:
+            signals_df = self.get_backtest_signals(run_id)
+            if not signals_df.empty:
+                if params is None:
+                    params = {}
+                params['signal_ids'] = signals_df['signal_id'].tolist()
+                params['signal_weights'] = dict(zip(signals_df['signal_id'], signals_df['weight']))
+                params['signal_names'] = signals_df['signal_name'].tolist()
+                backtest.params = params
+        
+        return backtest
     
     # Backtest NAV Operations
     

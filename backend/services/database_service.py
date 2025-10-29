@@ -13,7 +13,7 @@ import pandas as pd
 import logging
 
 from src.database import DatabaseManager
-from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
+from src.database.models import Signal, Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse
@@ -708,8 +708,57 @@ class DatabaseService:
             logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
             raise
     
+    def get_all_signals(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """Get all signal definitions."""
+        try:
+            signals_df = self.db_manager.get_all_signals(enabled_only=enabled_only)
+            
+            if signals_df.empty:
+                return []
+            
+            signals = []
+            for _, row in signals_df.iterrows():
+                signal_data = {
+                    "id": int(row['id']),
+                    "name": str(row['name']),
+                    "description": str(row.get('description')) if pd.notna(row.get('description')) else None,
+                    "enabled": bool(row.get('enabled', True)),
+                    "parameters": self._parse_json_field(row.get('parameters')),
+                    "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None,
+                    "updated_at": row['updated_at'].isoformat() if pd.notna(row.get('updated_at')) else None
+                }
+                signals.append(signal_data)
+            
+            return signals
+            
+        except Exception as e:
+            logger.error(f"Error getting signals: {e}")
+            raise
+    
+    def get_signal_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get a signal definition by name."""
+        try:
+            signal = self.db_manager.get_signal_by_name(name)
+            if signal is None:
+                return None
+            
+            return {
+                "id": signal.id,
+                "name": signal.name,
+                "description": signal.description,
+                "enabled": signal.enabled,
+                "parameters": signal.parameters,
+                "created_at": signal.created_at.isoformat() if signal.created_at else None,
+                "updated_at": signal.updated_at.isoformat() if signal.updated_at else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting signal {name}: {e}")
+            raise
+    
     def get_signals_raw(self, tickers: Optional[List[str]] = None, 
                        signal_names: Optional[List[str]] = None,
+                       signal_ids: Optional[List[int]] = None,
                        start_date: Optional[date] = None, 
                        end_date: Optional[date] = None) -> List[Dict[str, Any]]:
         """Get raw signals with optional filtering."""
@@ -717,6 +766,7 @@ class DatabaseService:
             signals_df = self.db_manager.get_signals_raw(
                 tickers=tickers,
                 signal_names=signal_names,
+                signal_ids=signal_ids,
                 start_date=start_date,
                 end_date=end_date
             )
@@ -731,7 +781,8 @@ class DatabaseService:
                     "id": int(row.get('id')) if pd.notna(row.get('id')) else None,
                     "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
                     "ticker": str(row['ticker']),
-                    "signal_name": str(row['signal_name']),
+                    "signal_id": int(row['signal_id']) if pd.notna(row.get('signal_id')) else None,
+                    "signal_name": str(row.get('signal_name_display') or row.get('signal_name', '')) if pd.notna(row.get('signal_name_display') or row.get('signal_name')) else None,
                     "value": float(row['value']) if pd.notna(row['value']) else None,
                     "metadata": self._parse_json_field(row.get('metadata')),
                     "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None

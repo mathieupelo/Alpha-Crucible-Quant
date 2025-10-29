@@ -16,6 +16,7 @@ COPY frontend/ .
 # Set environment variables for build
 ARG VITE_API_URL
 ARG VITE_API_KEY
+# Vite needs these at build time - they'll be baked into the bundle
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_API_KEY=$VITE_API_KEY
 

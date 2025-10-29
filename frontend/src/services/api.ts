@@ -46,10 +46,16 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Request interceptor for logging (avoid TS errors in production builds)
 api.interceptors.request.use(
   (config) => {
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // Note: Do not assume header is a string in production builds
+    try {
+      const auth = (config.headers as any)?.['Authorization'];
+      const preview = typeof auth === 'string' ? `${auth.slice(0, 20)}...` : '[hidden]';
+      console.log(`API Key being sent: ${preview}`);
+    } catch { /* noop */ }
     return config;
   },
   (error) => {

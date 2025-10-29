@@ -12,14 +12,28 @@ import json
 
 
 @dataclass
+class Signal:
+    """Represents a signal definition/metadata."""
+    name: str
+    description: Optional[str] = None
+    enabled: bool = True
+    parameters: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
+@dataclass
 class SignalRaw:
     """Represents raw signal data for a specific ticker and date."""
     asof_date: date
     ticker: str
-    signal_name: str
+    signal_id: int  # Foreign key to signals.id
     value: float
+    signal_name: Optional[str] = None  # Kept for backward compatibility
     metadata: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
+    id: Optional[int] = None
 
 
 @dataclass
@@ -55,6 +69,16 @@ class PortfolioPosition:
     ticker: str
     weight: float
     price_used: float
+    created_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class BacktestSignal:
+    """Represents the relationship between a backtest and a signal."""
+    run_id: str
+    signal_id: int
+    weight: float = 1.0
     created_at: Optional[datetime] = None
     id: Optional[int] = None
 

@@ -37,6 +37,7 @@ import {
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useQuery, useMutation } from 'react-query';
@@ -129,6 +130,26 @@ const BacktestManager: React.FC = () => {
       enabled: !!selectedBacktestId,
     }
   );
+
+  // Fetch ONLY used signal definitions for the selected backtest
+  const {
+    data: usedSignalsData,
+    isLoading: usedSignalsLoading,
+  } = useQuery(
+    ['backtest-used-signals', selectedBacktestId],
+    () => backtestApi.getBacktestUsedSignals(selectedBacktestId),
+    {
+      enabled: !!selectedBacktestId,
+      staleTime: 0,
+      cacheTime: 0,
+    }
+  );
+
+  // Extract unique signal names from signals data
+  const uniqueSignalNames = React.useMemo(() => {
+    if (!usedSignalsData?.signals) return [];
+    return usedSignalsData.signals.map(s => s.name).sort();
+  }, [usedSignalsData]);
 
   // Initialize selected backtest from URL or auto-select most recent
   useEffect(() => {
@@ -640,6 +661,57 @@ const BacktestManager: React.FC = () => {
                 </Alert>
               )}
             </Box>
+
+            {/* Signals Section */}
+            {backtest && (
+              <Card sx={{ mb: 4 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <AnalyticsIcon sx={{ mr: 1, color: 'primary.main' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Signals Used in This Backtest
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    The following signals were used to create this backtest:
+                  </Typography>
+                  {usedSignalsLoading ? (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      {[...Array(3)].map((_, index) => (
+                        <Skeleton key={index} variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                      ))}
+                    </Box>
+                  ) : uniqueSignalNames.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {uniqueSignalNames.map((signalName) => (
+                        <Chip
+                          key={signalName}
+                          label={signalName}
+                          color="secondary"
+                          variant="filled"
+                          sx={{
+                            fontWeight: 500,
+                            backgroundColor: isDarkMode 
+                              ? 'rgba(156, 39, 176, 0.2)'
+                              : 'rgba(156, 39, 176, 0.1)',
+                            color: isDarkMode 
+                              ? '#ce93d8'
+                              : '#7b1fa2',
+                            border: isDarkMode 
+                              ? '1px solid rgba(156, 39, 176, 0.3)'
+                              : '1px solid rgba(156, 39, 176, 0.2)',
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  ) : (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      No signals found for this backtest.
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Performance Metrics */}
             <Grid container spacing={3} sx={{ mb: 4 }}>

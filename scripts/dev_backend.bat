@@ -58,5 +58,6 @@ echo.
 REM Start the backend with hot reload
 REM Change to backend directory but keep PYTHONPATH pointing to repo root
 cd backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir .. --reload-dir ../src
+REM Watch multiple directories for changes, including services
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir .. --reload-dir ../src --reload-dir ../backend/services --reload-dir ../backend/api
 

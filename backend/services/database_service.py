@@ -345,27 +345,67 @@ class DatabaseService:
     
     def get_backtest_signals(self, run_id: str, start_date: Optional[date] = None,
                            end_date: Optional[date] = None) -> List[Dict[str, Any]]:
-        """Get raw signals for a backtest period."""
+        """Get raw signals for a backtest period, filtered to only signals used in this backtest."""
         try:
-            # Get backtest to determine date range
+            # Check if backtest exists
             backtest = self.db_manager.get_backtest_by_run_id(run_id)
             if backtest is None:
                 return []
             
+            # Get the signals that were actually used for this backtest from backtest_signals table
+            backtest_signals_df = self.db_manager.get_backtest_signals(run_id)
+            
+            if backtest_signals_df.empty:
+                logger.warning(f"No signals found in backtest_signals table for run_id: {run_id}")
+                return []
+            
+            # Extract signal IDs directly (more reliable than name lookup)
+            signal_ids = []
+            if 'signal_id' in backtest_signals_df.columns:
+                # Convert numpy types to native Python ints to avoid database adapter issues
+                signal_ids = [int(sid) for sid in backtest_signals_df['signal_id'].unique().tolist()]
+            
+            # Also extract signal names for logging
+            signal_names = []
+            if 'signal_name' in backtest_signals_df.columns:
+                signal_names = backtest_signals_df['signal_name'].unique().tolist()
+            
+            if not signal_ids:
+                logger.warning(f"Could not extract signal IDs from backtest_signals for run_id: {run_id}. Columns: {list(backtest_signals_df.columns)}")
+                return []
+            
+            logger.info(f"Found {len(signal_ids)} unique signal(s) for backtest {run_id}: signal_ids={signal_ids}, names={signal_names}")
+            
+            # Get date range if not provided
             if start_date is None:
                 start_date = backtest.start_date
             if end_date is None:
                 end_date = backtest.end_date
             
+            # Get universe tickers for this backtest
+            universe_tickers_df = self.db_manager.get_universe_tickers(backtest.universe_id)
+            tickers = universe_tickers_df['ticker'].tolist() if not universe_tickers_df.empty else []
+            
+            # Get signal raw data filtered by signal IDs (more reliable than names)
             signals_df = self.db_manager.get_signals_raw(
+                tickers=tickers if tickers else None,
+                signal_ids=signal_ids,  # Use signal_ids instead of signal_names for more reliable filtering
                 start_date=start_date,
                 end_date=end_date
             )
             
+            logger.info(f"Retrieved {len(signals_df)} signal records after filtering by signal_ids={signal_ids}")
+            
             if signals_df.empty:
                 return []
-            
-            return signals_df.to_dict('records')
+
+            # Normalize signal name field to avoid mixed naming in frontend
+            signal_records = signals_df.to_dict('records')
+            for rec in signal_records:
+                # Prefer joined signal name over raw table column
+                if 'signal_name_display' in rec and rec['signal_name_display']:
+                    rec['signal_name'] = rec['signal_name_display']
+            return signal_records
             
         except Exception as e:
             logger.error(f"Error getting signals for {run_id}: {e}")
@@ -397,6 +437,35 @@ class DatabaseService:
             
         except Exception as e:
             logger.error(f"Error getting scores for {run_id}: {e}")
+            raise
+
+    def get_backtest_used_signals(self, run_id: str) -> List[Dict[str, Any]]:
+        """Return the list of signals explicitly associated with a backtest (by run_id)."""
+        try:
+            df = self.db_manager.get_backtest_signals(run_id)
+            if df.empty:
+                return []
+            # Ensure expected columns exist
+            name_col = 'signal_name' if 'signal_name' in df.columns else 'name' if 'name' in df.columns else None
+            desc_col = 'signal_description' if 'signal_description' in df.columns else 'description' if 'description' in df.columns else None
+            out = []
+            seen = set()
+            for _, row in df.iterrows():
+                signal_id = int(row['signal_id']) if 'signal_id' in row else None
+                name = str(row[name_col]) if name_col else None
+                if signal_id is None or name is None:
+                    continue
+                if signal_id in seen:
+                    continue
+                seen.add(signal_id)
+                out.append({
+                    'signal_id': signal_id,
+                    'name': name,
+                    'description': (str(row[desc_col]) if desc_col and pd.notna(row[desc_col]) else None)
+                })
+            return out
+        except Exception as e:
+            logger.error(f"Error getting used signals for {run_id}: {e}")
             raise
     
     def get_backtest_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:

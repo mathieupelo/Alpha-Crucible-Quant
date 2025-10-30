@@ -304,3 +304,26 @@ async def delete_backtest(run_id: str):
         logger.error(f"Error deleting backtest {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/backtests/{run_id}/used-signals")
+async def get_backtest_used_signals(run_id: str):
+    """Get only the signal definitions used to create this backtest."""
+    try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        # Check if backtest exists
+        backtest = db_service.get_backtest_by_run_id(run_id)
+        if backtest is None:
+            raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
+
+        signals = db_service.get_backtest_used_signals(run_id)
+        return {
+            'signals': signals,
+            'total': len(signals),
+            'run_id': run_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting used signals for {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

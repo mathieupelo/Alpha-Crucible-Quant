@@ -112,6 +112,12 @@ export const backtestApi = {
     return response.data;
   },
 
+  // Get only used signals (definitions) for a backtest
+  getBacktestUsedSignals: async (runId: string): Promise<{ signals: Array<{ signal_id: number; name: string; description?: string }>; total: number; run_id: string }> => {
+    const response = await api.get(`/backtests/${runId}/used-signals`);
+    return response.data;
+  },
+
   // Get scores for a backtest
   getBacktestScores: async (runId: string, filters?: FilterOptions): Promise<{ scores: Score[]; total: number; run_id: string }> => {
     const response = await api.get(`/backtests/${runId}/scores`, {

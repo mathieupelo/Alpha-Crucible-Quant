@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleBacktestClick = (backtest: Backtest) => {
-    navigate(`/backtest/${backtest.run_id}`);
+    navigate(`/backtest?id=${backtest.run_id}`);
   };
 
   if (backtestsError) {

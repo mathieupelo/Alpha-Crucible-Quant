@@ -643,11 +643,24 @@ class DatabaseManager:
         query = """
         SELECT bs.*, s.name as signal_name, s.description as signal_description, s.enabled
         FROM backtest_signals bs
-        JOIN signals s ON bs.signal_id = s.id
+        LEFT JOIN signals s ON bs.signal_id = s.id
         WHERE bs.run_id = %s
-        ORDER BY s.name
+        ORDER BY COALESCE(s.name, bs.signal_id::text)
         """
-        return self.execute_query(query, (run_id,))
+        try:
+            result = self.execute_query(query, (run_id,))
+            if result.empty:
+                logger.warning(f"No signals found for backtest {run_id} in backtest_signals table")
+            else:
+                # Check for orphaned records (signals without matching signal_id in signals table)
+                orphaned = result[result['signal_name'].isna()]
+                if not orphaned.empty:
+                    logger.warning(f"Found {len(orphaned)} orphaned signal record(s) for backtest {run_id}: signal_ids={orphaned['signal_id'].tolist()}")
+            return result
+        except Exception as e:
+            logger.error(f"Error executing get_backtest_signals query for {run_id}: {e}", exc_info=True)
+            # Return empty DataFrame on error rather than raising
+            return pd.DataFrame()
     
     def delete_backtest_signals(self, run_id: str) -> int:
         """Delete all signal relationships for a backtest."""

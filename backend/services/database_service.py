@@ -440,32 +440,52 @@ class DatabaseService:
             raise
 
     def get_backtest_used_signals(self, run_id: str) -> List[Dict[str, Any]]:
-        """Return the list of signals explicitly associated with a backtest (by run_id)."""
+        """Return the list of signals explicitly associated with a backtest (by run_id).
+        
+        Fetches all signals from backtest_signals table and joins with signals table
+        to return the name and description of each signal.
+        """
         try:
+            # Get backtest signals with join to signals table
+            # get_backtest_signals already performs: SELECT bs.*, s.name as signal_name, s.description as signal_description
+            # FROM backtest_signals bs LEFT JOIN signals s ON bs.signal_id = s.id WHERE bs.run_id = %s
             df = self.db_manager.get_backtest_signals(run_id)
             if df.empty:
+                logger.info(f"No backtest_signals records found for run_id: {run_id}")
                 return []
-            # Ensure expected columns exist
-            name_col = 'signal_name' if 'signal_name' in df.columns else 'name' if 'name' in df.columns else None
-            desc_col = 'signal_description' if 'signal_description' in df.columns else 'description' if 'description' in df.columns else None
-            out = []
-            seen = set()
+            
+            # Get unique signal_ids and their corresponding name/description
+            result = []
+            seen_signal_ids = set()
+            
             for _, row in df.iterrows():
-                signal_id = int(row['signal_id']) if 'signal_id' in row else None
-                name = str(row[name_col]) if name_col else None
-                if signal_id is None or name is None:
+                signal_id = int(row['signal_id']) if pd.notna(row['signal_id']) else None
+                if signal_id is None or signal_id in seen_signal_ids:
                     continue
-                if signal_id in seen:
-                    continue
-                seen.add(signal_id)
-                out.append({
+                
+                seen_signal_ids.add(signal_id)
+                
+                # Extract name from joined signals table (signal_name column)
+                name = None
+                if 'signal_name' in row and pd.notna(row['signal_name']):
+                    name = str(row['signal_name']).strip()
+                
+                # Extract description from joined signals table (signal_description column)
+                description = None
+                if 'signal_description' in row and pd.notna(row['signal_description']):
+                    description = str(row['signal_description']).strip()
+                
+                result.append({
                     'signal_id': signal_id,
-                    'name': name,
-                    'description': (str(row[desc_col]) if desc_col and pd.notna(row[desc_col]) else None)
+                    'name': name if name else f"SIGNAL_{signal_id}",
+                    'description': description
                 })
-            return out
+            
+            logger.info(f"Successfully retrieved {len(result)} unique signal(s) for backtest {run_id}")
+            return result
+            
         except Exception as e:
-            logger.error(f"Error getting used signals for {run_id}: {e}")
+            logger.error(f"Error getting used signals for {run_id}: {e}", exc_info=True)
             raise
     
     def get_backtest_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:

@@ -38,6 +38,8 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Analytics as AnalyticsIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useQuery, useMutation } from 'react-query';
@@ -70,6 +72,7 @@ const BacktestManager: React.FC = () => {
     return runId || localStorage.getItem('selected-backtest-id') || '';
   });
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
+  const [expandedSignals, setExpandedSignals] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -259,6 +262,18 @@ const BacktestManager: React.FC = () => {
 
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const toggleSignalExpansion = (signalName: string) => {
+    setExpandedSignals(prev => {
+      const next = new Set(prev);
+      if (next.has(signalName)) {
+        next.delete(signalName);
+      } else {
+        next.add(signalName);
+      }
+      return next;
+    });
   };
 
   if (backtestsError) {
@@ -684,66 +699,91 @@ const BacktestManager: React.FC = () => {
                     The following signals were used to create this backtest:
                   </Typography>
                   {usedSignalsLoading ? (
-                    <Grid container spacing={2}>
+                    <Box>
                       {[...Array(3)].map((_, index) => (
-                        <Grid key={index} item xs={12} md={6} lg={4}>
-                          <Skeleton variant="rectangular" height={86} sx={{ borderRadius: 2 }} />
-                        </Grid>
+                        <Skeleton key={index} variant="rectangular" height={100} sx={{ borderRadius: 2, mb: 2 }} />
                       ))}
-                    </Grid>
+                    </Box>
                   ) : uniqueSignals.length > 0 ? (
-                    <Grid container spacing={2}>
-                      {uniqueSignals.map((signal) => (
-                        <Grid key={signal.name} item xs={12} md={6} lg={4}>
+                    <Box>
+                      {uniqueSignals.map((signal) => {
+                        const isExpanded = expandedSignals.has(signal.name);
+                        const description = signal.description || 'No description provided';
+                        const needsExpansion = description.length > 150; // Approximate threshold
+                        
+                        return (
                           <Card
+                            key={signal.name}
                             variant="outlined"
                             sx={{
-                              height: '100%',
+                              mb: 2,
                               background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff',
                               borderColor: isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)',
                               '&:hover': {
                                 boxShadow: isDarkMode
                                   ? '0 8px 24px rgba(0,0,0,0.35)'
                                   : '0 8px 24px rgba(0,0,0,0.15)',
-                                transform: 'translateY(-1px)',
+                                borderColor: isDarkMode ? 'rgba(148,163,184,0.40)' : 'rgba(148,163,184,0.50)',
                               },
                               transition: 'all 0.2s ease-in-out',
                             }}
                           >
-                            <CardContent sx={{ p: 2.0, '&:last-child': { pb: 2.0 } }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                <Chip 
-                                  label={signal.name} 
-                                  size="small" 
-                                  variant="outlined" 
-                                  sx={{ 
-                                    fontWeight: 600, 
-                                    height: 22,
-                                    backgroundColor: isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(147,197,253,0.35)', // lighter blue tint used elsewhere
-                                    borderColor: isDarkMode ? '#60a5fa' : '#60a5fa', // light blue border
-                                    color: isDarkMode ? '#bfdbfe' : '#1e40af', // readable text color
-                                  }} 
-                                />
+                            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
+                                <Box sx={{ flex: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                                    <Chip 
+                                      label={signal.name} 
+                                      size="small" 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        fontWeight: 600, 
+                                        height: 24,
+                                        backgroundColor: isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(147,197,253,0.35)',
+                                        borderColor: isDarkMode ? '#60a5fa' : '#60a5fa',
+                                        color: isDarkMode ? '#bfdbfe' : '#1e40af',
+                                      }} 
+                                    />
+                                  </Box>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                      lineHeight: 1.6,
+                                      whiteSpace: isExpanded ? 'normal' : 'pre-wrap',
+                                      ...(needsExpansion && !isExpanded && {
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }),
+                                    }}
+                                  >
+                                    {description}
+                                  </Typography>
+                                </Box>
+                                {needsExpansion && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => toggleSignalExpansion(signal.name)}
+                                    sx={{
+                                      ml: 1.5,
+                                      color: isDarkMode ? '#94a3b8' : '#64748b',
+                                      '&:hover': {
+                                        backgroundColor: isDarkMode ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.08)',
+                                      },
+                                    }}
+                                  >
+                                    {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                  </IconButton>
+                                )}
                               </Box>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 3,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                                title={signal.description || 'No description provided'}
-                              >
-                                {signal.description || 'No description provided'}
-                              </Typography>
                             </CardContent>
                           </Card>
-                        </Grid>
-                      ))}
-                    </Grid>
+                        );
+                      })}
+                    </Box>
                   ) : (
                     <Alert severity="info" sx={{ mt: 1 }}>
                       No signals found for this backtest.

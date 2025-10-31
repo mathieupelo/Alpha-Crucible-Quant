@@ -145,10 +145,18 @@ const BacktestManager: React.FC = () => {
     }
   );
 
-  // Extract unique signal names from signals data
-  const uniqueSignalNames = React.useMemo(() => {
-    if (!usedSignalsData?.signals) return [];
-    return usedSignalsData.signals.map(s => s.name).sort();
+  // Extract unique signals with descriptions (deduped by name)
+  const uniqueSignals = React.useMemo(() => {
+    if (!usedSignalsData?.signals) return [] as Array<{ name: string; description?: string }>;
+    const nameToDescription = new Map<string, string | undefined>();
+    usedSignalsData.signals.forEach(s => {
+      if (!nameToDescription.has(s.name)) {
+        nameToDescription.set(s.name, s.description);
+      }
+    });
+    return Array.from(nameToDescription.entries())
+      .map(([name, description]) => ({ name, description }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [usedSignalsData]);
 
   // Initialize selected backtest from URL or auto-select most recent
@@ -676,34 +684,66 @@ const BacktestManager: React.FC = () => {
                     The following signals were used to create this backtest:
                   </Typography>
                   {usedSignalsLoading ? (
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Grid container spacing={2}>
                       {[...Array(3)].map((_, index) => (
-                        <Skeleton key={index} variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                        <Grid key={index} item xs={12} md={6} lg={4}>
+                          <Skeleton variant="rectangular" height={86} sx={{ borderRadius: 2 }} />
+                        </Grid>
                       ))}
-                    </Box>
-                  ) : uniqueSignalNames.length > 0 ? (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {uniqueSignalNames.map((signalName) => (
-                        <Chip
-                          key={signalName}
-                          label={signalName}
-                          color="secondary"
-                          variant="filled"
-                          sx={{
-                            fontWeight: 500,
-                            backgroundColor: isDarkMode 
-                              ? 'rgba(156, 39, 176, 0.2)'
-                              : 'rgba(156, 39, 176, 0.1)',
-                            color: isDarkMode 
-                              ? '#ce93d8'
-                              : '#7b1fa2',
-                            border: isDarkMode 
-                              ? '1px solid rgba(156, 39, 176, 0.3)'
-                              : '1px solid rgba(156, 39, 176, 0.2)',
-                          }}
-                        />
+                    </Grid>
+                  ) : uniqueSignals.length > 0 ? (
+                    <Grid container spacing={2}>
+                      {uniqueSignals.map((signal) => (
+                        <Grid key={signal.name} item xs={12} md={6} lg={4}>
+                          <Card
+                            variant="outlined"
+                            sx={{
+                              height: '100%',
+                              background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff',
+                              borderColor: isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)',
+                              '&:hover': {
+                                boxShadow: isDarkMode
+                                  ? '0 8px 24px rgba(0,0,0,0.35)'
+                                  : '0 8px 24px rgba(0,0,0,0.15)',
+                                transform: 'translateY(-1px)',
+                              },
+                              transition: 'all 0.2s ease-in-out',
+                            }}
+                          >
+                            <CardContent sx={{ p: 2.0, '&:last-child': { pb: 2.0 } }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Chip 
+                                  label={signal.name} 
+                                  size="small" 
+                                  variant="outlined" 
+                                  sx={{ 
+                                    fontWeight: 600, 
+                                    height: 22,
+                                    backgroundColor: isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(147,197,253,0.35)', // lighter blue tint used elsewhere
+                                    borderColor: isDarkMode ? '#60a5fa' : '#60a5fa', // light blue border
+                                    color: isDarkMode ? '#bfdbfe' : '#1e40af', // readable text color
+                                  }} 
+                                />
+                              </Box>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                                title={signal.description || 'No description provided'}
+                              >
+                                {signal.description || 'No description provided'}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
                       ))}
-                    </Box>
+                    </Grid>
                   ) : (
                     <Alert severity="info" sx={{ mt: 1 }}>
                       No signals found for this backtest.

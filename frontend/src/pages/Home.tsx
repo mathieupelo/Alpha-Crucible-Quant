@@ -440,6 +440,7 @@ const Home: React.FC = () => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hasRefreshedRef = useRef(false);
   const { scrollYProgress } = useScroll();
+  const [useMovieCore8, setUseMovieCore8] = useState(true);
   
   // Parallax effects
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
@@ -1120,13 +1121,123 @@ const Home: React.FC = () => {
                 Live Sentiment Analysis
               </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Live feed from GameCore-12 universe with AI sentiment analysis
+            
+            {/* Universe Selector - Segmented Control */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  background: isDarkMode
+                    ? 'rgba(30, 41, 59, 0.6)'
+                    : 'rgba(248, 250, 252, 0.8)',
+                  borderRadius: 3,
+                  p: 0.5,
+                  border: '1px solid',
+                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+                  position: 'relative',
+                  gap: 0.5,
+                }}
+              >
+                {/* Animated background indicator */}
+                <motion.div
+                  animate={{
+                    left: useMovieCore8 ? '4px' : 'calc(50% + 2px)',
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 30,
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '4px',
+                    width: 'calc(50% - 6px)',
+                    height: 'calc(100% - 8px)',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                    zIndex: 0,
+                  }}
+                />
+                
+                {/* Movies Option */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setUseMovieCore8(true)}
+                  style={{ position: 'relative', zIndex: 1, cursor: 'pointer' }}
+                >
+                  <Box
+                    sx={{
+                      px: 3,
+                      py: 1,
+                      borderRadius: 2,
+                      minWidth: 120,
+                      textAlign: 'center',
+                      position: 'relative',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: useMovieCore8 ? 700 : 500,
+                        fontSize: '0.875rem',
+                        color: useMovieCore8
+                          ? '#ffffff'
+                          : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'),
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      Movies
+                    </Typography>
+                  </Box>
+                </motion.div>
+                
+                {/* Gaming Option */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setUseMovieCore8(false)}
+                  style={{ position: 'relative', zIndex: 1, cursor: 'pointer' }}
+                >
+                  <Box
+                    sx={{
+                      px: 3,
+                      py: 1,
+                      borderRadius: 2,
+                      minWidth: 120,
+                      textAlign: 'center',
+                      position: 'relative',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: useMovieCore8 ? 500 : 700,
+                        fontSize: '0.875rem',
+                        color: useMovieCore8
+                          ? (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')
+                          : '#ffffff',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      Gaming
+                    </Typography>
+                  </Box>
+                </motion.div>
+              </Box>
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+              Live feed from {useMovieCore8 ? 'Movies' : 'Gaming'} universe with AI sentiment analysis
             </Typography>
           </Box>
           <NewsFeed
+            key={useMovieCore8 ? "MovieCore-8" : "GameCore-12"}
             ref={newsFeedRef}
-            universeName="GameCore-12 (GC-12)"
+            universeName={useMovieCore8 ? "MovieCore-8 (MC-8)" : "GameCore-12 (GC-12)"}
             pollingInterval={30000} // 30 seconds
             maxItems={10}
           />

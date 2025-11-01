@@ -51,9 +51,28 @@ async def get_universe_news(
             all_universes = db_service.get_all_universes()
             logger.info(f"Available universes: {[u['name'] for u in all_universes]}")
             
-            # Try to find by partial match (e.g., "GameCore" in "GameCore-12 (GC-12)")
+            # Extract base name (e.g., "MovieCore-8" from "MovieCore-8 (MC-8)")
+            base_name = decoded_name.split('(')[0].strip()
+            
+            # Try to find by partial match - check if names overlap in either direction
             for u in all_universes:
-                if "GameCore" in decoded_name or decoded_name in u['name'] or "GameCore" in u['name']:
+                universe_name_lower = u['name'].lower()
+                decoded_name_lower = decoded_name.lower()
+                base_name_lower = base_name.lower()
+                
+                # Check various matching conditions:
+                # 1. Exact match (case-insensitive)
+                # 2. One name contains the other
+                # 3. Base name matches (e.g., "MovieCore-8" matches "MovieCore-8 (MC-8)")
+                # 4. Universe name base matches (extract base from universe name too)
+                universe_base = u['name'].split('(')[0].strip().lower()
+                
+                if (decoded_name_lower == universe_name_lower or
+                    decoded_name_lower in universe_name_lower or
+                    universe_name_lower in decoded_name_lower or
+                    base_name_lower == universe_base or
+                    base_name_lower in universe_name_lower or
+                    universe_base in decoded_name_lower):
                     logger.info(f"Found similar universe: {u['name']}, using it")
                     universe_id = u['id']
                     # Get universe by ID instead

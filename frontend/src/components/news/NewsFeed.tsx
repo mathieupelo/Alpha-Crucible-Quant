@@ -35,6 +35,7 @@ interface NewsItem {
   publisher: string;
   link: string;
   pub_date: string;
+  image_url?: string;
   sentiment: {
     label: string;
     score: number;
@@ -197,6 +198,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                     transition: 'all 0.3s ease',
                     position: 'relative',
                     overflow: 'hidden',
+                    boxShadow: isDarkMode 
+                      ? '0 1px 4px rgba(0, 0, 0, 0.1)' 
+                      : '0 1px 4px rgba(0, 0, 0, 0.04)',
                     '&::before': {
                       content: '""',
                       position: 'absolute',
@@ -209,7 +213,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                     },
                     '&:hover': {
                       transform: 'translateY(-2px)',
-                      boxShadow: `0 8px 24px ${sentimentStyle.color}20`,
+                      boxShadow: isDarkMode 
+                        ? `0 4px 12px ${sentimentStyle.color}12` 
+                        : `0 4px 12px ${sentimentStyle.color}10`,
                       borderColor: sentimentStyle.borderColor,
                     },
                   }}
@@ -288,23 +294,52 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                       </Link>
                     </Typography>
 
-                    {/* Summary */}
-                    {item.summary && (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
+                    {/* Image or Summary */}
+                    {item.image_url ? (
+                      <Box
                         sx={{
                           mb: 2,
-                          lineHeight: 1.6,
-                          fontSize: '0.875rem',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
+                          borderRadius: 2,
                           overflow: 'hidden',
+                          position: 'relative',
+                          width: '100%',
+                          height: '180px',
+                          backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.3)' : 'rgba(248, 250, 252, 0.5)',
+                          '& img': {
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          },
                         }}
                       >
-                        {item.summary}
-                      </Typography>
+                        <img
+                          src={item.image_url}
+                          alt={item.title}
+                          onError={(e) => {
+                            // Hide image on error, will fall through to show summary if available
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      </Box>
+                    ) : (
+                      item.summary && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mb: 2,
+                            lineHeight: 1.6,
+                            fontSize: '0.875rem',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {item.summary}
+                        </Typography>
+                      )
                     )}
 
                     {/* Footer: Publisher and Sentiment Score */}

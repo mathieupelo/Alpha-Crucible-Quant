@@ -209,6 +209,7 @@ class NewsService:
                     publisher = 'Unknown'
                     link = ''
                     pub_date = None
+                    image_url = ''
                     
                     # Check if data is in 'content' field (new yfinance format)
                     if 'content' in news_item and news_item['content']:
@@ -228,6 +229,15 @@ class NewsService:
                                 import re
                                 description = re.sub(r'<[^>]+>', '', description)
                             summary = description
+                            
+                            # Extract image URL - try multiple possible fields
+                            image_obj = content.get('thumbnail') or content.get('thumbnailUrl') or content.get('image') or content.get('previewImage') or content.get('mainImage') or news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
+                            if isinstance(image_obj, dict):
+                                image_url = image_obj.get('url', '') or image_obj.get('src', '') or image_obj.get('originalUrl', '') or ''
+                            elif image_obj:
+                                image_url = str(image_obj)
+                            else:
+                                image_url = ''
                             
                             # Publisher - check multiple locations
                             pub_info = content.get('publisher') or news_item.get('publisher')
@@ -270,6 +280,14 @@ class NewsService:
                             publisher = news_item.get('publisher', 'Unknown')
                             link = news_item.get('link', '') or news_item.get('url', '')
                             pub_date = news_item.get('providerPublishTime') or news_item.get('pubDate')
+                            # Try to get image from top level
+                            image_obj = news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
+                            if isinstance(image_obj, dict):
+                                image_url = image_obj.get('url', '') or image_obj.get('src', '') or ''
+                            elif image_obj:
+                                image_url = str(image_obj)
+                            else:
+                                image_url = ''
                     else:
                         # Old format - direct fields
                         title = news_item.get('title', '') or ''
@@ -277,6 +295,14 @@ class NewsService:
                         publisher = news_item.get('publisher', 'Unknown') or 'Unknown'
                         link = news_item.get('link', '') or news_item.get('url', '') or ''
                         pub_date = news_item.get('providerPublishTime') or news_item.get('pubDate') or news_item.get('publishedAt')
+                        # Try to get image from top level
+                        image_obj = news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
+                        if isinstance(image_obj, dict):
+                            image_url = image_obj.get('url', '') or image_obj.get('src', '') or ''
+                        elif image_obj:
+                            image_url = str(image_obj)
+                        else:
+                            image_url = ''
                     
                     # Ensure we have at least a title or summary
                     if not title and not summary:
@@ -329,6 +355,7 @@ class NewsService:
                         "link": link,
                         "pub_date": pub_date.isoformat(),
                         "sentiment": sentiment,
+                        "image_url": image_url,
                         "raw_data": news_item
                     }
                     

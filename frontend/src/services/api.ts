@@ -372,6 +372,7 @@ export const newsApi = {
       publisher: string;
       link: string;
       pub_date: string;
+      image_url?: string;
       sentiment: {
         label: string;
         score: number;
@@ -401,6 +402,7 @@ export const newsApi = {
       publisher: string;
       link: string;
       pub_date: string;
+      image_url?: string;
       sentiment: {
         label: string;
         score: number;
@@ -430,6 +432,7 @@ export const newsApi = {
       publisher: string;
       link: string;
       pub_date: string;
+      image_url?: string;
       sentiment: {
         label: string;
         score: number;

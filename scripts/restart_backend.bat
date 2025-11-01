@@ -17,7 +17,11 @@ echo.
 echo Finding and closing existing backend processes...
 taskkill /FI "WINDOWTITLE eq Alpha Crucible - Backend*" /T /F >nul 2>&1
 taskkill /FI "IMAGENAME eq python.exe" /FI "COMMANDLINE eq *uvicorn*" /T /F >nul 2>&1
-timeout /t 2 /nobreak >nul
+REM Also kill any process using port 8000
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :8000') do (
+    taskkill /PID %%a /F >nul 2>&1
+)
+timeout /t 3 /nobreak >nul
 echo.
 
 echo Starting backend...

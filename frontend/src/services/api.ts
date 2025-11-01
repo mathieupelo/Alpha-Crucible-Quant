@@ -29,11 +29,20 @@ const getBaseURL = () => {
   if (window.location.hostname.includes('ngrok-free.dev')) {
     return `${window.location.protocol}//${window.location.hostname}/api`;
   }
-  // Use relative URL to go through nginx proxy when accessing via localhost:8080
-  if (window.location.port === '8080' || window.location.hostname === 'localhost') {
+  
+  // If VITE_API_URL is explicitly set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // For development (Vite dev server on any port), use relative URL
+  // This allows Vite's proxy (configured in vite.config.ts) to forward /api requests to backend
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return '/api';
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  
+  // Fallback: use relative URL
+  return '/api';
 };
 
 const api = axios.create({
@@ -344,6 +353,100 @@ export const marketApi = {
         start_date: startDate,
         end_date: endDate,
         start_value: startValue
+      }
+    });
+    return response.data;
+  }
+};
+
+// News API calls
+export const newsApi = {
+  // Get news for a universe
+  getUniverseNews: async (universeName: string, maxItems: number = 10): Promise<{
+    universe_name: string;
+    tickers: string[];
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}`, {
+      params: { max_items: maxItems }
+    });
+    return response.data;
+  },
+
+  // Get news for a specific ticker
+  getTickerNews: async (ticker: string, maxItems: number = 10): Promise<{
+    ticker: string;
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get(`/news/ticker/${ticker}`, {
+      params: { max_items: maxItems }
+    });
+    return response.data;
+  },
+
+  // Get news for multiple tickers
+  getMultipleTickersNews: async (tickers: string[], maxItems: number = 10): Promise<{
+    tickers: string[];
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get('/news/tickers', {
+      params: { 
+        tickers: tickers.join(','),
+        max_items: maxItems 
       }
     });
     return response.data;

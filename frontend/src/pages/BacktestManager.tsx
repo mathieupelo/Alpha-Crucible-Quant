@@ -61,6 +61,8 @@ import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
 import PortfolioDetail from '@/components/tables/PortfolioDetail';
 import Logo from '@/components/common/Logo';
+import AnimatedBackground from '@/components/common/AnimatedBackground';
+import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const SIDEBAR_WIDTH = 320;
@@ -550,6 +552,7 @@ const BacktestManager: React.FC = () => {
       display: 'flex', 
       height: '100vh', 
       overflow: 'hidden',
+      position: 'relative',
       '&::-webkit-scrollbar': {
         width: '8px',
       },
@@ -570,6 +573,10 @@ const BacktestManager: React.FC = () => {
         },
       },
     }}>
+      {/* Animated Backgrounds */}
+      <GradientMesh />
+      <AnimatedBackground />
+
       {/* Sidebar */}
       {isMobile ? (
         <Drawer
@@ -580,9 +587,12 @@ const BacktestManager: React.FC = () => {
             '& .MuiDrawer-paper': {
               width: SIDEBAR_WIDTH,
               background: isDarkMode 
-                ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-                : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                ? 'rgba(30, 41, 59, 0.95)'
+                : 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
               border: 'none',
+              position: 'relative',
+              zIndex: 2,
             },
           }}
         >
@@ -594,12 +604,15 @@ const BacktestManager: React.FC = () => {
             width: sidebarCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH,
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             background: isDarkMode 
-              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-            borderRight: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'}`,
+              ? 'rgba(30, 41, 59, 0.95)'
+              : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRight: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)'}`,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            position: 'relative',
+            zIndex: 2,
           }}
         >
           {sidebarContent}
@@ -616,13 +629,14 @@ const BacktestManager: React.FC = () => {
             left: 16,
             zIndex: 1300,
             background: isDarkMode 
-              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              ? 'rgba(30, 41, 59, 0.95)'
+              : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
             border: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'}`,
             '&:hover': {
               background: isDarkMode 
-                ? 'linear-gradient(145deg, #334155 0%, #475569 100%)'
-                : 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+                ? 'rgba(51, 65, 85, 0.95)'
+                : 'rgba(248, 250, 252, 0.95)',
             },
           }}
         >
@@ -636,6 +650,8 @@ const BacktestManager: React.FC = () => {
         overflow: 'auto', 
         p: 3,
         pb: 10,
+        position: 'relative',
+        zIndex: 1,
         '&::-webkit-scrollbar': {
           width: '8px',
         },
@@ -692,7 +708,7 @@ const BacktestManager: React.FC = () => {
               {backtestLoading ? (
                 <Skeleton variant="rectangular" height={60} />
               ) : backtest ? (
-                <Card sx={{ mb: 3, background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff' }}>
+                <Card sx={{ mb: 3, background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
                       <Box sx={{ flex: 1, minWidth: 300 }}>
@@ -736,7 +752,7 @@ const BacktestManager: React.FC = () => {
 
             {/* Main Tabbed Content */}
             {backtest && (
-              <Card sx={{ background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff' }}>
+              <Card sx={{ background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }}>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                   <Tabs 
                     value={mainTab} 
@@ -889,7 +905,8 @@ const BacktestManager: React.FC = () => {
                               variant="outlined"
                               sx={{
                                 mb: 2,
-                                background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff',
+                                background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)',
+                                backdropFilter: 'blur(20px)',
                                 borderColor: isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)',
                                 '&:hover': {
                                   boxShadow: isDarkMode
@@ -1008,7 +1025,8 @@ const BacktestManager: React.FC = () => {
                               onChange={() => togglePortfolioExpansion(portfolio.id)}
                               sx={{
                                 mb: 2,
-                                background: isDarkMode ? 'rgba(30,41,59,0.60)' : '#ffffff',
+                                background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)',
+                                backdropFilter: 'blur(20px)',
                                 '&:before': { display: 'none' },
                                 border: `1px solid ${isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)'}`,
                                 boxShadow: isExpanded 

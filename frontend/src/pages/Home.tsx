@@ -3,7 +3,7 @@
  * Ultra-polished landing page with Netflix/Apple/Spotify-level animations
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import {
@@ -45,7 +45,6 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   CalendarToday as CalendarTodayIcon,
   Timeline as TimelineIcon,
-  Article as ArticleIcon,
 } from '@mui/icons-material';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -55,7 +54,7 @@ import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
 import { backtestApi } from '@/services/api';
 import SectorsSection from '@/components/sectors/SectorsSection';
-import NewsFeed from '@/components/news/NewsFeed';
+import NewsFeed, { NewsFeedRef } from '@/components/news/NewsFeed';
 
 // Configuration
 const CONFIG = {
@@ -437,6 +436,9 @@ const Home: React.FC = () => {
   const [email, setEmail] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const heroRef = useRef<HTMLDivElement>(null);
+  const newsFeedRef = useRef<NewsFeedRef>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const hasRefreshedRef = useRef(false);
   const { scrollYProgress } = useScroll();
   
   // Parallax effects
@@ -457,6 +459,32 @@ const Home: React.FC = () => {
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
+
+  // Handle scroll-based refresh for sidebar
+  useEffect(() => {
+    const sidebarElement = sidebarRef.current;
+    if (!sidebarElement) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = sidebarElement;
+      const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+      const threshold = 0.85; // Refresh when 85% scrolled
+
+      if (scrollPercentage >= threshold && !hasRefreshedRef.current) {
+        newsFeedRef.current?.refresh();
+        hasRefreshedRef.current = true;
+        // Reset after 2 seconds to allow another refresh
+        setTimeout(() => {
+          hasRefreshedRef.current = false;
+        }, 2000);
+      }
+    };
+
+    sidebarElement.addEventListener('scroll', handleScroll);
+    return () => {
+      sidebarElement.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   // Animated Counter Component
   const AnimatedCounter: React.FC<{ end: number; duration?: number; suffix?: string }> = ({ end, duration = 2, suffix = '' }) => {
@@ -997,6 +1025,7 @@ const Home: React.FC = () => {
 
       {/* News Feed Sidebar - Fixed on Right Side */}
       <Box
+        ref={sidebarRef}
         sx={{
           position: 'fixed',
           top: { xs: 0, lg: 64 },
@@ -1067,10 +1096,28 @@ const Home: React.FC = () => {
           transition={{ duration: 0.6 }}
         >
           <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <ArticleIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2, position: 'relative' }}>
+              <motion.div
+                animate={{
+                  scale: [1, 1.3, 1],
+                  opacity: [0.8, 1, 0.8],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)',
+                  flexShrink: 0,
+                }}
+              />
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Real-Time News
+                Live Sentiment Analysis
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -1078,6 +1125,7 @@ const Home: React.FC = () => {
             </Typography>
           </Box>
           <NewsFeed
+            ref={newsFeedRef}
             universeName="GameCore-12 (GC-12)"
             pollingInterval={30000} // 30 seconds
             maxItems={10}

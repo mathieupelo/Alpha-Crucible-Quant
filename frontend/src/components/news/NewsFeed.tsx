@@ -3,7 +3,7 @@
  * Displays aggregated news with sentiment analysis from GameCore-12 universe
  */
 
-import React, { useState } from 'react';
+import { useState, useImperativeHandle, forwardRef } from 'react';
 import { useQuery } from 'react-query';
 import {
   Box,
@@ -54,16 +54,20 @@ interface NewsFeedProps {
   maxItems?: number;
 }
 
-const NewsFeed: React.FC<NewsFeedProps> = ({
+export interface NewsFeedRef {
+  refresh: () => void;
+}
+
+const NewsFeed = forwardRef<NewsFeedRef, NewsFeedProps>(({
   universeName = 'GameCore-12 (GC-12)',
   pollingInterval = 30000, // 30 seconds
   maxItems = 10,
-}) => {
+}, ref) => {
   const { isDarkMode } = useTheme();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // Fetch news with polling
-  const { data, isLoading, error } = useQuery(
+  const { data, isLoading, error, refetch } = useQuery(
     ['news', universeName, maxItems],
     () => newsApi.getUniverseNews(universeName, maxItems),
     {
@@ -74,6 +78,13 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
       },
     }
   );
+
+  // Expose refresh function via ref
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      refetch();
+    },
+  }));
 
   // Get sentiment color and icon
   const getSentimentStyle = (sentiment: NewsItem['sentiment']) => {
@@ -398,7 +409,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
       )}
     </Box>
   );
-};
+});
+
+NewsFeed.displayName = 'NewsFeed';
 
 export default NewsFeed;
 

@@ -869,80 +869,15 @@ const Home: React.FC = () => {
         </motion.div>
       </Box>
 
-      {/* Sectors Section */}
-      <SectorsSection />
-
-      {/* Real-Time News Feed Section */}
+      {/* Main Content Area */}
       <Box
         sx={{
-          py: { xs: 8, md: 12 },
-          background: 'transparent',
-          position: 'relative',
-          zIndex: 1,
+          width: { xs: '100%', lg: 'calc(100% - 600px)' },
+          transition: 'width 0.3s ease',
         }}
       >
-        <Container maxWidth="lg">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={staggerContainer}
-          >
-            <motion.div variants={fadeInUp}>
-              <Box sx={{ textAlign: 'center', mb: 6 }}>
-                <motion.div
-                  animate={{
-                    scale: [1, 1.1, 1],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                >
-                  <ArticleIcon
-                    sx={{
-                      fontSize: 56,
-                      color: 'primary.main',
-                      mb: 2,
-                      background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                    }}
-                  />
-                </motion.div>
-                <Typography
-                  variant="h2"
-                  sx={{
-                    fontWeight: 800,
-                    mb: 2,
-                    background: isDarkMode
-                      ? 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)'
-                      : 'linear-gradient(135deg, #0f172a 0%, #475569 100%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                >
-                  Real-Time News & Sentiment Analysis
-                </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 700, mx: 'auto' }}>
-                  Live news feed from GameCore-12 universe with AI-powered sentiment analysis
-                </Typography>
-              </Box>
-            </motion.div>
-
-            <motion.div variants={scaleIn}>
-              <NewsFeed
-                universeName="GameCore-12 (GC-12)"
-                pollingInterval={30000} // 30 seconds
-                maxItems={10}
-              />
-            </motion.div>
-          </motion.div>
-        </Container>
-      </Box>
+        {/* Sectors Section */}
+        <SectorsSection />
 
       {/* Animated Stats Section */}
       <Box
@@ -1058,6 +993,97 @@ const Home: React.FC = () => {
 
       {/* Latest Backtest Showcase */}
       <LatestBacktestShowcase />
+      </Box>
+
+      {/* News Feed Sidebar - Fixed on Right Side */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: { xs: 0, lg: 64 },
+          right: 0,
+          width: { xs: '100%', lg: '580px' },
+          height: { xs: '100vh', lg: 'calc(100vh - 64px)' },
+          overflowY: 'auto',
+          zIndex: 50,
+          background: 'transparent',
+          backdropFilter: 'blur(40px)',
+          borderLeft: { xs: 'none', lg: 'none' },
+          boxShadow: { xs: 'none', lg: 'none' },
+          px: { xs: 2, lg: 4 },
+          py: { xs: 4, lg: 5 },
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: isDarkMode
+              ? 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%)'
+              : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '1px',
+            height: '100%',
+            background: isDarkMode
+              ? 'linear-gradient(180deg, transparent 0%, rgba(148, 163, 184, 0.08) 20%, rgba(148, 163, 184, 0.12) 50%, rgba(148, 163, 184, 0.08) 80%, transparent 100%)'
+              : 'linear-gradient(180deg, transparent 0%, rgba(148, 163, 184, 0.12) 20%, rgba(148, 163, 184, 0.18) 50%, rgba(148, 163, 184, 0.12) 80%, transparent 100%)',
+            pointerEvents: 'none',
+            zIndex: 1,
+          },
+          '& > *': {
+            position: 'relative',
+            zIndex: 2,
+          },
+          '&::-webkit-scrollbar': {
+            width: '4px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: isDarkMode 
+              ? 'linear-gradient(180deg, rgba(148, 163, 184, 0.2) 0%, rgba(148, 163, 184, 0.15) 100%)'
+              : 'linear-gradient(180deg, rgba(148, 163, 184, 0.15) 0%, rgba(148, 163, 184, 0.1) 100%)',
+            borderRadius: '2px',
+            border: 'none',
+            '&:hover': {
+              background: isDarkMode 
+                ? 'linear-gradient(180deg, rgba(148, 163, 184, 0.3) 0%, rgba(148, 163, 184, 0.25) 100%)'
+                : 'linear-gradient(180deg, rgba(148, 163, 184, 0.25) 0%, rgba(148, 163, 184, 0.2) 100%)',
+            },
+          },
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <ArticleIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Real-Time News
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Live feed from GameCore-12 universe with AI sentiment analysis
+            </Typography>
+          </Box>
+          <NewsFeed
+            universeName="GameCore-12 (GC-12)"
+            pollingInterval={30000} // 30 seconds
+            maxItems={10}
+          />
+        </motion.div>
+      </Box>
 
       {/* Project Description Section */}
       <Box

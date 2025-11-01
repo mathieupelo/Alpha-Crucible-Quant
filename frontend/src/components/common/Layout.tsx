@@ -55,9 +55,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Header */}
       <AppBar 
-        position="static" 
+        position="sticky" 
         elevation={0}
         sx={{ 
+          zIndex: 1100,
+          top: 0,
           background: isDarkMode 
             ? 'rgba(30, 41, 59, 0.85)'
             : 'rgba(255, 255, 255, 0.85)',

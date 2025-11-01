@@ -129,9 +129,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
 
   return (
     <Box sx={{ position: 'relative' }}>
-      {/* Header with last update indicator */}
+      {/* Last update indicator */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <motion.div
             animate={{ rotate: [0, 360] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
@@ -139,13 +139,10 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
           >
             <CircularProgress size={20} />
           </motion.div>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Real-Time News Feed
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+            {isLoading ? 'Updating...' : `Updated ${formatDistanceToNow(lastUpdate, { addSuffix: true })}`}
           </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          {isLoading ? 'Updating...' : `Updated ${formatDistanceToNow(lastUpdate, { addSuffix: true })}`}
-        </Typography>
       </Box>
 
       {/* News items */}
@@ -154,7 +151,27 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
           <CircularProgress />
         </Box>
       ) : data && data.news && data.news.length > 0 ? (
-        <AnimatePresence mode="popLayout">
+        <Box
+          sx={{
+            maxHeight: { xs: 'none', lg: 'calc(100vh - 280px)' },
+            overflowY: 'auto',
+            pr: { xs: 0, lg: 1 },
+            '&::-webkit-scrollbar': {
+              width: '6px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '3px',
+              '&:hover': {
+                background: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+              },
+            },
+          }}
+        >
+          <AnimatePresence mode="popLayout">
           {data.news.map((item: NewsItem, index: number) => {
             const sentimentStyle = getSentimentStyle(item.sentiment);
 
@@ -200,12 +217,14 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                   <CardContent sx={{ p: 3 }}>
                     {/* Header: Ticker, Sentiment, Time */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                         <Chip
                           label={item.ticker}
                           size="small"
                           sx={{
                             fontWeight: 600,
+                            fontSize: '0.75rem',
+                            height: '28px',
                             background: isDarkMode
                               ? 'rgba(37, 99, 235, 0.2)'
                               : 'rgba(37, 99, 235, 0.1)',
@@ -218,15 +237,20 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                           label={item.sentiment.label_display}
                           size="small"
                           sx={{
+                            fontSize: '0.75rem',
+                            height: '28px',
                             color: sentimentStyle.color,
                             background: sentimentStyle.bgColor,
                             border: '1px solid',
                             borderColor: sentimentStyle.borderColor,
                             fontWeight: 500,
+                            '& .MuiChip-icon': {
+                              fontSize: '16px',
+                            },
                           }}
                         />
                       </Box>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                         {formatNewsDate(item.pub_date)}
                       </Typography>
                     </Box>
@@ -236,8 +260,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                       variant="h6"
                       sx={{
                         fontWeight: 600,
-                        mb: 1,
+                        mb: 1.5,
                         lineHeight: 1.4,
+                        fontSize: '1rem',
                         '&:hover': {
                           color: 'primary.main',
                         },
@@ -251,15 +276,15 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                           color: 'inherit',
                           textDecoration: 'none',
                           display: 'flex',
-                          alignItems: 'center',
+                          alignItems: 'flex-start',
                           gap: 0.5,
                           '&:hover': {
                             textDecoration: 'underline',
                           },
                         }}
                       >
-                        {item.title || item.summary?.substring(0, 100) || 'News Article'}
-                        <LaunchIcon sx={{ fontSize: 14, opacity: 0.6 }} />
+                        {item.title || item.summary?.substring(0, 120) || 'News Article'}
+                        <LaunchIcon sx={{ fontSize: 14, opacity: 0.6, mt: 0.25, flexShrink: 0 }} />
                       </Link>
                     </Typography>
 
@@ -271,8 +296,9 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                         sx={{
                           mb: 2,
                           lineHeight: 1.6,
+                          fontSize: '0.875rem',
                           display: '-webkit-box',
-                          WebkitLineClamp: 2,
+                          WebkitLineClamp: 3,
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                         }}
@@ -282,11 +308,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                     )}
 
                     {/* Footer: Publisher and Sentiment Score */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="caption" color="text.secondary">
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
                         {item.publisher || 'Unknown Source'}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                         {/* Sentiment Score Badge */}
                         <Box
                           sx={{
@@ -306,20 +332,12 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
                             sx={{
                               fontWeight: 600,
                               color: sentimentStyle.color,
-                              fontSize: '0.7rem',
+                              fontSize: '0.75rem',
                             }}
                           >
                             {item.sentiment.label_display}: {(item.sentiment.score * 100).toFixed(0)}%
                           </Typography>
                         </Box>
-                        {/* Sentiment Breakdown (if available) */}
-                        {item.sentiment.scores && (
-                          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                              P:{(item.sentiment.scores.positive * 100).toFixed(0)}% N:{(item.sentiment.scores.negative * 100).toFixed(0)}% U:{(item.sentiment.scores.neutral * 100).toFixed(0)}%
-                            </Typography>
-                          </Box>
-                        )}
                       </Box>
                     </Box>
                   </CardContent>
@@ -328,6 +346,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({
             );
           })}
         </AnimatePresence>
+        </Box>
       ) : (
         <Paper
           sx={{

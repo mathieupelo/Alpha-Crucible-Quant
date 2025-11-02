@@ -32,7 +32,6 @@ import {
   Chat as ChatIcon,
   YouTube as YouTubeIcon,
   Launch as LaunchIcon,
-  CheckCircle as CheckCircleIcon,
   ArrowForward as ArrowForwardIcon,
   Send as SendIcon,
   ContactMail as ContactMailIcon,
@@ -48,7 +47,7 @@ import {
   Movie as MovieIcon,
   Gamepad as GamepadIcon,
 } from '@mui/icons-material';
-import { motion, useScroll, useTransform, useInView } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import Logo from '@/components/common/Logo';
 import AnimatedBackground from '@/components/common/AnimatedBackground';
@@ -440,13 +439,8 @@ const Home: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const newsFeedRef = useRef<NewsFeedRef>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll();
   const [useMovieCore8, setUseMovieCore8] = useState(true);
   
-  // Parallax effects
-  const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,289 +548,207 @@ const Home: React.FC = () => {
       <GradientMesh />
       <AnimatedBackground />
 
-      {/* Hero Section with Parallax */}
+      {/* Hero Section with Netflix-style Background */}
       <Box
         ref={heroRef}
         sx={{
           minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           position: 'relative',
           overflow: 'hidden',
           background: 'transparent',
           zIndex: 1,
         }}
       >
-        <motion.div
-          style={{
-            y: heroY,
-            opacity: heroOpacity,
-            scale: heroScale,
+        {/* Centered Content */}
+        <Container
+          maxWidth="md"
+          sx={{
+            position: 'relative',
+            zIndex: 3,
+            textAlign: 'center',
+            px: { xs: 3, md: 4 },
           }}
         >
-          <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
-            <Grid container spacing={6} alignItems="center">
-              <Grid item xs={12} md={6}>
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+          >
+            <motion.div variants={fadeInUp}>
+              <Box sx={{ mb: 4 }}>
                 <motion.div
-                  initial="hidden"
-                  animate="visible"
-                  variants={staggerContainer}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <motion.div variants={fadeInUp}>
-                    <Box sx={{ mb: 4 }}>
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Logo size="xlarge" showText={true} clickable={false} />
-                      </motion.div>
-                    </Box>
-                  </motion.div>
-                  
-                  <motion.div variants={fadeInUp}>
-                    <Typography
-                      variant="h1"
-                      sx={{
-                        fontSize: { xs: '2.5rem', md: '3.5rem', lg: '5rem' },
-                        fontWeight: 900,
-                        mb: 3,
-                        lineHeight: 1.1,
-                        letterSpacing: '-0.03em',
-                        background: isDarkMode
-                          ? 'linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%)'
-                          : 'linear-gradient(135deg, #0f172a 0%, #334155 50%, #64748b 100%)',
-                        backgroundClip: 'text',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        position: 'relative',
-                      }}
-                    >
-                      <motion.span
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                      >
-                        Quantitative Trading Signals
-                      </motion.span>
-                      <br />
-                      <motion.span
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.4 }}
-                      >
-                        <Box 
-                          component="span" 
-                          sx={{ 
-                            background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%)',
-                            backgroundClip: 'text', 
-                            WebkitBackgroundClip: 'text', 
-                            WebkitTextFillColor: 'transparent',
-                            backgroundSize: '200% 200%',
-                            animation: 'gradientShift 3s ease infinite',
-                            '@keyframes gradientShift': {
-                              '0%, 100%': { backgroundPosition: '0% 50%' },
-                              '50%': { backgroundPosition: '100% 50%' },
-                            },
-                          }}
-                        >
-                          Validated by Backtesting
-                        </Box>
-                      </motion.span>
-                    </Typography>
-                  </motion.div>
-
-                  <motion.div variants={fadeInUp}>
-                    <Typography
-                      variant="h5"
-                      sx={{
-                        mb: 4,
-                        color: 'text.secondary',
-                        fontWeight: 400,
-                        lineHeight: 1.8,
-                        maxWidth: '90%',
-                        fontSize: { xs: '1rem', md: '1.25rem' },
-                      }}
-                    >
-                      Alpha Crucible leverages <strong>AI-powered analysis of alternative data</strong> to generate 
-                      sector-specific trading signals. We capture insights traditional financial analysis misses, 
-                      providing you with rigorously backtested quantitative strategies validated through comprehensive testing.
-                    </Typography>
-                  </motion.div>
-
-                  <motion.div variants={fadeInUp}>
-                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 4 }}>
-                      <motion.div 
-                        whileHover={{ scale: 1.05, y: -2 }} 
-                        whileTap={{ scale: 0.95 }}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6, delay: 0.6 }}
-                      >
-                        <Button
-                          variant="contained"
-                          size="large"
-                          endIcon={<ArrowForwardIcon />}
-                          onClick={() => navigate('/backtest')}
-                          sx={{
-                            px: 5,
-                            py: 2,
-                            fontSize: '1.1rem',
-                            fontWeight: 600,
-                            background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                            boxShadow: '0 20px 40px rgba(37, 99, 235, 0.4)',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            '&::before': {
-                              content: '""',
-                              position: 'absolute',
-                              top: 0,
-                              left: '-100%',
-                              width: '100%',
-                              height: '100%',
-                              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                              transition: 'left 0.5s',
-                            },
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-                              boxShadow: '0 25px 50px rgba(37, 99, 235, 0.6)',
-                              transform: 'translateY(-2px)',
-                              '&::before': {
-                                left: '100%',
-                              },
-                            },
-                          }}
-                        >
-                          View Backtests
-                        </Button>
-                      </motion.div>
-                      <motion.div 
-                        whileHover={{ scale: 1.05, y: -2 }} 
-                        whileTap={{ scale: 0.95 }}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6, delay: 0.7 }}
-                      >
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          endIcon={<LaunchIcon />}
-                          href={CONFIG.discordUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{
-                            px: 5,
-                            py: 2,
-                            fontSize: '1.1rem',
-                            fontWeight: 600,
-                            borderWidth: 2,
-                            backdropFilter: 'blur(10px)',
-                            background: isDarkMode ? 'rgba(30, 41, 59, 0.3)' : 'rgba(255, 255, 255, 0.3)',
-                            '&:hover': {
-                              borderWidth: 2,
-                              transform: 'translateY(-2px)',
-                              background: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(255, 255, 255, 0.5)',
-                              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-                            },
-                          }}
-                        >
-                          Join Discord
-                        </Button>
-                      </motion.div>
-                    </Box>
-                  </motion.div>
+                  <Logo size="xlarge" showText={true} clickable={false} />
                 </motion.div>
-              </Grid>
+              </Box>
+            </motion.div>
 
-              <Grid item xs={12} md={6}>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8, rotateY: 15 }}
-                  animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                  transition={{ duration: 1, delay: 0.3, ease: [0.6, -0.05, 0.01, 0.99] }}
+            <motion.div variants={fadeInUp}>
+              <Typography
+                variant="h1"
+                sx={{
+                  fontSize: { xs: '2.5rem', md: '4rem', lg: '5.5rem' },
+                  fontWeight: 900,
+                  mb: 3,
+                  lineHeight: 1.1,
+                  letterSpacing: '-0.03em',
+                  color: '#ffffff',
+                  textShadow: '0 2px 20px rgba(0, 0, 0, 0.5)',
+                }}
+              >
+                <motion.span
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
                 >
-                  <motion.div
-                    whileHover={{ 
-                      scale: 1.02,
-                      rotateY: -5,
-                      transition: { duration: 0.3 }
+                  Quantitative Trading Signals
+                </motion.span>
+                <br />
+                <motion.span
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.4 }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundSize: '200% 200%',
+                      animation: 'gradientShift 3s ease infinite',
+                      '@keyframes gradientShift': {
+                        '0%, 100%': { backgroundPosition: '0% 50%' },
+                        '50%': { backgroundPosition: '100% 50%' },
+                      },
                     }}
-                    style={{ perspective: 1000 }}
                   >
-                    <Card
-                      sx={{
-                        background: isDarkMode
-                          ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
-                          : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
-                        backdropFilter: 'blur(30px)',
-                        border: '1px solid',
-                        borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
-                        boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
-                        borderRadius: 4,
-                        position: 'relative',
-                        overflow: 'hidden',
+                    Validated by Backtesting
+                  </Box>
+                </motion.span>
+              </Typography>
+            </motion.div>
+
+            <motion.div variants={fadeInUp}>
+              <Typography
+                variant="h6"
+                sx={{
+                  mb: 4,
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontWeight: 400,
+                  lineHeight: 1.8,
+                  fontSize: { xs: '1rem', md: '1.25rem' },
+                  textShadow: '0 1px 10px rgba(0, 0, 0, 0.5)',
+                  maxWidth: '90%',
+                  mx: 'auto',
+                }}
+              >
+                Alpha Crucible leverages <strong>AI-powered analysis of alternative data</strong> to generate
+                sector-specific trading signals. We capture insights traditional financial analysis misses,
+                providing you with rigorously backtested quantitative strategies validated through comprehensive testing.
+              </Typography>
+            </motion.div>
+
+            <motion.div variants={fadeInUp}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 2,
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
+                  mb: 4,
+                }}
+              >
+                <motion.div
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.6 }}
+                >
+                  <Button
+                    variant="contained"
+                    size="large"
+                    endIcon={<ArrowForwardIcon />}
+                    onClick={() => navigate('/backtest')}
+                    sx={{
+                      px: 5,
+                      py: 2,
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                      boxShadow: '0 20px 40px rgba(37, 99, 235, 0.4)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: '-100%',
+                        width: '100%',
+                        height: '100%',
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                        transition: 'left 0.5s',
+                      },
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                        boxShadow: '0 25px 50px rgba(37, 99, 235, 0.6)',
+                        transform: 'translateY(-2px)',
                         '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: '2px',
-                          background: 'linear-gradient(90deg, #2563eb, #8b5cf6, #ec4899, #2563eb)',
-                          backgroundSize: '200% 100%',
-                          animation: 'gradientFlow 3s linear infinite',
-                          '@keyframes gradientFlow': {
-                            '0%': { backgroundPosition: '0% 0%' },
-                            '100%': { backgroundPosition: '200% 0%' },
-                          },
+                          left: '100%',
                         },
-                      }}
-                    >
-                      <CardContent sx={{ p: 5 }}>
-                        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 4, fontSize: '1.5rem' }}>
-                          What You Get Access To:
-                        </Typography>
-                        {[
-                          'AI-processed alternative data signals',
-                          'Sector-specific trading insights',
-                          'Historical backtest performance',
-                          'Portfolio composition analysis',
-                          'Risk-adjusted return metrics',
-                          'Signal performance attribution',
-                        ].map((feature, index) => (
-                          <motion.div
-                            key={index}
-                            initial={{ opacity: 0, x: -30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
-                            whileHover={{ x: 5 }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
-                              <motion.div
-                                animate={{ 
-                                  scale: [1, 1.2, 1],
-                                  rotate: [0, 10, 0]
-                                }}
-                                transition={{ 
-                                  duration: 0.5, 
-                                  delay: 0.9 + index * 0.1,
-                                  ease: 'easeInOut'
-                                }}
-                              >
-                                <CheckCircleIcon sx={{ color: 'success.main', mr: 2, fontSize: 28 }} />
-                              </motion.div>
-                              <Typography variant="body1" sx={{ fontWeight: 500, fontSize: '1.05rem' }}>
-                                {feature}
-                              </Typography>
-                            </Box>
-                          </motion.div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                      },
+                    }}
+                  >
+                    View Backtests
+                  </Button>
                 </motion.div>
-              </Grid>
-            </Grid>
-          </Container>
-        </motion.div>
+                <motion.div
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.7 }}
+                >
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    endIcon={<LaunchIcon />}
+                    href={CONFIG.discordUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      px: 5,
+                      py: 2,
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      borderWidth: 2,
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      color: '#ffffff',
+                      backdropFilter: 'blur(10px)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      '&:hover': {
+                        borderWidth: 2,
+                        borderColor: 'rgba(255, 255, 255, 0.8)',
+                        transform: 'translateY(-2px)',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                      },
+                    }}
+                  >
+                    Join Discord
+                  </Button>
+                </motion.div>
+              </Box>
+            </motion.div>
+          </motion.div>
+        </Container>
 
         {/* Scroll Indicator */}
         <motion.div

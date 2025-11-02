@@ -94,34 +94,47 @@ const AnimatedBackground: React.FC = () => {
 
     window.addEventListener('resize', resizeCanvas, { passive: true });
 
-    // Create particles
-    const createParticles = () => {
-      const particles: Particle[] = [];
-      const particleCount = 50;
-      const width = canvas.width / (window.devicePixelRatio || 1);
-      const height = canvas.height / (window.devicePixelRatio || 1);
+      // Create data-driven line particles
+      const createParticles = () => {
+        const particles: Particle[] = [];
+        const particleCount = 100; // More particles for visibility
+        const width = canvas.width / (window.devicePixelRatio || 1);
+        const height = canvas.height / (window.devicePixelRatio || 1);
       
       const colors = isDarkMode
         ? [
-            'rgba(37, 99, 235, 0.4)',
-            'rgba(139, 92, 246, 0.4)',
             'rgba(59, 130, 246, 0.3)',
-            'rgba(168, 85, 247, 0.3)',
+            'rgba(37, 99, 235, 0.3)',
+            'rgba(139, 92, 246, 0.25)',
+            'rgba(168, 85, 247, 0.25)',
           ]
         : [
             'rgba(37, 99, 235, 0.2)',
             'rgba(139, 92, 246, 0.2)',
-            'rgba(59, 130, 246, 0.15)',
-            'rgba(168, 85, 247, 0.15)',
+            'rgba(59, 130, 246, 0.18)',
+            'rgba(168, 85, 247, 0.18)',
           ];
 
+      // Create particles in a more structured, grid-like pattern that resembles data points
+      const gridCols = 12;
+      const gridRows = 8;
+      const cellWidth = width / gridCols;
+      const cellHeight = height / gridRows;
+
       for (let i = 0; i < particleCount; i++) {
+        const col = Math.floor(i % gridCols);
+        const row = Math.floor(i / gridCols);
+        
+        // Add some randomness but keep grid structure
+        const baseX = col * cellWidth + cellWidth / 2;
+        const baseY = row * cellHeight + cellHeight / 2;
+        
         particles.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
-          radius: Math.random() * 2 + 1,
+          x: baseX + (Math.random() - 0.5) * cellWidth * 0.6,
+          y: baseY + (Math.random() - 0.5) * cellHeight * 0.6,
+          vx: (Math.random() - 0.5) * 0.3, // Slower, more controlled movement
+          vy: (Math.random() - 0.5) * 0.3,
+          radius: Math.random() * 2 + 1, // Larger particles for visibility
           color: colors[Math.floor(Math.random() * colors.length)],
         });
       }
@@ -140,46 +153,74 @@ const AnimatedBackground: React.FC = () => {
 
       const width = canvas.width / (window.devicePixelRatio || 1);
       const height = canvas.height / (window.devicePixelRatio || 1);
-      const connectionDistance = 150;
-      const strokeOpacity = isDarkMode ? 0.2 : 0.1;
+      const connectionDistance = 200; // Much larger connection distance for more connections
+      const strokeOpacity = isDarkMode ? 0.2 : 0.15;
 
       // Update and draw particles
       const particles = particlesRef.current;
+      
+      // Draw lines first (connections)
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
       for (let i = 0; i < particles.length; i++) {
         const particle = particles[i];
         
         particle.x += particle.vx;
         particle.y += particle.vy;
 
-        // Wrap around edges
-        if (particle.x < 0) particle.x = width;
-        if (particle.x > width) particle.x = 0;
-        if (particle.y < 0) particle.y = height;
-        if (particle.y > height) particle.y = 0;
+        // Bounce off edges instead of wrapping for more controlled movement
+        if (particle.x < 0 || particle.x > width) particle.vx *= -1;
+        if (particle.y < 0 || particle.y > height) particle.vy *= -1;
+        particle.x = Math.max(0, Math.min(width, particle.x));
+        particle.y = Math.max(0, Math.min(height, particle.y));
+      }
 
-        // Draw particle
+      // Draw connections as lines (data-driven network)
+      // Connect each particle to nearby particles
+      for (let i = 0; i < particles.length; i++) {
+        const particle = particles[i];
+        
+        // Connect to multiple nearest neighbors
+        const connections: Array<{ particle: Particle; distance: number }> = [];
+        
+        for (let j = 0; j < particles.length; j++) {
+          if (i === j) continue;
+          const other = particles[j];
+          const dx = particle.x - other.x;
+          const dy = particle.y - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < connectionDistance) {
+            connections.push({ particle: other, distance });
+          }
+        }
+        
+        // Sort by distance and connect to nearest neighbors (more connections)
+        connections.sort((a, b) => a.distance - b.distance);
+        const maxConnections = Math.min(connections.length, 5); // Connect to up to 5 nearest neighbors
+        
+        for (let k = 0; k < maxConnections; k++) {
+          const other = connections[k];
+          const opacity = strokeOpacity * (1 - other.distance / connectionDistance);
+          
+          // Draw line with gradient-like opacity
+          ctx.beginPath();
+          ctx.moveTo(particle.x, particle.y);
+          ctx.lineTo(other.particle.x, other.particle.y);
+          ctx.strokeStyle = `rgba(59, 130, 246, ${opacity})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      // Draw particles as small points (data points)
+      for (let i = 0; i < particles.length; i++) {
+        const particle = particles[i];
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = particle.color;
         ctx.fill();
-
-        // Draw connections (only to particles after current one to avoid duplicates)
-        for (let j = i + 1; j < particles.length; j++) {
-          const other = particles[j];
-          const dx = particle.x - other.x;
-          const dy = particle.y - other.y;
-          const distanceSquared = dx * dx + dy * dy;
-
-          if (distanceSquared < connectionDistance * connectionDistance) {
-            const distance = Math.sqrt(distanceSquared);
-            ctx.beginPath();
-            ctx.moveTo(particle.x, particle.y);
-            ctx.lineTo(other.x, other.y);
-            ctx.strokeStyle = `rgba(37, 99, 235, ${strokeOpacity * (1 - distance / connectionDistance)})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
       }
 
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -312,6 +353,7 @@ const AnimatedBackground: React.FC = () => {
           height: '100%',
           zIndex: 0,
           pointerEvents: 'none',
+          opacity: 0.6,
         }}
       />
     </>

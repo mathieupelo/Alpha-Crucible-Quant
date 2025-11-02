@@ -79,10 +79,43 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
-              <Logo size="medium" showText={true} />
+              <Box
+                sx={{
+                  position: 'relative',
+                  '& img': {
+                    filter: 'drop-shadow(0 0 15px rgba(37, 99, 235, 0.4)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3))',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    zIndex: 1,
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '120%',
+                    height: '120%',
+                    background: 'radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%)',
+                    borderRadius: '50%',
+                    opacity: 0,
+                    transition: 'opacity 0.3s ease',
+                    zIndex: 0,
+                  },
+                  '&:hover': {
+                    '& img': {
+                      transform: 'scale(1.1)',
+                      filter: 'drop-shadow(0 0 25px rgba(37, 99, 235, 0.6)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3))',
+                    },
+                    '&::before': {
+                      opacity: 1,
+                    },
+                  },
+                }}
+              >
+                <Logo size="medium" showText={true} />
+              </Box>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: -10 }}

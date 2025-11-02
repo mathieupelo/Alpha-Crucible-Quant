@@ -49,7 +49,6 @@ import {
 } from '@mui/icons-material';
 import { motion, useInView } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import Logo from '@/components/common/Logo';
 import AnimatedBackground from '@/components/common/AnimatedBackground';
 import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -577,17 +576,6 @@ const Home: React.FC = () => {
             animate="visible"
             variants={staggerContainer}
           >
-            <motion.div variants={fadeInUp}>
-              <Box sx={{ mb: 4 }}>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Logo size="xlarge" showText={true} clickable={false} />
-                </motion.div>
-              </Box>
-            </motion.div>
-
             <motion.div variants={fadeInUp}>
               <Typography
                 variant="h1"

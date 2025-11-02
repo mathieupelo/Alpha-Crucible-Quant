@@ -21,6 +21,7 @@ import {
   Link,
   Snackbar,
   Alert,
+  IconButton,
 } from '@mui/material';
 import {
   Analytics as AnalyticsIcon,
@@ -41,20 +42,23 @@ import {
   ShowChart as ShowChartIcon,
   Security as SecurityIcon,
   Bolt as BoltIcon,
-  AutoAwesome as AutoAwesomeIcon,
   CalendarToday as CalendarTodayIcon,
   Timeline as TimelineIcon,
-  Movie as MovieIcon,
-  Gamepad as GamepadIcon,
 } from '@mui/icons-material';
 import { motion, useInView } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import AnimatedBackground from '@/components/common/AnimatedBackground';
 import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
-import { backtestApi } from '@/services/api';
+import { backtestApi, newsApi } from '@/services/api';
 import SectorsSection from '@/components/sectors/SectorsSection';
-import NewsFeed, { NewsFeedRef } from '@/components/news/NewsFeed';
+import {
+  TrendingDown as TrendingDownIcon,
+  Remove as RemoveIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  RadioButtonChecked as RadioButtonCheckedIcon,
+} from '@mui/icons-material';
 
 // Configuration
 const CONFIG = {
@@ -94,6 +98,530 @@ const scaleIn = {
   },
 };
 
+// Live News Preview Component
+const LiveNewsPreview: React.FC = () => {
+  const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Fetch recent news for GameCore-12 universe
+  const { data: newsData, isLoading: newsLoading } = useQuery(
+    'home-news-preview',
+    () => newsApi.getUniverseNews('GameCore-12 (GC-12)', 6),
+    {
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const formatNewsDate = (dateStr: string) => {
+    try {
+      const date = parseISO(dateStr);
+      const now = new Date();
+      const diffMinutes = (now.getTime() - date.getTime()) / (1000 * 60);
+
+      if (diffMinutes < 60) {
+        return `${Math.floor(diffMinutes)}m ago`;
+      } else if (diffMinutes < 1440) {
+        return `${Math.floor(diffMinutes / 60)}h ago`;
+      } else {
+        return format(date, 'MMM dd');
+      }
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getSentimentStyle = (label: string) => {
+    switch (label) {
+      case 'positive':
+        return {
+          color: '#10b981',
+          bgColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+          icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,
+        };
+      case 'negative':
+        return {
+          color: '#ef4444',
+          bgColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+          icon: <TrendingDownIcon sx={{ fontSize: 16 }} />,
+        };
+      default:
+        return {
+          color: '#6b7280',
+          bgColor: isDarkMode ? 'rgba(107, 114, 128, 0.15)' : 'rgba(107, 114, 128, 0.1)',
+          icon: <RemoveIcon sx={{ fontSize: 16 }} />,
+        };
+    }
+  };
+
+  const previewNews = newsData?.news || []; // Show all 6 items
+  const visibleItems = 3; // Number of items visible at once (always show 3)
+  // Ensure we have at least 3 items for display
+  const displayNews = previewNews.length >= 3 ? previewNews : [];
+  const maxIndex = Math.max(0, displayNews.length - visibleItems);
+  const canGoPrevious = currentIndex > 0;
+  const canGoNext = currentIndex < maxIndex && displayNews.length > visibleItems;
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePrevious = () => {
+    if (scrollContainerRef.current && currentIndex > 0) {
+      const container = scrollContainerRef.current;
+      const cards = container.querySelectorAll('[data-card-index]');
+      if (cards.length > 0) {
+        const firstCard = cards[0] as HTMLElement;
+        const cardWidth = firstCard.offsetWidth;
+        const gap = 24; // gap-3 = 24px
+        
+        const newIndex = Math.max(0, currentIndex - 1);
+        setCurrentIndex(newIndex);
+        
+        // Scroll to show exactly visibleItems cards
+        const targetScroll = newIndex * (cardWidth + gap);
+        container.scrollTo({
+          left: targetScroll,
+          behavior: 'smooth',
+        });
+      }
+    }
+  };
+
+  const handleNext = () => {
+    if (scrollContainerRef.current && currentIndex < maxIndex) {
+      const container = scrollContainerRef.current;
+      const cards = container.querySelectorAll('[data-card-index]');
+      if (cards.length > 0) {
+        const firstCard = cards[0] as HTMLElement;
+        const cardWidth = firstCard.offsetWidth;
+        const gap = 24; // gap-3 = 24px
+        
+        const newIndex = Math.min(maxIndex, currentIndex + 1);
+        setCurrentIndex(newIndex);
+        
+        // Scroll to show exactly visibleItems cards
+        const targetScroll = newIndex * (cardWidth + gap);
+        container.scrollTo({
+          left: targetScroll,
+          behavior: 'smooth',
+        });
+      }
+    }
+  };
+
+  // Reset index when news data changes
+  React.useEffect(() => {
+    if (newsData?.news && newsData.news.length >= 3) {
+      setCurrentIndex(0);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ left: 0, behavior: 'instant' });
+      }
+    }
+  }, [newsData?.news?.length]);
+
+  return (
+    <Box
+      sx={{
+        py: { xs: 8, md: 12 },
+        background: 'transparent',
+        position: 'relative',
+        zIndex: 1,
+      }}
+    >
+      <Container maxWidth="lg">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={staggerContainer}
+        >
+          <motion.div variants={fadeInUp}>
+            <Box sx={{ textAlign: 'center', mb: 6 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                        <Typography
+                          variant="h2"
+                          sx={{
+                            fontWeight: 800,
+                            background: isDarkMode
+                              ? 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)'
+                              : 'linear-gradient(135deg, #0f172a 0%, #475569 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                          }}
+                        >
+                          Live News Data Analysis
+                        </Typography>
+                        {/* Breathing/Pulsing Real-time Indicator */}
+                        <motion.div
+                          animate={{
+                            scale: [1, 1.3, 1],
+                            opacity: [0.6, 1, 0.6],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                          }}
+                        >
+                          <RadioButtonCheckedIcon
+                            sx={{
+                              fontSize: 16,
+                              color: '#10b981',
+                            }}
+                          />
+                        </motion.div>
+                      </Box>
+              <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 700, mx: 'auto' }}>
+                Real-time data analysis of market news with AI-powered sentiment insights
+              </Typography>
+            </Box>
+          </motion.div>
+
+          {/* News Preview Cards with Carousel */}
+          <Box 
+            sx={{ 
+              position: 'relative', 
+              mb: 4,
+              // Fix shadow artifacts but don't clip arrows
+              // Use padding instead of overflow hidden to allow arrows to show
+              px: { xs: 2, md: 3 },
+              // Ensure arrows are never clipped
+              overflow: 'visible',
+            }}
+          >
+            {/* Left Arrow */}
+            {!newsLoading && displayNews.length > visibleItems && (
+              <IconButton
+                onClick={handlePrevious}
+                disabled={!canGoPrevious}
+                sx={{
+                  position: 'absolute',
+                  left: { xs: -8, md: -16 },
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  background: isDarkMode
+                    ? 'rgba(30, 41, 59, 0.9)'
+                    : 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  opacity: canGoPrevious ? 1 : 0.3,
+                  cursor: canGoPrevious ? 'pointer' : 'not-allowed',
+                  '&:hover': canGoPrevious ? {
+                    background: isDarkMode
+                      ? 'rgba(30, 41, 59, 1)'
+                      : 'rgba(255, 255, 255, 1)',
+                    transform: 'translateY(-50%) scale(1.1)',
+                  } : {},
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                }}
+              >
+                <ChevronLeftIcon />
+              </IconButton>
+            )}
+
+            {/* Scrollable News Cards Container */}
+            <Box
+              ref={scrollContainerRef}
+              sx={{
+                display: 'flex',
+                gap: 3,
+                overflowX: 'auto',
+                overflowY: 'visible',
+                scrollBehavior: 'smooth',
+                position: 'relative',
+                scrollSnapType: 'x proximity',
+                // Ensure container shows exactly 3 cards on desktop
+                width: '100%',
+                maxWidth: '100%',
+                // Prevent shadow bleeding while allowing arrows
+                '& > *': {
+                  flexShrink: 0,
+                },
+                // Fix shadow artifacts by ensuring clean clipping
+                isolation: 'isolate',
+                transform: 'translateZ(0)', // Force hardware acceleration
+                willChange: 'scroll-position',
+                // Hide scrollbar
+                '&::-webkit-scrollbar': {
+                  display: 'none',
+                },
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
+              {newsLoading || displayNews.length < 3 ? (
+                // Loading Skeleton - show 3 skeleton cards (always show during loading or when data is insufficient)
+                <>
+                  {[1, 2, 3].map((idx) => (
+                    <Card
+                      key={`skeleton-${idx}`}
+                      sx={{
+                        width: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        minWidth: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        maxWidth: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        flexShrink: 0,
+                        height: '100%',
+                        background: isDarkMode
+                          ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                          : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 4,
+                        boxShadow: 'none',
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Box sx={{ mb: 2, borderRadius: 2, overflow: 'hidden', width: '100%', height: '120px', bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }}>
+                          <Box sx={{ width: '100%', height: '100%', bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                          <Box sx={{ width: 60, height: 24, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                          <Box sx={{ width: 80, height: 24, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        </Box>
+                        <Box sx={{ mb: 1.5 }}>
+                          <Box sx={{ width: '90%', height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)', mb: 1 }} />
+                          <Box sx={{ width: '70%', height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        </Box>
+                        <Box sx={{ mb: 2 }}>
+                          <Box sx={{ width: '100%', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)', mb: 0.5 }} />
+                          <Box sx={{ width: '85%', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Box sx={{ width: 60, height: 12, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                          <Box sx={{ width: 80, height: 12, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </>
+              ) : displayNews.length >= 3 ? (
+                // Actual News Cards - show all pre-loaded (at least 3)
+                displayNews.map((item: any, index: number) => {
+                  const sentimentStyle = getSentimentStyle(item.sentiment.label);
+                  return (
+                    <Card
+                      key={`${item.ticker}-${item.pub_date}-${index}`}
+                      data-card-index={index}
+                      component={motion.div}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: index * 0.1 }}
+                      sx={{
+                        width: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        minWidth: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        maxWidth: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
+                        flexShrink: 0,
+                        height: '100%',
+                        background: isDarkMode
+                          ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                          : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        position: 'relative',
+                        transition: 'all 0.3s ease',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: '4px',
+                          background: sentimentStyle.color,
+                          opacity: 0.6,
+                        },
+                        '&:hover': {
+                          boxShadow: `0 8px 24px ${sentimentStyle.color}20`,
+                          transform: 'translateY(-5px)',
+                        },
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        {/* Image */}
+                        {item.image_url && (
+                          <Box
+                            sx={{
+                              mb: 2,
+                              borderRadius: 2,
+                              overflow: 'hidden',
+                              width: '100%',
+                              height: '120px',
+                              backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.3)' : 'rgba(248, 250, 252, 0.5)',
+                              position: 'relative',
+                              '& img': {
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              },
+                            }}
+                          >
+                            <img
+                              src={item.image_url}
+                              alt={item.title}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </Box>
+                        )}
+
+                        {/* Header */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                          <Chip
+                            label={item.ticker}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                              background: isDarkMode
+                                ? 'rgba(37, 99, 235, 0.2)'
+                                : 'rgba(37, 99, 235, 0.1)',
+                              border: '1px solid',
+                              borderColor: 'primary.main',
+                            }}
+                          />
+                          <Chip
+                            icon={sentimentStyle.icon}
+                            label={item.sentiment.label_display}
+                            size="small"
+                            sx={{
+                              fontSize: '0.75rem',
+                              color: sentimentStyle.color,
+                              background: sentimentStyle.bgColor,
+                              border: '1px solid',
+                              borderColor: sentimentStyle.color + '40',
+                              fontWeight: 500,
+                            }}
+                          />
+                        </Box>
+
+                        {/* Title */}
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            mb: 1.5,
+                            lineHeight: 1.4,
+                            fontSize: '1rem',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {item.title || item.summary?.substring(0, 100) || 'News Article'}
+                        </Typography>
+
+                        {/* Summary */}
+                        {item.summary && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mb: 2,
+                              lineHeight: 1.6,
+                              fontSize: '0.875rem',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {item.summary}
+                          </Typography>
+                        )}
+
+                        {/* Footer */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 'auto', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                            {formatNewsDate(item.pub_date)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                            {item.publisher || 'News Source'}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : null}
+            </Box>
+
+            {/* Right Arrow */}
+            {!newsLoading && displayNews.length > visibleItems && (
+              <IconButton
+                onClick={handleNext}
+                disabled={!canGoNext}
+                sx={{
+                  position: 'absolute',
+                  right: { xs: -8, md: -16 },
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  background: isDarkMode
+                    ? 'rgba(30, 41, 59, 0.9)'
+                    : 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  opacity: canGoNext ? 1 : 0.3,
+                  cursor: canGoNext ? 'pointer' : 'not-allowed',
+                  '&:hover': canGoNext ? {
+                    background: isDarkMode
+                      ? 'rgba(30, 41, 59, 1)'
+                      : 'rgba(255, 255, 255, 1)',
+                    transform: 'translateY(-50%) scale(1.1)',
+                  } : {},
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                }}
+              >
+                <ChevronRightIcon />
+              </IconButton>
+            )}
+          </Box>
+
+          {/* CTA Button */}
+          {!newsLoading && displayNews.length >= 3 && (
+            <motion.div variants={fadeInUp}>
+              <Box sx={{ textAlign: 'center' }}>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    endIcon={<ArrowForwardIcon />}
+                    onClick={() => navigate('/news-deep-dive')}
+                    sx={{
+                      px: 5,
+                      py: 2,
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
+                      boxShadow: '0 20px 40px rgba(37, 99, 235, 0.4)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
+                        boxShadow: '0 25px 50px rgba(37, 99, 235, 0.5)',
+                        transform: 'translateY(-2px)',
+                      },
+                    }}
+                  >
+                    Explore Full News Analysis
+                  </Button>
+                </motion.div>
+              </Box>
+            </motion.div>
+          )}
+        </motion.div>
+      </Container>
+    </Box>
+  );
+};
+
 // Latest Backtest Showcase Component
 const LatestBacktestShowcase: React.FC = () => {
   const navigate = useNavigate();
@@ -113,7 +641,7 @@ const LatestBacktestShowcase: React.FC = () => {
   const runId = latestBacktest?.run_id;
 
   // Fetch metrics for the latest backtest
-  const { data: metricsData, isLoading: metricsLoading } = useQuery(
+  const { data: metricsData, isLoading: metricsLoading, isFetching: metricsFetching } = useQuery(
     ['backtest-metrics', runId],
     () => backtestApi.getBacktestMetrics(runId!),
     {
@@ -123,11 +651,20 @@ const LatestBacktestShowcase: React.FC = () => {
     }
   );
 
-  if (backtestsLoading || metricsLoading || !latestBacktest || !metricsData) {
-    return null; // Don't show anything if loading or no data
-  }
+  // Show skeleton if:
+  // 1. Backtests are loading, OR
+  // 2. We have a runId but metrics are loading/fetching, OR
+  // 3. We have a backtest but no metrics data yet (waiting for metrics to load)
+  // Use isFetching as primary check since it's more reliable for detecting active queries
+  const isLoading = backtestsLoading 
+    || (!!runId && (metricsLoading || metricsFetching)) 
+    || (!!latestBacktest && runId && !metricsData);
+  
+  // Show content only when we have both backtest and metrics data
+  // Ensure metricsData exists and is a valid object
+  const hasData = !!latestBacktest && !!metricsData;
 
-  const metrics = metricsData;
+  const metrics = metricsData || undefined;
   const formatDate = (dateStr: string) => format(parseISO(dateStr), 'MMM dd, yyyy');
   const formatPercent = (val: number) => `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
 
@@ -149,28 +686,6 @@ const LatestBacktestShowcase: React.FC = () => {
         >
           <motion.div variants={fadeInUp}>
             <Box sx={{ textAlign: 'center', mb: 6 }}>
-              <motion.div
-                animate={{
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              >
-                <AutoAwesomeIcon
-                  sx={{
-                    fontSize: 56,
-                    color: 'primary.main',
-                    mb: 2,
-                    background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                />
-              </motion.div>
               <Typography
                 variant="h2"
                 sx={{
@@ -192,8 +707,73 @@ const LatestBacktestShowcase: React.FC = () => {
             </Box>
           </motion.div>
 
-          <motion.div variants={scaleIn} whileHover={{ y: -10, transition: { duration: 0.3 } }}>
+          {isLoading ? (
+            // Loading Skeleton for Backtest
             <Card
+              sx={{
+                background: isDarkMode
+                  ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                  : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 4,
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              <CardContent sx={{ p: { xs: 4, md: 6 } }}>
+                {/* Header Skeleton */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ mb: 1, width: '60%', height: 32, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                      <Box sx={{ width: 200, height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                      <Box sx={{ width: 100, height: 24, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                    </Box>
+                  </Box>
+                  <Box sx={{ mt: { xs: 2, md: 0 }, width: 140, height: 40, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                </Box>
+
+                {/* Metrics Grid Skeleton */}
+                <Grid container spacing={3} sx={{ mb: 4 }} justifyContent="center">
+                  {[1, 2, 3, 4].map((idx) => (
+                    <Grid item xs={6} sm={4} md={3} key={idx}>
+                      <Card
+                        sx={{
+                          background: isDarkMode
+                            ? 'rgba(148, 163, 184, 0.05)'
+                            : 'rgba(148, 163, 184, 0.02)',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 3,
+                          p: 2,
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Box sx={{ mb: 1, width: '70%', mx: 'auto', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        <Box sx={{ width: '50%', mx: 'auto', height: 28, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {/* Additional Metrics Skeleton */}
+                <Grid container spacing={2}>
+                  {[1, 2, 3].map((idx) => (
+                    <Grid item xs={6} sm={4} key={idx}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 20, height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                        <Box sx={{ width: '80%', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          ) : hasData ? (
+            <motion.div variants={scaleIn} whileHover={{ y: -10, transition: { duration: 0.3 } }}>
+              <Card
               sx={{
                 background: isDarkMode
                   ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
@@ -309,10 +889,10 @@ const LatestBacktestShowcase: React.FC = () => {
                           variant="h5"
                           sx={{
                             fontWeight: 800,
-                            color: metrics.total_return >= 0 ? 'success.main' : 'error.main',
+                            color: metrics && metrics.total_return >= 0 ? 'success.main' : 'error.main',
                           }}
                         >
-                          {formatPercent(metrics.total_return)}
+                          {formatPercent(metrics?.total_return || 0)}
                         </Typography>
                       </Card>
                     </motion.div>
@@ -335,7 +915,7 @@ const LatestBacktestShowcase: React.FC = () => {
                           Sharpe Ratio
                         </Typography>
                         <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>
-                          {metrics.sharpe_ratio.toFixed(2)}
+                          {(metrics?.sharpe_ratio || 0).toFixed(2)}
                         </Typography>
                       </Card>
                     </motion.div>
@@ -361,10 +941,10 @@ const LatestBacktestShowcase: React.FC = () => {
                           variant="h5"
                           sx={{
                             fontWeight: 800,
-                            color: metrics.alpha >= 0 ? 'success.main' : 'error.main',
+                            color: metrics && metrics.alpha >= 0 ? 'success.main' : 'error.main',
                           }}
                         >
-                          {formatPercent(metrics.alpha)}
+                          {formatPercent(metrics?.alpha || 0)}
                         </Typography>
                       </Card>
                     </motion.div>
@@ -387,7 +967,7 @@ const LatestBacktestShowcase: React.FC = () => {
                           Max Drawdown
                         </Typography>
                         <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>
-                          {formatPercent(metrics.max_drawdown)}
+                          {formatPercent(metrics?.max_drawdown || 0)}
                         </Typography>
                       </Card>
                     </motion.div>
@@ -400,7 +980,7 @@ const LatestBacktestShowcase: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <TimelineIcon sx={{ fontSize: 20, color: 'primary.main' }} />
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Volatility:</strong> {formatPercent(metrics.volatility)}
+                        <strong>Volatility:</strong> {formatPercent(metrics?.volatility || 0)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -408,7 +988,7 @@ const LatestBacktestShowcase: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <TrendingUpIcon sx={{ fontSize: 20, color: 'success.main' }} />
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Win Rate:</strong> {formatPercent(metrics.win_rate)}
+                        <strong>Win Rate:</strong> {formatPercent(metrics?.win_rate || 0)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -416,14 +996,15 @@ const LatestBacktestShowcase: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <ShowChartIcon sx={{ fontSize: 20, color: 'info.main' }} />
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Annualized Return:</strong> {formatPercent(metrics.annualized_return)}
+                        <strong>Annualized Return:</strong> {formatPercent(metrics?.annualized_return || 0)}
                       </Typography>
                     </Box>
                   </Grid>
                 </Grid>
               </CardContent>
             </Card>
-          </motion.div>
+            </motion.div>
+          ) : null}
         </motion.div>
       </Container>
     </Box>
@@ -436,9 +1017,6 @@ const Home: React.FC = () => {
   const [email, setEmail] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const heroRef = useRef<HTMLDivElement>(null);
-  const newsFeedRef = useRef<NewsFeedRef>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const [useMovieCore8, setUseMovieCore8] = useState(true);
   
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
@@ -782,9 +1360,8 @@ const Home: React.FC = () => {
       {/* Main Content Area */}
       <Box
         sx={{
-          width: { xs: '100%', lg: 'calc(100% - 600px)' },
+          width: '100%',
           margin: '0 auto',
-          transition: 'width 0.3s ease',
         }}
       >
         {/* Sectors Section */}
@@ -904,297 +1481,9 @@ const Home: React.FC = () => {
 
       {/* Latest Backtest Showcase */}
       <LatestBacktestShowcase />
-      </Box>
 
-      {/* News Feed Sidebar - Fixed on Right Side */}
-      <Box
-        ref={sidebarRef}
-        sx={{
-          position: 'fixed',
-          top: { xs: 0, lg: 64 },
-          right: 0,
-          width: { xs: '100%', lg: '580px' },
-          height: { xs: '100vh', lg: 'calc(100vh - 64px)' },
-          overflowY: 'hidden',
-          zIndex: 50,
-          background: 'transparent',
-          backdropFilter: 'blur(40px)',
-          borderLeft: { xs: 'none', lg: 'none' },
-          boxShadow: { xs: 'none', lg: 'none' },
-          px: { xs: 2, lg: 4 },
-          py: { xs: 4, lg: 5 },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: isDarkMode
-              ? useMovieCore8
-                ? 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%), linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, transparent 100%)'
-                : 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%), linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, transparent 100%)'
-              : useMovieCore8
-              ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%), linear-gradient(135deg, rgba(139, 92, 246, 0.02) 0%, transparent 100%)'
-              : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%), linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, transparent 100%)',
-            pointerEvents: 'none',
-            zIndex: 0,
-            transition: 'background 0.5s ease',
-          },
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '1px',
-            height: '100%',
-            background: isDarkMode
-              ? 'linear-gradient(180deg, transparent 0%, rgba(148, 163, 184, 0.08) 20%, rgba(148, 163, 184, 0.12) 50%, rgba(148, 163, 184, 0.08) 80%, transparent 100%)'
-              : 'linear-gradient(180deg, transparent 0%, rgba(148, 163, 184, 0.12) 20%, rgba(148, 163, 184, 0.18) 50%, rgba(148, 163, 184, 0.12) 80%, transparent 100%)',
-            pointerEvents: 'none',
-            zIndex: 1,
-          },
-          '& > *': {
-            position: 'relative',
-            zIndex: 2,
-          },
-        }}
-      >
-        <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <Box sx={{ mb: 3, position: 'relative' }}>
-            {/* Themed Background Pattern */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                opacity: 0.05,
-                zIndex: 0,
-                backgroundImage: useMovieCore8
-                  ? `repeating-linear-gradient(
-                      45deg,
-                      transparent,
-                      transparent 10px,
-                      rgba(139, 92, 246, 0.1) 10px,
-                      rgba(139, 92, 246, 0.1) 20px
-                    )`
-                  : `repeating-linear-gradient(
-                      0deg,
-                      transparent,
-                      transparent 2px,
-                      rgba(16, 185, 129, 0.1) 2px,
-                      rgba(16, 185, 129, 0.1) 4px
-                    )`,
-                pointerEvents: 'none',
-              }}
-            />
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2, position: 'relative', zIndex: 1 }}>
-              {/* Themed Animated Icon */}
-              <motion.div
-                key={useMovieCore8 ? 'movies' : 'gaming'}
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  rotate: 0,
-                }}
-                transition={{
-                  scale: {
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  },
-                  rotate: {
-                    duration: 0.6,
-                    type: 'spring',
-                    stiffness: 200,
-                  },
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  background: useMovieCore8
-                    ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                  boxShadow: useMovieCore8
-                    ? '0 0 20px rgba(139, 92, 246, 0.6), 0 4px 12px rgba(139, 92, 246, 0.4)'
-                    : '0 0 20px rgba(16, 185, 129, 0.6), 0 4px 12px rgba(16, 185, 129, 0.4)',
-                  flexShrink: 0,
-                }}
-              >
-                {useMovieCore8 ? (
-                  <MovieIcon sx={{ fontSize: 24, color: '#ffffff' }} />
-                ) : (
-                  <GamepadIcon sx={{ fontSize: 24, color: '#ffffff' }} />
-                )}
-              </motion.div>
-              
-              <Typography 
-                variant="h5" 
-                onClick={() => navigate('/news-deep-dive')}
-                sx={{ 
-                  fontWeight: 700,
-                  background: useMovieCore8
-                    ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'scale(1.05)',
-                    opacity: 0.9,
-                  },
-                }}
-              >
-                Live Sentiment Analysis
-              </Typography>
-            </Box>
-            
-            {/* Universe Selector - Segmented Control */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  background: isDarkMode
-                    ? 'rgba(30, 41, 59, 0.6)'
-                    : 'rgba(248, 250, 252, 0.8)',
-                  borderRadius: 3,
-                  p: 0.5,
-                  border: '1px solid',
-                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
-                  position: 'relative',
-                  gap: 0.5,
-                }}
-              >
-                {/* Animated background indicator - Themed */}
-                <motion.div
-                  animate={{
-                    left: useMovieCore8 ? '4px' : 'calc(50% + 2px)',
-                  }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 30,
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '4px',
-                    width: 'calc(50% - 6px)',
-                    height: 'calc(100% - 8px)',
-                    borderRadius: '8px',
-                    background: useMovieCore8
-                      ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
-                      : 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                    boxShadow: useMovieCore8
-                      ? '0 4px 12px rgba(139, 92, 246, 0.4)'
-                      : '0 4px 12px rgba(16, 185, 129, 0.4)',
-                    zIndex: 0,
-                  }}
-                />
-                
-                {/* Movies Option */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setUseMovieCore8(true)}
-                  style={{ position: 'relative', zIndex: 1, cursor: 'pointer' }}
-                >
-                  <Box
-                    sx={{
-                      px: 3,
-                      py: 1,
-                      borderRadius: 2,
-                      minWidth: 120,
-                      textAlign: 'center',
-                      position: 'relative',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: useMovieCore8 ? 700 : 500,
-                        fontSize: '0.875rem',
-                        color: useMovieCore8
-                          ? '#ffffff'
-                          : (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'),
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      Movies
-                    </Typography>
-                  </Box>
-                </motion.div>
-                
-                {/* Gaming Option */}
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setUseMovieCore8(false)}
-                  style={{ position: 'relative', zIndex: 1, cursor: 'pointer' }}
-                >
-                  <Box
-                    sx={{
-                      px: 3,
-                      py: 1,
-                      borderRadius: 2,
-                      minWidth: 120,
-                      textAlign: 'center',
-                      position: 'relative',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: useMovieCore8 ? 500 : 700,
-                        fontSize: '0.875rem',
-                        color: useMovieCore8
-                          ? (isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')
-                          : '#ffffff',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      Gaming
-                    </Typography>
-                  </Box>
-                </motion.div>
-              </Box>
-            </Box>
-            
-            <Box sx={{ mb: 3, textAlign: 'center', position: 'relative', zIndex: 1 }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  color: useMovieCore8 ? 'rgba(139, 92, 246, 0.9)' : 'rgba(16, 185, 129, 0.9)',
-                  fontWeight: 500,
-                  fontSize: '0.9rem',
-                }}
-              >
-                Live feed from <strong>{useMovieCore8 ? 'Movies' : 'Gaming'}</strong> universe with AI sentiment analysis
-              </Typography>
-            </Box>
-          </Box>
-          <NewsFeed
-            key={useMovieCore8 ? "MovieCore-8" : "GameCore-12"}
-            ref={newsFeedRef}
-            universeName={useMovieCore8 ? "MovieCore-8 (MC-8)" : "GameCore-12 (GC-12)"}
-            pollingInterval={30000} // 30 seconds
-            maxItems={10}
-          />
-        </motion.div>
+      {/* Live News Preview */}
+      <LiveNewsPreview />
       </Box>
 
       {/* Project Description Section */}

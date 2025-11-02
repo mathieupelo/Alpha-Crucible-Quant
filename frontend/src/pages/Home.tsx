@@ -3,7 +3,7 @@
  * Ultra-polished landing page with Netflix/Apple/Spotify-level animations
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import {
@@ -440,7 +440,6 @@ const Home: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const newsFeedRef = useRef<NewsFeedRef>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const hasRefreshedRef = useRef(false);
   const { scrollYProgress } = useScroll();
   const [useMovieCore8, setUseMovieCore8] = useState(true);
   
@@ -463,31 +462,6 @@ const Home: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Handle scroll-based refresh for sidebar
-  useEffect(() => {
-    const sidebarElement = sidebarRef.current;
-    if (!sidebarElement) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = sidebarElement;
-      const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
-      const threshold = 0.85; // Refresh when 85% scrolled
-
-      if (scrollPercentage >= threshold && !hasRefreshedRef.current) {
-        newsFeedRef.current?.refresh();
-        hasRefreshedRef.current = true;
-        // Reset after 2 seconds to allow another refresh
-        setTimeout(() => {
-          hasRefreshedRef.current = false;
-        }, 2000);
-      }
-    };
-
-    sidebarElement.addEventListener('scroll', handleScroll);
-    return () => {
-      sidebarElement.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
   // Animated Counter Component
   const AnimatedCounter: React.FC<{ end: number; duration?: number; suffix?: string }> = ({ end, duration = 2, suffix = '' }) => {
@@ -1035,7 +1009,7 @@ const Home: React.FC = () => {
           right: 0,
           width: { xs: '100%', lg: '580px' },
           height: { xs: '100vh', lg: 'calc(100vh - 64px)' },
-          overflowY: 'auto',
+          overflowY: 'hidden',
           zIndex: 50,
           background: 'transparent',
           backdropFilter: 'blur(40px)',
@@ -1077,24 +1051,6 @@ const Home: React.FC = () => {
           '& > *': {
             position: 'relative',
             zIndex: 2,
-          },
-          '&::-webkit-scrollbar': {
-            width: '4px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: 'transparent',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: isDarkMode 
-              ? 'linear-gradient(180deg, rgba(148, 163, 184, 0.2) 0%, rgba(148, 163, 184, 0.15) 100%)'
-              : 'linear-gradient(180deg, rgba(148, 163, 184, 0.15) 0%, rgba(148, 163, 184, 0.1) 100%)',
-            borderRadius: '2px',
-            border: 'none',
-            '&:hover': {
-              background: isDarkMode 
-                ? 'linear-gradient(180deg, rgba(148, 163, 184, 0.3) 0%, rgba(148, 163, 184, 0.25) 100%)'
-                : 'linear-gradient(180deg, rgba(148, 163, 184, 0.25) 0%, rgba(148, 163, 184, 0.2) 100%)',
-            },
           },
         }}
       >

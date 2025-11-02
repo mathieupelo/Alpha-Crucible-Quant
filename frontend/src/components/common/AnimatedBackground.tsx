@@ -10,6 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useQuery } from 'react-query';
 import { backtestApi, navApi } from '@/services/api';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis } from 'recharts';
+import { motion } from 'framer-motion';
 
 interface Particle {
   x: number;
@@ -49,6 +50,7 @@ const AnimatedBackground: React.FC = () => {
       refetchOnWindowFocus: false,
     }
   );
+
 
   // Debug: log data availability
   React.useEffect(() => {
@@ -197,8 +199,11 @@ const AnimatedBackground: React.FC = () => {
     <>
       {/* Backtest Chart Background - No text, just the graph */}
       {latestNavData?.nav_data && latestNavData.nav_data.length > 0 && (
-        <Box
-          sx={{
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ duration: 2, ease: 'easeOut' }}
+          style={{
             position: 'fixed',
             top: 0,
             left: 0,
@@ -206,68 +211,93 @@ const AnimatedBackground: React.FC = () => {
             height: '100%',
             zIndex: 0,
             pointerEvents: 'none',
-            opacity: 0.4,
             overflow: 'hidden',
-            '& svg': {
-              filter: 'blur(4px)',
-            },
-            '& .recharts-wrapper': {
-              pointerEvents: 'none !important',
-            },
-            '& .recharts-tooltip-wrapper': {
-              display: 'none !important',
-            },
-            '& .recharts-legend-wrapper': {
-              display: 'none !important',
-            },
-            '& .recharts-cartesian-grid': {
-              display: 'none !important',
-            },
-            '& .recharts-cartesian-axis': {
-              display: 'none !important',
-            },
-            '& text': {
-              display: 'none !important',
-              opacity: 0,
-            },
-            '& .recharts-cartesian-axis-tick-value': {
-              display: 'none !important',
-            },
-            '& .recharts-layer': {
-              '& text': {
-                display: 'none !important',
-              },
-            },
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={latestNavData.nav_data.map(item => ({
-                date: item.nav_date,
-                portfolio: item.portfolio_nav,
-              }))}
-              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+          <motion.div
+            animate={{
+              scale: [1, 1.04, 1],
+              y: [0, -15, 0],
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+            }}
+          >
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                '& svg': {
+                  filter: 'blur(4px)',
+                  transition: 'filter 0.3s ease',
+                },
+                '& .recharts-wrapper': {
+                  pointerEvents: 'none !important',
+                },
+                '& .recharts-tooltip-wrapper': {
+                  display: 'none !important',
+                },
+                '& .recharts-legend-wrapper': {
+                  display: 'none !important',
+                },
+                '& .recharts-cartesian-grid': {
+                  display: 'none !important',
+                },
+                '& .recharts-cartesian-axis': {
+                  display: 'none !important',
+                },
+                '& text': {
+                  display: 'none !important',
+                  opacity: 0,
+                },
+                '& .recharts-cartesian-axis-tick-value': {
+                  display: 'none !important',
+                },
+                '& .recharts-layer': {
+                  '& text': {
+                    display: 'none !important',
+                  },
+                },
+              }}
             >
-              <defs>
-                <linearGradient id="bgChartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5}/>
-                  <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Area
-                type="monotone"
-                dataKey="portfolio"
-                stroke="#60a5fa"
-                fill="url(#bgChartGradient)"
-                strokeWidth={3}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Box>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={latestNavData.nav_data.map(item => ({
+                    date: item.nav_date,
+                    portfolio: item.portfolio_nav,
+                  }))}
+                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="bgChartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5}/>
+                      <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" hide />
+                  <YAxis hide />
+                  <Area
+                    type="monotone"
+                    dataKey="portfolio"
+                    stroke="#60a5fa"
+                    fill="url(#bgChartGradient)"
+                    strokeWidth={3}
+                    isAnimationActive={true}
+                    animationDuration={2000}
+                    animationEasing="ease-out"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Particles Canvas */}

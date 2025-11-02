@@ -356,6 +356,36 @@ export const marketApi = {
       }
     });
     return response.data;
+  },
+
+  // Get live price for a symbol
+  getLivePrice: async (symbol: string): Promise<{
+    symbol: string;
+    price: number;
+    previous_close: number;
+    daily_change: number;
+    daily_change_percent: number;
+    timestamp: string;
+  }> => {
+    const response = await api.get(`/market-data/live/${symbol}`);
+    return response.data;
+  },
+
+  // Get live prices for multiple tickers
+  getLivePricesBatch: async (tickers: string[]): Promise<{
+    results: Array<{
+      symbol: string;
+      price: number | null;
+      previous_close: number | null;
+      daily_change: number | null;
+      daily_change_percent: number | null;
+      timestamp?: string;
+      error?: string;
+    }>;
+    timestamp: string;
+  }> => {
+    const response = await api.post('/market-data/live/batch', tickers);
+    return response.data;
   }
 };
 

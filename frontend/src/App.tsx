@@ -65,9 +65,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
       dark: isDarkMode ? '#059669' : '#047857',
     },
     background: {
-      default: isDarkMode 
-        ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)'
-        : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+      default: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
       paper: isDarkMode 
         ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
@@ -213,9 +211,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          background: isDarkMode 
-            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)'
-            : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
           backgroundAttachment: 'fixed',
           minHeight: '100vh',
         },

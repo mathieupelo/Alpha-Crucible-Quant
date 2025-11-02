@@ -26,6 +26,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Logo from './Logo';
+import TickerBar from './TickerBar';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface LayoutProps {
@@ -211,6 +212,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Box>
         </Toolbar>
       </AppBar>
+
+      {/* Ticker Bar */}
+      <TickerBar />
 
       {/* Main Content */}
       <motion.div

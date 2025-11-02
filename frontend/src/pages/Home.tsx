@@ -289,7 +289,7 @@ const LatestBacktestShowcase: React.FC = () => {
                 </Box>
 
                 {/* Key Metrics Grid */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid container spacing={3} sx={{ mb: 4 }} justifyContent="center">
                   <Grid item xs={6} sm={4} md={3}>
                     <motion.div whileHover={{ scale: 1.05 }}>
                       <Card
@@ -544,7 +544,12 @@ const Home: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ position: 'relative', overflow: 'hidden' }}>
+    <Box 
+      sx={{ 
+        position: 'relative', 
+        overflow: 'hidden',
+      }}
+    >
       {/* Animated Backgrounds */}
       <GradientMesh />
       <AnimatedBackground />
@@ -878,6 +883,7 @@ const Home: React.FC = () => {
       <Box
         sx={{
           width: { xs: '100%', lg: 'calc(100% - 600px)' },
+          margin: '0 auto',
           transition: 'width 0.3s ease',
         }}
       >
@@ -919,7 +925,7 @@ const Home: React.FC = () => {
               </Typography>
             </motion.div>
 
-            <Grid container spacing={4}>
+            <Grid container spacing={4} justifyContent="center">
               {stats.map((stat, index) => (
                 <Grid item xs={6} md={3} key={index}>
                   <motion.div
@@ -1319,7 +1325,7 @@ const Home: React.FC = () => {
               </Typography>
             </motion.div>
 
-            <Grid container spacing={6}>
+            <Grid container spacing={6} justifyContent="center">
               <Grid item xs={12} md={6}>
                 <motion.div
                   variants={scaleIn}
@@ -1454,7 +1460,7 @@ const Home: React.FC = () => {
               </Typography>
             </motion.div>
 
-            <Grid container spacing={4}>
+            <Grid container spacing={4} justifyContent="center">
               {valueProps.map((prop, index) => (
                 <Grid item xs={12} sm={6} md={3} key={index}>
                   <motion.div
@@ -1665,7 +1671,7 @@ const Home: React.FC = () => {
               </Typography>
             </motion.div>
 
-            <Grid container spacing={4}>
+            <Grid container spacing={4} justifyContent="center">
               {upcomingFeatures.map((feature, index) => (
                 <Grid item xs={12} md={4} key={index}>
                   <motion.div
@@ -1762,7 +1768,7 @@ const Home: React.FC = () => {
         }}
       >
         <Container maxWidth="lg">
-          <Grid container spacing={6}>
+          <Grid container spacing={6} justifyContent="center">
             <Grid item xs={12} md={6}>
               <motion.div
                 initial={{ opacity: 0, x: -50 }}

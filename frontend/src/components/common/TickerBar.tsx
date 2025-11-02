@@ -1,11 +1,11 @@
 /**
  * Ticker Bar Component
- * Displays live stock prices in a scrolling ticker bar with fade animations
+ * Displays live stock prices in a static bar that flips to show new tickers
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'react-query';
 import { useTheme } from '@/contexts/ThemeContext';
 import { universeApi, marketApi } from '@/services/api';
@@ -18,9 +18,15 @@ interface TickerItem {
   universe: string;
 }
 
+const TICKERS_PER_VIEW = 4; // Number of tickers to show at once
+const FLIP_INTERVAL = 5000; // Flip every 5 seconds
+
 const TickerBar: React.FC = () => {
   const { isDarkMode } = useTheme();
   const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [displayGroupIndex, setDisplayGroupIndex] = useState(0);
+  const [flipKey, setFlipKey] = useState(0); // Stable key that only changes after flip completes
 
   // Fetch universes
   const { data: universesData } = useQuery(
@@ -140,18 +146,46 @@ const TickerBar: React.FC = () => {
     setTickerItems(items);
   }, [pricesData, allTickers]);
 
-  // Duplicate items multiple times for seamless infinite loop
-  const duplicatedItems = useMemo(() => {
+  // Split tickers into groups for flipping
+  const tickerGroups = useMemo(() => {
     if (!tickerItems.length) return [];
-    // Create 3 copies to ensure seamless scrolling
-    return [...tickerItems, ...tickerItems, ...tickerItems];
+    const groups: TickerItem[][] = [];
+    for (let i = 0; i < tickerItems.length; i += TICKERS_PER_VIEW) {
+      groups.push(tickerItems.slice(i, i + TICKERS_PER_VIEW));
+    }
+    // If we have multiple groups, make sure we loop back
+    return groups.length > 0 ? groups : [];
   }, [tickerItems]);
-  
-  // Calculate approximate width per item (symbol + price + change)
-  const itemWidth = 300; // Width including gaps (ticker + info spacing + bigger gap between tickers)
-  const totalWidth = tickerItems.length > 0 ? tickerItems.length * itemWidth : 0;
 
-  if (!tickerItems.length || totalWidth === 0) {
+  // Get groups to display (front and back)
+  const frontGroup = useMemo(() => {
+    if (!tickerGroups.length) return [];
+    return tickerGroups[displayGroupIndex % tickerGroups.length];
+  }, [tickerGroups, displayGroupIndex]);
+
+  const backGroup = useMemo(() => {
+    if (!tickerGroups.length) return [];
+    return tickerGroups[(displayGroupIndex + 1) % tickerGroups.length];
+  }, [tickerGroups, displayGroupIndex]);
+
+  // Auto-flip to next group after interval
+  useEffect(() => {
+    if (tickerGroups.length <= 1) return; // No need to flip if only one group
+
+    const interval = setInterval(() => {
+      setIsFlipping(true);
+      // Update the display index after flip completes
+      setTimeout(() => {
+        setDisplayGroupIndex((prev) => (prev + 1) % tickerGroups.length);
+        setFlipKey((prev) => prev + 1); // Update key after animation completes
+        setIsFlipping(false);
+      }, 1200); // After full flip duration
+    }, FLIP_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [tickerGroups.length]);
+
+  if (!tickerItems.length || !frontGroup.length) {
     return null; // Don't show anything if no data
   }
 
@@ -163,85 +197,68 @@ const TickerBar: React.FC = () => {
         overflow: 'hidden',
         background: 'transparent',
         zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        perspective: '1000px', // Enable 3D perspective for flip effect
       }}
     >
-      {/* Gradient masks for stronger fade effect */}
-      <Box
-        sx={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 120,
-          background: isDarkMode
-            ? 'linear-gradient(to right, rgba(30, 41, 59, 1) 0%, rgba(30, 41, 59, 0.95) 30%, rgba(30, 41, 59, 0.8) 60%, rgba(30, 41, 59, 0.3) 90%, rgba(30, 41, 59, 0) 100%)'
-            : 'linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.95) 30%, rgba(255, 255, 255, 0.8) 60%, rgba(255, 255, 255, 0.3) 90%, rgba(255, 255, 255, 0) 100%)',
-          zIndex: 2,
-          pointerEvents: 'none',
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: 120,
-          background: isDarkMode
-            ? 'linear-gradient(to left, rgba(30, 41, 59, 1) 0%, rgba(30, 41, 59, 0.95) 30%, rgba(30, 41, 59, 0.8) 60%, rgba(30, 41, 59, 0.3) 90%, rgba(30, 41, 59, 0) 100%)'
-            : 'linear-gradient(to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.95) 30%, rgba(255, 255, 255, 0.8) 60%, rgba(255, 255, 255, 0.3) 90%, rgba(255, 255, 255, 0) 100%)',
-          zIndex: 2,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Scrolling container */}
+      {/* Static container with flip animation */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
           height: '100%',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
+          width: '100%',
+          position: 'relative',
         }}
       >
-        <motion.div
-          animate={{
-            x: [0, -totalWidth], // Move by one set of items to create seamless loop
-          }}
-          transition={{
-            duration: 180, // Slower scrolling (180s per loop)
-            repeat: Infinity,
-            ease: 'linear',
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '48px', // Bigger spacing between tickers
-            paddingLeft: '120px', // Start after fade area
-            willChange: 'transform',
+        <Box
+          sx={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            transformStyle: 'preserve-3d',
           }}
         >
-          {duplicatedItems.map((item, index) => {
+          {/* Front side - current group */}
+          <motion.div
+            key={`front-${flipKey}`}
+            animate={{
+              rotateX: isFlipping ? 180 : 0,
+            }}
+            transition={{
+              duration: 1.2,
+              ease: [0.43, 0.13, 0.23, 0.96],
+            }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '48px',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            {frontGroup.map((item, index) => {
               const isPositive = (item.dailyChangePercent ?? 0) >= 0;
               const changeColor = isPositive
                 ? (isDarkMode ? '#10b981' : '#059669')
                 : (isDarkMode ? '#ef4444' : '#dc2626');
-
-              // Create unique key that includes the item symbol and its position in the loop
-              // This helps with animation but we'll use index for now to maintain order
-              const uniqueKey = `${item.symbol}-${item.universe}-${index}`;
               
               return (
                 <motion.div
-                  key={uniqueKey}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  key={`${item.symbol}-${item.universe}`}
+                  initial={false}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px', // Less space between ticker symbol and its info
+                    gap: '8px',
                     minWidth: '140px',
                   }}
                 >
@@ -299,7 +316,104 @@ const TickerBar: React.FC = () => {
                 </motion.div>
               );
             })}
-        </motion.div>
+          </motion.div>
+
+          {/* Back side - next group (initially rotated 180 degrees) */}
+          <motion.div
+            key={`back-${flipKey}`}
+            initial={{ rotateX: 180 }}
+            animate={{
+              rotateX: isFlipping ? 0 : 180,
+            }}
+            transition={{
+              duration: 1.2,
+              ease: [0.43, 0.13, 0.23, 0.96],
+            }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '48px',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            {backGroup.map((item, index) => {
+              const isPositive = (item.dailyChangePercent ?? 0) >= 0;
+              const changeColor = isPositive
+                ? (isDarkMode ? '#10b981' : '#059669')
+                : (isDarkMode ? '#ef4444' : '#dc2626');
+              
+              return (
+                <div
+                  key={`${item.symbol}-${item.universe}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    minWidth: '140px',
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      color: isDarkMode ? '#cbd5e1' : '#334155',
+                      minWidth: '50px',
+                    }}
+                  >
+                    {item.symbol}
+                  </Typography>
+                  
+                  {item.price !== null ? (
+                    <>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          color: isDarkMode ? '#f8fafc' : '#0f172a',
+                          minWidth: '60px',
+                        }}
+                      >
+                        ${item.price.toFixed(2)}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          color: changeColor,
+                          minWidth: '70px',
+                        }}
+                      >
+                        {isPositive ? '+' : ''}
+                        {item.dailyChangePercent?.toFixed(2)}%
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 400,
+                        fontSize: '0.75rem',
+                        color: 'text.secondary',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      Loading...
+                    </Typography>
+                  )}
+                </div>
+              );
+            })}
+          </motion.div>
+        </Box>
       </Box>
     </Box>
   );

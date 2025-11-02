@@ -72,8 +72,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             : '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset',
         }}
       >
-        <Toolbar sx={{ py: 1.5, px: { xs: 2, sm: 3, md: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 3 }}>
+        <Toolbar sx={{ py: 1.5, px: { xs: 2, sm: 3, md: 4 }, gap: 2 }}>
+          {/* Left Section: Logo */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -94,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   color: 'text.secondary',
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  display: { xs: 'none', md: 'block' },
+                  display: { xs: 'none', lg: 'block' },
                   background: isDarkMode
                     ? 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)'
                     : 'linear-gradient(135deg, #475569 0%, #64748b 100%)',
@@ -107,8 +108,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Typography>
             </motion.div>
           </Box>
+
+          {/* Center Section: Ticker Bar */}
+          <Box sx={{ flexGrow: 1, flexShrink: 1, minWidth: 0, display: { xs: 'none', md: 'flex' }, justifyContent: 'center', alignItems: 'center', mx: 2 }}>
+            <Box sx={{ width: '100%', maxWidth: '800px' }}>
+              <TickerBar />
+            </Box>
+          </Box>
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* Right Section: Navigation */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
             {navigationItems.map((item, index) => (
               <motion.div
                 key={item.path}
@@ -212,9 +221,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Box>
         </Toolbar>
       </AppBar>
-
-      {/* Ticker Bar */}
-      <TickerBar />
 
       {/* Main Content */}
       <motion.div

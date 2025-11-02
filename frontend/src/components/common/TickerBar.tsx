@@ -176,14 +176,9 @@ const TickerBar: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        height: 48,
+        height: 40,
         overflow: 'hidden',
-        background: isDarkMode
-          ? 'rgba(15, 23, 42, 0.9)'
-          : 'rgba(248, 250, 252, 0.95)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid',
-        borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+        background: 'transparent',
         zIndex: 1000,
       }}
     >
@@ -194,10 +189,10 @@ const TickerBar: React.FC = () => {
           left: 0,
           top: 0,
           bottom: 0,
-          width: 100,
+          width: 80,
           background: isDarkMode
-            ? 'linear-gradient(to right, rgba(15, 23, 42, 1), rgba(15, 23, 42, 0))'
-            : 'linear-gradient(to right, rgba(248, 250, 252, 1), rgba(248, 250, 252, 0))',
+            ? 'linear-gradient(to right, rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0))'
+            : 'linear-gradient(to right, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0))',
           zIndex: 2,
           pointerEvents: 'none',
         }}
@@ -208,10 +203,10 @@ const TickerBar: React.FC = () => {
           right: 0,
           top: 0,
           bottom: 0,
-          width: 100,
+          width: 80,
           background: isDarkMode
-            ? 'linear-gradient(to left, rgba(15, 23, 42, 1), rgba(15, 23, 42, 0))'
-            : 'linear-gradient(to left, rgba(248, 250, 252, 1), rgba(248, 250, 252, 0))',
+            ? 'linear-gradient(to left, rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0))'
+            : 'linear-gradient(to left, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0))',
           zIndex: 2,
           pointerEvents: 'none',
         }}
@@ -232,7 +227,7 @@ const TickerBar: React.FC = () => {
             x: [0, -totalWidth], // Move by one set of items to create seamless loop
           }}
           transition={{
-            duration: 40, // Adjust speed here (higher = slower, 40s per loop)
+            duration: 120, // Slower scrolling (120s per loop)
             repeat: Infinity,
             ease: 'linear',
           }}
@@ -240,7 +235,7 @@ const TickerBar: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '32px',
-            paddingLeft: '100px', // Start after fade area
+            paddingLeft: '80px', // Start after fade area
             willChange: 'transform',
           }}
         >

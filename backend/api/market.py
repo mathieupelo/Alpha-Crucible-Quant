@@ -246,6 +246,7 @@ async def get_live_prices_batch(tickers: List[str]):
 async def get_intraday_price_data(symbol: str):
     """
     Get intraday price data for today (5-minute intervals from market open to current time).
+    If market is closed, returns the last trading day's data.
     
     Args:
         symbol: Stock ticker symbol
@@ -256,21 +257,31 @@ async def get_intraday_price_data(symbol: str):
     try:
         validated_symbol = validate_ticker(symbol)
         
-        # Get today's date
-        today = date.today()
-        
         # Fetch intraday data using yfinance (5-minute intervals)
         ticker = yf.Ticker(validated_symbol)
         
-        # Get intraday data for today
-        # yfinance uses '1d' period with '5m' interval for intraday
+        # Get intraday data - yfinance will return the last available trading day if market is closed
+        # Use '1d' period with '5m' interval for intraday
         intraday_data = ticker.history(period="1d", interval="5m")
         
         if intraday_data.empty:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No intraday data available for symbol {symbol} today"
-            )
+            # Try to get data from the last 5 days
+            intraday_data = ticker.history(period="5d", interval="5m")
+            if intraday_data.empty:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No intraday data available for symbol {symbol}"
+                )
+            # Use the most recent day's data
+            last_date = intraday_data.index[-1].date()
+            # Filter by date: convert index to date and compare
+            intraday_data = intraday_data[[idx.date() == last_date for idx in intraday_data.index]]
+        
+        # Extract the actual date from the data (use the first timestamp's date)
+        if not intraday_data.empty:
+            data_date = intraday_data.index[0].date()
+        else:
+            data_date = date.today()
         
         # Convert to list of dictionaries
         intraday_points = []
@@ -289,7 +300,7 @@ async def get_intraday_price_data(symbol: str):
         
         return {
             "symbol": validated_symbol,
-            "date": today.isoformat(),
+            "date": data_date.isoformat(),
             "data": intraday_points,
             "total_points": len(intraday_points),
             "interval": "5m"

@@ -369,12 +369,12 @@ const LiveNewsPreview: React.FC = () => {
                         backdropFilter: 'blur(20px)',
                         border: '1px solid',
                         borderColor: 'divider',
-                        borderRadius: 4,
+                        borderRadius: 1, // Minimal border radius
                         boxShadow: 'none',
                       }}
                     >
                       <CardContent sx={{ p: 3 }}>
-                        <Box sx={{ mb: 2, borderRadius: 2, overflow: 'hidden', width: '100%', height: '120px', bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }}>
+                        <Box sx={{ mb: 2, borderRadius: 1, overflow: 'hidden', width: '100%', height: '120px', bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }}>
                           <Box sx={{ width: '100%', height: '100%', bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
@@ -421,7 +421,7 @@ const LiveNewsPreview: React.FC = () => {
                         backdropFilter: 'blur(20px)',
                         border: '1px solid',
                         borderColor: 'divider',
-                        borderRadius: 4,
+                        borderRadius: 1, // Minimal border radius
                         overflow: 'hidden',
                         position: 'relative',
                         transition: 'all 0.3s ease',
@@ -447,7 +447,7 @@ const LiveNewsPreview: React.FC = () => {
                           <Box
                             sx={{
                               mb: 2,
-                              borderRadius: 2,
+                              borderRadius: 1, // Minimal border radius
                               overflow: 'hidden',
                               width: '100%',
                               height: '120px',
@@ -717,7 +717,7 @@ const LatestBacktestShowcase: React.FC = () => {
                 backdropFilter: 'blur(20px)',
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 4,
+                borderRadius: 1, // Minimal border radius
                 overflow: 'hidden',
                 position: 'relative',
               }}
@@ -746,7 +746,7 @@ const LatestBacktestShowcase: React.FC = () => {
                             : 'rgba(148, 163, 184, 0.02)',
                           border: '1px solid',
                           borderColor: 'divider',
-                          borderRadius: 3,
+                          borderRadius: 1, // Minimal border radius
                           p: 2,
                           textAlign: 'center',
                         }}
@@ -781,7 +781,7 @@ const LatestBacktestShowcase: React.FC = () => {
                 backdropFilter: 'blur(20px)',
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 4,
+                borderRadius: 1, // Minimal border radius
                 overflow: 'hidden',
                 position: 'relative',
                 boxShadow: '0 30px 80px rgba(0, 0, 0, 0.3)',
@@ -877,7 +877,7 @@ const LatestBacktestShowcase: React.FC = () => {
                             : 'rgba(37, 99, 235, 0.05)',
                           border: '1px solid',
                           borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.2)',
-                          borderRadius: 3,
+                          borderRadius: 1, // Minimal border radius
                           p: 2,
                           textAlign: 'center',
                         }}
@@ -906,7 +906,7 @@ const LatestBacktestShowcase: React.FC = () => {
                             : 'rgba(16, 185, 129, 0.05)',
                           border: '1px solid',
                           borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
-                          borderRadius: 3,
+                          borderRadius: 1, // Minimal border radius
                           p: 2,
                           textAlign: 'center',
                         }}
@@ -929,7 +929,7 @@ const LatestBacktestShowcase: React.FC = () => {
                             : 'rgba(139, 92, 246, 0.05)',
                           border: '1px solid',
                           borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.3)' : 'rgba(139, 92, 246, 0.2)',
-                          borderRadius: 3,
+                          borderRadius: 1, // Minimal border radius
                           p: 2,
                           textAlign: 'center',
                         }}
@@ -958,7 +958,7 @@ const LatestBacktestShowcase: React.FC = () => {
                             : 'rgba(245, 158, 11, 0.05)',
                           border: '1px solid',
                           borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
-                          borderRadius: 3,
+                          borderRadius: 1, // Minimal border radius
                           p: 2,
                           textAlign: 'center',
                         }}
@@ -1338,7 +1338,7 @@ const Home: React.FC = () => {
                 width: 30,
                 height: 50,
                 border: `2px solid ${isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
-                borderRadius: 25,
+                borderRadius: 1, // Minimal border radius
                 position: 'relative',
                 '&::before': {
                   content: '""',
@@ -1421,7 +1421,7 @@ const Home: React.FC = () => {
                           : `linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)`,
                         border: '1px solid',
                         borderColor: 'divider',
-                        borderRadius: 4,
+                        borderRadius: 1, // Minimal border radius
                         p: 4,
                         textAlign: 'center',
                         position: 'relative',
@@ -1537,7 +1537,7 @@ const Home: React.FC = () => {
                       border: '1px solid',
                       borderColor: 'divider',
                       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-                      borderRadius: 4,
+                      borderRadius: 1, // Minimal border radius
                       transition: 'all 0.3s ease',
                       '&:hover': {
                         boxShadow: '0 30px 80px rgba(37, 99, 235, 0.3)',
@@ -1578,7 +1578,7 @@ const Home: React.FC = () => {
                       border: '1px solid',
                       borderColor: 'divider',
                       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-                      borderRadius: 4,
+                      borderRadius: 1, // Minimal border radius
                       transition: 'all 0.3s ease',
                       '&:hover': {
                         boxShadow: '0 30px 80px rgba(139, 92, 246, 0.3)',
@@ -1677,7 +1677,7 @@ const Home: React.FC = () => {
                         backdropFilter: 'blur(20px)',
                         border: '1px solid',
                         borderColor: 'divider',
-                        borderRadius: 4,
+                        borderRadius: 1, // Minimal border radius
                         transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                         position: 'relative',
                         overflow: 'hidden',
@@ -1721,7 +1721,7 @@ const Home: React.FC = () => {
                               justifyContent: 'center',
                               width: 100,
                               height: 100,
-                              borderRadius: 4,
+                              borderRadius: 1, // Minimal border radius
                               background: prop.gradient,
                               color: 'white',
                               mb: 3,
@@ -1809,7 +1809,7 @@ const Home: React.FC = () => {
                   paddingBottom: '56.25%',
                   height: 0,
                   overflow: 'hidden',
-                  borderRadius: 4,
+                  borderRadius: 1, // Minimal border radius
                   boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)',
                   background: '#000',
                 }}
@@ -1889,7 +1889,7 @@ const Home: React.FC = () => {
                         borderColor: 'divider',
                         position: 'relative',
                         overflow: 'hidden',
-                        borderRadius: 4,
+                        borderRadius: 1, // Minimal border radius
                         '&::before': {
                           content: '""',
                           position: 'absolute',
@@ -1918,7 +1918,7 @@ const Home: React.FC = () => {
                                 justifyContent: 'center',
                                 width: 80,
                                 height: 80,
-                                borderRadius: 3,
+                                borderRadius: 1, // Minimal border radius
                                 background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
                                 color: 'white',
                               }}
@@ -1982,7 +1982,7 @@ const Home: React.FC = () => {
                     backdropFilter: 'blur(20px)',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 4,
+                    borderRadius: 1, // Minimal border radius
                   }}
                 >
                   <CardContent sx={{ p: 4 }}>
@@ -2049,7 +2049,7 @@ const Home: React.FC = () => {
                     backdropFilter: 'blur(20px)',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 4,
+                    borderRadius: 1, // Minimal border radius
                   }}
                 >
                   <CardContent sx={{ p: 4 }}>
@@ -2143,7 +2143,7 @@ const Home: React.FC = () => {
                 backdropFilter: 'blur(20px)',
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 4,
+                borderRadius: 1, // Minimal border radius
                 position: 'relative',
                 overflow: 'hidden',
                 '&::before': {

@@ -416,13 +416,13 @@ const BacktestManager: React.FC = () => {
           },
           '&::-webkit-scrollbar-track': {
             background: isDarkMode ? '#1e293b' : '#f1f5f9',
-            borderRadius: '3px',
+            borderRadius: '1px', // Minimal border radius
           },
           '&::-webkit-scrollbar-thumb': {
             background: isDarkMode 
               ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
               : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-            borderRadius: '3px',
+            borderRadius: '1px', // Minimal border radius
             '&:hover': {
               background: isDarkMode 
                 ? 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)'
@@ -437,7 +437,7 @@ const BacktestManager: React.FC = () => {
                   key={index} 
                   variant="rectangular" 
                   height={80} 
-                  sx={{ mb: 1, borderRadius: 2 }} 
+                  sx={{ mb: 1, borderRadius: 1 }} // Minimal border radius 
                 />
               ))}
             </Box>
@@ -558,13 +558,13 @@ const BacktestManager: React.FC = () => {
       },
       '&::-webkit-scrollbar-track': {
         background: isDarkMode ? '#1e293b' : '#f1f5f9',
-        borderRadius: '4px',
+        borderRadius: '1px', // Minimal border radius
       },
       '&::-webkit-scrollbar-thumb': {
         background: isDarkMode 
           ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
           : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-        borderRadius: '4px',
+        borderRadius: '1px', // Minimal border radius
         border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
         '&:hover': {
           background: isDarkMode 
@@ -657,13 +657,13 @@ const BacktestManager: React.FC = () => {
         },
         '&::-webkit-scrollbar-track': {
           background: isDarkMode ? '#1e293b' : '#f1f5f9',
-          borderRadius: '4px',
+          borderRadius: '1px', // Minimal border radius
         },
         '&::-webkit-scrollbar-thumb': {
           background: isDarkMode 
             ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
             : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-          borderRadius: '4px',
+          borderRadius: '1px', // Minimal border radius
           border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
           '&:hover': {
             background: isDarkMode 
@@ -861,7 +861,7 @@ const BacktestManager: React.FC = () => {
                         Performance Overview
                       </Typography>
                       {navLoading ? (
-                        <Skeleton variant="rectangular" height={450} sx={{ borderRadius: 2 }} />
+                        <Skeleton variant="rectangular" height={450} sx={{ borderRadius: 1 }} /> // Minimal border radius
                       ) : (
                         <Box sx={{ pb: 6 }}>
                           <PerformanceChart
@@ -889,7 +889,7 @@ const BacktestManager: React.FC = () => {
                     {usedSignalsLoading ? (
                       <Box>
                         {[...Array(3)].map((_, index) => (
-                          <Skeleton key={index} variant="rectangular" height={100} sx={{ borderRadius: 2, mb: 2 }} />
+                          <Skeleton key={index} variant="rectangular" height={100} sx={{ borderRadius: 1, mb: 2 }} /> // Minimal border radius
                         ))}
                       </Box>
                     ) : uniqueSignals.length > 0 ? (
@@ -994,7 +994,7 @@ const BacktestManager: React.FC = () => {
                     {portfoliosLoading ? (
                       <Box>
                         {[...Array(5)].map((_, index) => (
-                          <Skeleton key={index} variant="rectangular" height={80} sx={{ borderRadius: 2, mb: 2 }} />
+                          <Skeleton key={index} variant="rectangular" height={80} sx={{ borderRadius: 1, mb: 2 }} /> // Minimal border radius
                         ))}
                       </Box>
                     ) : portfoliosData && portfoliosData.portfolios.length > 0 ? (

@@ -176,7 +176,7 @@ const NewsFeed = forwardRef<NewsFeedRef, NewsFeedProps>(({
             },
             '&::-webkit-scrollbar-thumb': {
               background: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
-              borderRadius: '3px',
+              borderRadius: '1px', // Minimal border radius
               '&:hover': {
                 background: isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
               },
@@ -205,7 +205,7 @@ const NewsFeed = forwardRef<NewsFeedRef, NewsFeedProps>(({
                     backdropFilter: 'blur(20px)',
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: 3,
+                    borderRadius: 1, // Minimal border radius
                     transition: 'all 0.3s ease',
                     position: 'relative',
                     overflow: 'hidden',
@@ -310,7 +310,7 @@ const NewsFeed = forwardRef<NewsFeedRef, NewsFeedProps>(({
                       <Box
                         sx={{
                           mb: 2,
-                          borderRadius: 2,
+                          borderRadius: 1, // Minimal border radius
                           overflow: 'hidden',
                           position: 'relative',
                           width: '100%',
@@ -367,7 +367,7 @@ const NewsFeed = forwardRef<NewsFeedRef, NewsFeedProps>(({
                             gap: 0.5,
                             px: 1.5,
                             py: 0.5,
-                            borderRadius: 2,
+                            borderRadius: 1, // Minimal border radius
                             background: sentimentStyle.bgColor,
                             border: '1px solid',
                             borderColor: sentimentStyle.borderColor,

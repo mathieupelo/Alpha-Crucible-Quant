@@ -166,7 +166,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     sx={{
                       color: isActive(item.path) ? 'primary.main' : 'text.secondary',
                       fontWeight: isActive(item.path) ? 600 : 500,
-                      borderRadius: 2.5,
+                      borderRadius: 8, // Keep rounded for clickable navigation buttons
                       px: 2.5,
                       py: 1,
                       minHeight: 40,
@@ -231,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   onClick={toggleTheme}
                   sx={{
                     color: 'text.secondary',
-                    borderRadius: 2,
+                    borderRadius: 8, // Keep rounded for clickable icon button
                     width: 40,
                     height: 40,
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

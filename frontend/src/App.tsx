@@ -125,7 +125,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
     },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 1, // Minimal border radius - barely visible except for buttons and icons
   },
   shadows: [
     'none',
@@ -276,7 +276,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
         root: {
           textTransform: 'none',
           fontWeight: 600,
-          borderRadius: 12,
+          borderRadius: 8, // Keep rounded for clickable buttons
           padding: '10px 24px',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover': {
@@ -312,7 +312,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 12,
+            borderRadius: 1, // Minimal border radius for input fields
             backgroundColor: isDarkMode 
               ? 'rgba(30, 41, 59, 0.5)'
               : 'rgba(255, 255, 255, 0.8)',
@@ -335,7 +335,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
     MuiSelect: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 1, // Minimal border radius for select fields
           backgroundColor: isDarkMode 
             ? 'rgba(30, 41, 59, 0.5)'
             : 'rgba(255, 255, 255, 0.8)',
@@ -346,7 +346,7 @@ const createAppTheme = (isDarkMode: boolean) => createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 1, // Minimal border radius for chips
           fontWeight: 500,
         },
       },

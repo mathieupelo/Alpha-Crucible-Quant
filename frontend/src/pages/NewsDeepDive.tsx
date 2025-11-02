@@ -387,7 +387,7 @@ const NewsDeepDive: React.FC = () => {
               sx={{
                 display: 'flex',
                 background: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(248, 250, 252, 0.8)',
-                borderRadius: 3,
+                borderRadius: 1, // Minimal border radius
                 p: 0.5,
                 border: '1px solid',
                 borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
@@ -403,7 +403,7 @@ const NewsDeepDive: React.FC = () => {
                   top: '4px',
                   width: 'calc(50% - 6px)',
                   height: 'calc(100% - 8px)',
-                  borderRadius: '8px',
+                  borderRadius: '1px', // Minimal border radius
                   background: useMovieCore8
                     ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
                     : 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
@@ -415,7 +415,7 @@ const NewsDeepDive: React.FC = () => {
                 sx={{
                   px: 3,
                   py: 1,
-                  borderRadius: 2,
+                  borderRadius: 1, // Minimal border radius
                   cursor: 'pointer',
                   position: 'relative',
                   zIndex: 1,
@@ -430,7 +430,7 @@ const NewsDeepDive: React.FC = () => {
                 sx={{
                   px: 3,
                   py: 1,
-                  borderRadius: 2,
+                  borderRadius: 1, // Minimal border radius
                   cursor: 'pointer',
                   position: 'relative',
                   zIndex: 1,
@@ -898,7 +898,7 @@ const NewsDeepDive: React.FC = () => {
                                       contentStyle={{
                                         background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                                         border: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
-                                        borderRadius: '8px',
+                                        borderRadius: '1px', // Minimal border radius
                                       }}
                                       formatter={(value: any) => {
                                         return [`$${Number(value).toFixed(2)}`, 'Price'];

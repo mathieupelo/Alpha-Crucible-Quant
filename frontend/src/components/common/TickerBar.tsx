@@ -129,16 +129,7 @@ const TickerBar: React.FC = () => {
         }
       });
     
-    // Add separator (empty item with special marker)
-    items.push({
-      symbol: 'SEPARATOR',
-      price: null,
-      dailyChange: null,
-      dailyChangePercent: null,
-      universe: 'SEPARATOR',
-    });
-    
-    // Add GameCore-12 tickers
+    // Add GameCore-12 tickers (no separator)
     allTickers
       .filter(t => t.universe === 'GameCore-12')
       .forEach(ticker => {
@@ -165,7 +156,7 @@ const TickerBar: React.FC = () => {
   }, [tickerItems]);
   
   // Calculate approximate width per item (symbol + price + change)
-  const itemWidth = 280; // Approximate width including gaps
+  const itemWidth = 300; // Width including gaps (ticker + info spacing + bigger gap between tickers)
   const totalWidth = tickerItems.length > 0 ? tickerItems.length * itemWidth : 0;
 
   if (!tickerItems.length || totalWidth === 0) {
@@ -182,17 +173,17 @@ const TickerBar: React.FC = () => {
         zIndex: 1000,
       }}
     >
-      {/* Gradient masks for fade effect */}
+      {/* Gradient masks for stronger fade effect */}
       <Box
         sx={{
           position: 'absolute',
           left: 0,
           top: 0,
           bottom: 0,
-          width: 80,
+          width: 120,
           background: isDarkMode
-            ? 'linear-gradient(to right, rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0))'
-            : 'linear-gradient(to right, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0))',
+            ? 'linear-gradient(to right, rgba(30, 41, 59, 1) 0%, rgba(30, 41, 59, 0.95) 30%, rgba(30, 41, 59, 0.8) 60%, rgba(30, 41, 59, 0.3) 90%, rgba(30, 41, 59, 0) 100%)'
+            : 'linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.95) 30%, rgba(255, 255, 255, 0.8) 60%, rgba(255, 255, 255, 0.3) 90%, rgba(255, 255, 255, 0) 100%)',
           zIndex: 2,
           pointerEvents: 'none',
         }}
@@ -203,10 +194,10 @@ const TickerBar: React.FC = () => {
           right: 0,
           top: 0,
           bottom: 0,
-          width: 80,
+          width: 120,
           background: isDarkMode
-            ? 'linear-gradient(to left, rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0))'
-            : 'linear-gradient(to left, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0))',
+            ? 'linear-gradient(to left, rgba(30, 41, 59, 1) 0%, rgba(30, 41, 59, 0.95) 30%, rgba(30, 41, 59, 0.8) 60%, rgba(30, 41, 59, 0.3) 90%, rgba(30, 41, 59, 0) 100%)'
+            : 'linear-gradient(to left, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.95) 30%, rgba(255, 255, 255, 0.8) 60%, rgba(255, 255, 255, 0.3) 90%, rgba(255, 255, 255, 0) 100%)',
           zIndex: 2,
           pointerEvents: 'none',
         }}
@@ -227,36 +218,19 @@ const TickerBar: React.FC = () => {
             x: [0, -totalWidth], // Move by one set of items to create seamless loop
           }}
           transition={{
-            duration: 120, // Slower scrolling (120s per loop)
+            duration: 180, // Slower scrolling (180s per loop)
             repeat: Infinity,
             ease: 'linear',
           }}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '32px',
-            paddingLeft: '80px', // Start after fade area
+            gap: '48px', // Bigger spacing between tickers
+            paddingLeft: '120px', // Start after fade area
             willChange: 'transform',
           }}
         >
           {duplicatedItems.map((item, index) => {
-              if (item.symbol === 'SEPARATOR') {
-                return (
-                  <Box
-                    key={`separator-${index}`}
-                    sx={{
-                      width: 80,
-                      height: 2,
-                      background: isDarkMode
-                        ? 'rgba(148, 163, 184, 0.3)'
-                        : 'rgba(148, 163, 184, 0.4)',
-                      borderRadius: 1,
-                      mx: 2,
-                    }}
-                  />
-                );
-              }
-
               const isPositive = (item.dailyChangePercent ?? 0) >= 0;
               const changeColor = isPositive
                 ? (isDarkMode ? '#10b981' : '#059669')
@@ -275,7 +249,7 @@ const TickerBar: React.FC = () => {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
+                    gap: '8px', // Less space between ticker symbol and its info
                     minWidth: '140px',
                   }}
                 >

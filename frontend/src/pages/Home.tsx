@@ -45,6 +45,8 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   CalendarToday as CalendarTodayIcon,
   Timeline as TimelineIcon,
+  Movie as MovieIcon,
+  Gamepad as GamepadIcon,
 } from '@mui/icons-material';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -1049,10 +1051,15 @@ const Home: React.FC = () => {
             right: 0,
             bottom: 0,
             background: isDarkMode
-              ? 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%)'
-              : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%)',
+              ? useMovieCore8
+                ? 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%), linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, transparent 100%)'
+                : 'linear-gradient(90deg, transparent 0%, rgba(15, 23, 42, 0.3) 50%, rgba(30, 41, 59, 0.4) 100%), linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, transparent 100%)'
+              : useMovieCore8
+              ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%), linear-gradient(135deg, rgba(139, 92, 246, 0.02) 0%, transparent 100%)'
+              : 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, rgba(248, 250, 252, 0.4) 100%), linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, transparent 100%)',
             pointerEvents: 'none',
             zIndex: 0,
+            transition: 'background 0.5s ease',
           },
           '&::after': {
             content: '""',
@@ -1096,28 +1103,92 @@ const Home: React.FC = () => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2, position: 'relative' }}>
+          <Box sx={{ mb: 3, position: 'relative' }}>
+            {/* Themed Background Pattern */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                opacity: 0.05,
+                zIndex: 0,
+                backgroundImage: useMovieCore8
+                  ? `repeating-linear-gradient(
+                      45deg,
+                      transparent,
+                      transparent 10px,
+                      rgba(139, 92, 246, 0.1) 10px,
+                      rgba(139, 92, 246, 0.1) 20px
+                    )`
+                  : `repeating-linear-gradient(
+                      0deg,
+                      transparent,
+                      transparent 2px,
+                      rgba(16, 185, 129, 0.1) 2px,
+                      rgba(16, 185, 129, 0.1) 4px
+                    )`,
+                pointerEvents: 'none',
+              }}
+            />
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 2, position: 'relative', zIndex: 1 }}>
+              {/* Themed Animated Icon */}
               <motion.div
-                animate={{
-                  scale: [1, 1.3, 1],
-                  opacity: [0.8, 1, 0.8],
+                key={useMovieCore8 ? 'movies' : 'gaming'}
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  rotate: 0,
                 }}
                 transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
+                  scale: {
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  },
+                  rotate: {
+                    duration: 0.6,
+                    type: 'spring',
+                    stiffness: 200,
+                  },
                 }}
                 style={{
-                  width: '12px',
-                  height: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '50%',
-                  background: '#10b981',
-                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)',
+                  background: useMovieCore8
+                    ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                  boxShadow: useMovieCore8
+                    ? '0 0 20px rgba(139, 92, 246, 0.6), 0 4px 12px rgba(139, 92, 246, 0.4)'
+                    : '0 0 20px rgba(16, 185, 129, 0.6), 0 4px 12px rgba(16, 185, 129, 0.4)',
                   flexShrink: 0,
                 }}
-              />
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              >
+                {useMovieCore8 ? (
+                  <MovieIcon sx={{ fontSize: 24, color: '#ffffff' }} />
+                ) : (
+                  <GamepadIcon sx={{ fontSize: 24, color: '#ffffff' }} />
+                )}
+              </motion.div>
+              
+              <Typography 
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 700,
+                  background: useMovieCore8
+                    ? 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
                 Live Sentiment Analysis
               </Typography>
             </Box>
@@ -1138,7 +1209,7 @@ const Home: React.FC = () => {
                   gap: 0.5,
                 }}
               >
-                {/* Animated background indicator */}
+                {/* Animated background indicator - Themed */}
                 <motion.div
                   animate={{
                     left: useMovieCore8 ? '4px' : 'calc(50% + 2px)',
@@ -1154,8 +1225,12 @@ const Home: React.FC = () => {
                     width: 'calc(50% - 6px)',
                     height: 'calc(100% - 8px)',
                     borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                    background: useMovieCore8
+                      ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+                      : 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                    boxShadow: useMovieCore8
+                      ? '0 4px 12px rgba(139, 92, 246, 0.4)'
+                      : '0 4px 12px rgba(16, 185, 129, 0.4)',
                     zIndex: 0,
                   }}
                 />
@@ -1230,9 +1305,18 @@ const Home: React.FC = () => {
               </Box>
             </Box>
             
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-              Live feed from {useMovieCore8 ? 'Movies' : 'Gaming'} universe with AI sentiment analysis
-            </Typography>
+            <Box sx={{ mb: 3, textAlign: 'center', position: 'relative', zIndex: 1 }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: useMovieCore8 ? 'rgba(139, 92, 246, 0.9)' : 'rgba(16, 185, 129, 0.9)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                }}
+              >
+                Live feed from <strong>{useMovieCore8 ? 'Movies' : 'Gaming'}</strong> universe with AI sentiment analysis
+              </Typography>
+            </Box>
           </Box>
           <NewsFeed
             key={useMovieCore8 ? "MovieCore-8" : "GameCore-12"}

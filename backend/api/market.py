@@ -240,3 +240,63 @@ async def get_live_prices_batch(tickers: List[str]):
     except Exception as e:
         logger.error(f"Error getting live prices batch: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/market-data/{symbol}/intraday")
+async def get_intraday_price_data(symbol: str):
+    """
+    Get intraday price data for today (5-minute intervals from market open to current time).
+    
+    Args:
+        symbol: Stock ticker symbol
+        
+    Returns:
+        Intraday price data with timestamps
+    """
+    try:
+        validated_symbol = validate_ticker(symbol)
+        
+        # Get today's date
+        today = date.today()
+        
+        # Fetch intraday data using yfinance (5-minute intervals)
+        ticker = yf.Ticker(validated_symbol)
+        
+        # Get intraday data for today
+        # yfinance uses '1d' period with '5m' interval for intraday
+        intraday_data = ticker.history(period="1d", interval="5m")
+        
+        if intraday_data.empty:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No intraday data available for symbol {symbol} today"
+            )
+        
+        # Convert to list of dictionaries
+        intraday_points = []
+        for timestamp, row in intraday_data.iterrows():
+            # Convert to ISO format string
+            timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+            intraday_points.append({
+                "timestamp": timestamp_str,
+                "datetime": timestamp.isoformat(),
+                "open": float(row['Open']) if pd.notna(row['Open']) else None,
+                "high": float(row['High']) if pd.notna(row['High']) else None,
+                "low": float(row['Low']) if pd.notna(row['Low']) else None,
+                "close": float(row['Close']) if pd.notna(row['Close']) else None,
+                "volume": int(row['Volume']) if pd.notna(row['Volume']) else 0
+            })
+        
+        return {
+            "symbol": validated_symbol,
+            "date": today.isoformat(),
+            "data": intraday_points,
+            "total_points": len(intraday_points),
+            "interval": "5m"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting intraday price data for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

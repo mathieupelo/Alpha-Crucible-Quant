@@ -386,6 +386,26 @@ export const marketApi = {
   }> => {
     const response = await api.post('/market-data/live/batch', tickers);
     return response.data;
+  },
+
+  // Get intraday price data (5-minute intervals)
+  getIntradayPriceData: async (symbol: string): Promise<{
+    symbol: string;
+    date: string;
+    data: Array<{
+      timestamp: string;
+      datetime: string;
+      open: number | null;
+      high: number | null;
+      low: number | null;
+      close: number | null;
+      volume: number;
+    }>;
+    total_points: number;
+    interval: string;
+  }> => {
+    const response = await api.get(`/market-data/${symbol}/intraday`);
+    return response.data;
   }
 };
 
@@ -482,6 +502,102 @@ export const newsApi = {
         max_items: maxItems 
       }
     });
+    return response.data;
+  },
+
+  // Get today's news aggregated by ticker
+  getTodayNewsAggregated: async (universeName: string): Promise<{
+    universe_name: string;
+    date: string;
+    tickers: {
+      [ticker: string]: Array<{
+        ticker: string;
+        title: string;
+        summary: string;
+        publisher: string;
+        link: string;
+        pub_date: string;
+        image_url?: string;
+        sentiment: {
+          label: string;
+          score: number;
+          label_display: string;
+        };
+      }>;
+    };
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}/today-aggregated`);
+    return response.data;
+  },
+
+  // Analyze news with GPT-4o-mini
+  analyzeNews: async (request: {
+    ticker: string;
+    title: string;
+    summary: string;
+    sentiment: {
+      label: string;
+      score: number;
+      label_display: string;
+    };
+    price_data: {
+      price: number;
+      previous_close: number;
+      daily_change: number;
+      daily_change_percent: number;
+    };
+    pub_date: string;
+  }): Promise<{
+    ticker: string;
+    analysis: string;
+    model: string;
+    timestamp: string;
+  }> => {
+    const response = await api.post('/news/analyze', request);
+    return response.data;
+  },
+
+  // Get news statistics
+  getNewsStatistics: async (universeName: string): Promise<{
+    universe_name: string;
+    date: string;
+    top_tickers: Array<{
+      ticker: string;
+      avg_sentiment_score: number;
+      positive_count: number;
+      negative_count: number;
+      neutral_count: number;
+      total_news: number;
+    }>;
+    bottom_tickers: Array<{
+      ticker: string;
+      avg_sentiment_score: number;
+      positive_count: number;
+      negative_count: number;
+      neutral_count: number;
+      total_news: number;
+    }>;
+    sector_trends_today: {
+      positive_percent: number;
+      negative_percent: number;
+      neutral_percent: number;
+      total_news: number;
+    };
+    sector_trends_week: {
+      positive_percent: number;
+      negative_percent: number;
+      neutral_percent: number;
+      total_news: number;
+    };
+    time_based_changes: Array<{
+      hour: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      total: number;
+    }>;
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}/statistics`);
     return response.data;
   }
 };

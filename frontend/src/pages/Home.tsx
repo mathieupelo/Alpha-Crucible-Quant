@@ -1041,6 +1041,7 @@ const Home: React.FC = () => {
               
               <Typography 
                 variant="h5" 
+                onClick={() => navigate('/news-deep-dive')}
                 sx={{ 
                   fontWeight: 700,
                   background: useMovieCore8
@@ -1049,6 +1050,12 @@ const Home: React.FC = () => {
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'scale(1.05)',
+                    opacity: 0.9,
+                  },
                 }}
               >
                 Live Sentiment Analysis

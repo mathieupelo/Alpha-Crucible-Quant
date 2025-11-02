@@ -29,3 +29,6 @@ finbert-embedding>=0.1.3,<1.0.0
 # Alternative: use yiyanghkust/finbert-tone for sentiment analysis
 # finbert-tone can be installed via: pip install transformers torch
 
+# OpenAI
+openai>=1.0.0,<2.0.0
+

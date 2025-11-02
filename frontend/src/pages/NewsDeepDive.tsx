@@ -15,7 +15,6 @@ import {
   Container,
   CircularProgress,
   Alert,
-  Divider,
   LinearProgress,
   Paper,
 } from '@mui/material';
@@ -24,7 +23,6 @@ import {
   TrendingDown as TrendingDownIcon,
   Remove as RemoveIcon,
   Launch as LaunchIcon,
-  Insights as InsightsIcon,
   Article as ArticleIcon,
   AutoAwesome as AutoAwesomeIcon,
   Movie as MovieIcon,
@@ -34,7 +32,7 @@ import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { useTheme } from '@/contexts/ThemeContext';
 import { newsApi, marketApi } from '@/services/api';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LineChart } from 'recharts';
 import ReactMarkdown from 'react-markdown';
 
 interface NewsItem {
@@ -52,13 +50,6 @@ interface NewsItem {
   };
 }
 
-interface TickerData {
-  ticker: string;
-  news: NewsItem[];
-  intradayData?: any;
-  priceData?: any;
-  gptAnalyses?: { [newsId: string]: any };
-}
 
 const NewsDeepDive: React.FC = () => {
   const { isDarkMode } = useTheme();
@@ -70,7 +61,7 @@ const NewsDeepDive: React.FC = () => {
   const universeName = useMovieCore8 ? "MovieCore-8 (MC-8)" : "GameCore-12 (GC-12)";
 
   // Fetch today's aggregated news
-  const { data: newsData, isLoading: newsLoading, error: newsError, refetch: refetchNews } = useQuery(
+  const { data: newsData, isLoading: newsLoading, error: newsError } = useQuery(
     ['today-news', universeName],
     () => newsApi.getTodayNewsAggregated(universeName),
     {
@@ -137,7 +128,12 @@ const NewsDeepDive: React.FC = () => {
         previous_close: livePriceData.previous_close,
         daily_change: livePriceData.daily_change,
         daily_change_percent: livePriceData.daily_change_percent,
-      } : {};
+      } : {
+        price: 0,
+        previous_close: 0,
+        daily_change: 0,
+        daily_change_percent: 0,
+      };
       
       const analysis = await newsApi.analyzeNews({
         ticker: newsItem.ticker,
@@ -164,11 +160,24 @@ const NewsDeepDive: React.FC = () => {
     }
   };
 
+  // Check if market is open
+  const isMarketOpen = useMemo(() => {
+    const now = new Date();
+    const nyTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const hour = nyTime.getHours();
+    const minute = nyTime.getMinutes();
+    const dayOfWeek = nyTime.getDay();
+    
+    // Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday
+    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const isMarketHours = (hour > 9 || (hour === 9 && minute >= 30)) && hour < 16;
+    
+    return isWeekday && isMarketHours;
+  }, []);
+
   // Prepare chart data with news markers
   const chartData = useMemo(() => {
     if (!intradayData?.data || !newsData?.tickers || !selectedTicker) return [];
-    
-    const tickerNews = newsData.tickers[selectedTicker] || [];
     
     // Convert intraday data to chart format
     const chartPoints = intradayData.data.map((point: any) => ({
@@ -176,10 +185,76 @@ const NewsDeepDive: React.FC = () => {
       datetime: point.datetime,
       price: point.close,
       volume: point.volume,
+      open: point.open,
     }));
     
     return chartPoints;
   }, [intradayData, newsData, selectedTicker]);
+
+  // Get opening price and calculate price change from opening
+  const openingPrice = useMemo(() => {
+    if (!chartData.length || !intradayData?.data?.length) return null;
+    return intradayData.data[0]?.open || chartData[0]?.price || null;
+  }, [chartData, intradayData]);
+
+  // Calculate current price relative to opening
+  const priceChangeFromOpen = useMemo(() => {
+    if (!openingPrice || !livePriceData?.price) return null;
+    return livePriceData.price - openingPrice;
+  }, [openingPrice, livePriceData]);
+
+  const isPositiveFromOpen = useMemo(() => {
+    if (priceChangeFromOpen === null) {
+      // Fallback: check last price in chart data
+      if (!chartData.length || !openingPrice) return null;
+      const lastPrice = chartData[chartData.length - 1]?.price;
+      return lastPrice ? lastPrice >= openingPrice : null;
+    }
+    return priceChangeFromOpen >= 0;
+  }, [priceChangeFromOpen, chartData, openingPrice]);
+
+
+  // Calculate Y-axis domain centered around opening price
+  const yAxisDomain = useMemo(() => {
+    if (!chartData.length || !openingPrice) return ['auto', 'auto'];
+    
+    const prices = chartData.map((d: any) => d.price).filter(Boolean);
+    const maxPrice = Math.max(...prices);
+    const minPrice = Math.min(...prices);
+    
+    // Center around opening price
+    const range = Math.max(maxPrice - openingPrice, openingPrice - minPrice, (maxPrice - minPrice) * 0.5);
+    const padding = range * 0.1; // 10% padding
+    
+    return [
+      openingPrice - range - padding,
+      openingPrice + range + padding,
+    ];
+  }, [chartData, openingPrice]);
+
+  // Get chart date for display
+  const chartDate = useMemo(() => {
+    if (!intradayData?.date) {
+      // If no date in response, try to get from first data point
+      if (chartData.length > 0 && chartData[0]?.datetime) {
+        return format(parseISO(chartData[0].datetime), 'MMMM dd, yyyy');
+      }
+      return format(new Date(), 'MMMM dd, yyyy');
+    }
+    return format(parseISO(intradayData.date), 'MMMM dd, yyyy');
+  }, [intradayData, chartData]);
+
+  // Check if chart date is today or a previous day
+  const isChartDateToday = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    if (intradayData?.date) {
+      return intradayData.date.split('T')[0] === today;
+    }
+    if (chartData.length > 0 && chartData[0]?.datetime) {
+      return chartData[0].datetime.split('T')[0] === today;
+    }
+    return true;
+  }, [intradayData, chartData]);
 
   // Prepare news markers for chart
   const newsMarkers = useMemo(() => {
@@ -698,105 +773,251 @@ const NewsDeepDive: React.FC = () => {
                         }}
                       >
                         <CardContent>
-                          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-                            {selectedTicker} - Intraday Price Movement (Today)
-                          </Typography>
                           {intradayLoading ? (
                             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                               <CircularProgress />
                             </Box>
-                          ) : chartData.length > 0 ? (
+                          ) : chartData.length > 0 && livePriceData ? (
                             <Box>
-                              <ResponsiveContainer width="100%" height={400}>
-                                <LineChart data={chartData}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} />
-                                  <XAxis
-                                    dataKey="time"
-                                    stroke={isDarkMode ? '#cbd5e1' : '#475569'}
-                                    style={{ fontSize: '12px' }}
-                                  />
-                                  <YAxis
-                                    stroke={isDarkMode ? '#cbd5e1' : '#475569'}
-                                    style={{ fontSize: '12px' }}
-                                  />
-                                  <Tooltip
-                                    contentStyle={{
-                                      background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                                      border: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
-                                      borderRadius: '8px',
+                              {/* Header: Price, Change, Market Status, Date */}
+                              <Box sx={{ mb: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                                  <Typography
+                                    variant="h3"
+                                    sx={{
+                                      fontWeight: 800,
+                                      fontSize: { xs: '2rem', md: '2.5rem' },
+                                      color: 'text.primary',
                                     }}
-                                    formatter={(value: any, name: string, props: any) => {
-                                      if (props.payload?.newsTitle) {
-                                        return [
-                                          <div key="news">
-                                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>${Number(value).toFixed(2)}</div>
-                                            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                                              <strong>News:</strong> {props.payload.newsTitle}
-                                            </div>
-                                          </div>,
-                                          'Price',
-                                        ];
-                                      }
-                                      return [`$${Number(value).toFixed(2)}`, 'Price'];
+                                  >
+                                    ${livePriceData.price?.toFixed(2)} USD
+                                  </Typography>
+                                  <Typography
+                                    variant="h6"
+                                    sx={{
+                                      fontWeight: 600,
+                                      color: isPositiveFromOpen === false ? '#ef4444' : '#10b981',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.5,
                                     }}
-                                  />
-                                  <Legend />
-                                  <Line
-                                    type="monotone"
-                                    dataKey="price"
-                                    stroke={useMovieCore8 ? '#8b5cf6' : '#10b981'}
-                                    strokeWidth={2}
-                                    dot={false}
-                                    activeDot={{ r: 6 }}
-                                  />
-                                  {/* News markers */}
-                                  {newsMarkers.map((marker, idx) => (
-                                    <ReferenceLine
-                                      key={`news-${idx}`}
-                                      x={marker.time}
-                                      stroke={
-                                        marker.newsSentiment === 'positive' ? '#10b981' :
-                                        marker.newsSentiment === 'negative' ? '#ef4444' : '#6b7280'
-                                      }
-                                      strokeWidth={2}
-                                      strokeDasharray="5 5"
-                                    />
-                                  ))}
-                                </LineChart>
-                              </ResponsiveContainer>
-                              {/* Legend for news markers */}
-                              {newsMarkers.length > 0 && (
-                                <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap', fontSize: '0.75rem' }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box sx={{ width: 16, height: 2, background: '#10b981', borderStyle: 'dashed', borderWidth: '1px' }} />
-                                    <Typography variant="caption" color="text.secondary">Positive News</Typography>
-                                  </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box sx={{ width: 16, height: 2, background: '#ef4444', borderStyle: 'dashed', borderWidth: '1px' }} />
-                                    <Typography variant="caption" color="text.secondary">Negative News</Typography>
-                                  </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box sx={{ width: 16, height: 2, background: '#6b7280', borderStyle: 'dashed', borderWidth: '1px' }} />
-                                    <Typography variant="caption" color="text.secondary">Neutral News</Typography>
-                                  </Box>
+                                  >
+                                    {isPositiveFromOpen === false ? (
+                                      <TrendingDownIcon sx={{ fontSize: '1.5rem' }} />
+                                    ) : (
+                                      <TrendingUpIcon sx={{ fontSize: '1.5rem' }} />
+                                    )}
+                                    {priceChangeFromOpen !== null ? (
+                                      <>
+                                        {isPositiveFromOpen === false ? '-' : '+'}
+                                        {Math.abs(priceChangeFromOpen).toFixed(2)} ({isPositiveFromOpen === false ? '-' : '+'}
+                                        {openingPrice ? ((priceChangeFromOpen / openingPrice) * 100).toFixed(2) : '0.00'}%)
+                                      </>
+                                    ) : (
+                                      <>
+                                        {livePriceData.daily_change >= 0 ? '+' : ''}
+                                        {livePriceData.daily_change?.toFixed(2)} ({livePriceData.daily_change_percent >= 0 ? '+' : ''}
+                                        {livePriceData.daily_change_percent?.toFixed(2)}%)
+                                      </>
+                                    )}
+                                    {!isMarketOpen && (
+                                      <Typography
+                                        component="span"
+                                        variant="body2"
+                                        sx={{
+                                          ml: 1,
+                                          color: 'text.secondary',
+                                          fontWeight: 400,
+                                        }}
+                                      >
+                                        After-hours
+                                      </Typography>
+                                    )}
+                                  </Typography>
                                 </Box>
-                              )}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                    {chartDate}
+                                    {!isChartDateToday && !isMarketOpen && (
+                                      <Typography component="span" variant="caption" sx={{ ml: 1, fontWeight: 400 }}>
+                                        (Last Trading Day)
+                                      </Typography>
+                                    )}
+                                  </Typography>
+                                  <Chip
+                                    label={isMarketOpen ? 'Market Open' : 'Market Closed'}
+                                    size="small"
+                                    sx={{
+                                      background: isMarketOpen
+                                        ? 'rgba(16, 185, 129, 0.2)'
+                                        : 'rgba(107, 114, 128, 0.2)',
+                                      color: isMarketOpen ? '#10b981' : '#6b7280',
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  />
+                                  {!isMarketOpen && (
+                                    <Typography variant="caption" color="text.secondary">
+                                      {format(new Date(), 'h:mm a')} EST
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              {/* Chart */}
+                              <Box sx={{ mb: 3 }}>
+                                <ResponsiveContainer width="100%" height={400}>
+                                  <LineChart data={chartData}>
+                                    <CartesianGrid
+                                      strokeDasharray="3 3"
+                                      stroke={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
+                                      vertical={false}
+                                    />
+                                    <XAxis
+                                      dataKey="time"
+                                      stroke={isDarkMode ? '#cbd5e1' : '#475569'}
+                                      style={{ fontSize: '12px' }}
+                                      tick={{ fill: isDarkMode ? '#cbd5e1' : '#475569' }}
+                                      label={{
+                                        value: chartDate,
+                                        position: 'insideBottom',
+                                        offset: -10,
+                                        fill: isDarkMode ? '#94a3b8' : '#64748b',
+                                        fontSize: 11,
+                                        fontWeight: 500,
+                                      }}
+                                    />
+                                    <YAxis
+                                      domain={yAxisDomain}
+                                      stroke={isDarkMode ? '#cbd5e1' : '#475569'}
+                                      style={{ fontSize: '12px' }}
+                                      tick={{ fill: isDarkMode ? '#cbd5e1' : '#475569' }}
+                                      tickFormatter={(value) => `$${value.toFixed(0)}`}
+                                    />
+                                    <Tooltip
+                                      contentStyle={{
+                                        background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                                        border: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
+                                        borderRadius: '8px',
+                                      }}
+                                      formatter={(value: any) => {
+                                        return [`$${Number(value).toFixed(2)}`, 'Price'];
+                                      }}
+                                    />
+                                    <Legend />
+                                    
+                                    {/* Opening price reference line */}
+                                    {openingPrice && (
+                                      <ReferenceLine
+                                        y={openingPrice}
+                                        stroke={isDarkMode ? 'rgba(148, 163, 184, 0.5)' : 'rgba(107, 114, 128, 0.5)'}
+                                        strokeDasharray="5 5"
+                                        strokeWidth={1}
+                                        label={{
+                                          value: `Open: $${openingPrice.toFixed(2)}`,
+                                          position: 'right',
+                                          fill: isDarkMode ? '#94a3b8' : '#64748b',
+                                          fontSize: 11,
+                                        }}
+                                      />
+                                    )}
+
+                                    {/* Price line - colored based on opening price */}
+                                    <Line
+                                      type="monotone"
+                                      dataKey="price"
+                                      stroke={isPositiveFromOpen === false ? '#ef4444' : '#10b981'}
+                                      strokeWidth={2}
+                                      dot={false}
+                                      activeDot={{
+                                        r: 6,
+                                        fill: isPositiveFromOpen === false ? '#ef4444' : '#10b981',
+                                        stroke: isDarkMode ? '#1e293b' : '#ffffff',
+                                        strokeWidth: 2,
+                                      }}
+                                    />
+
+                                    {/* News markers */}
+                                    {newsMarkers.map((marker, idx) => (
+                                      <ReferenceLine
+                                        key={`news-${idx}`}
+                                        x={marker.time}
+                                        stroke={
+                                          marker.newsSentiment === 'positive' ? '#10b981' :
+                                          marker.newsSentiment === 'negative' ? '#ef4444' : '#6b7280'
+                                        }
+                                        strokeWidth={2}
+                                        strokeDasharray="5 5"
+                                      />
+                                    ))}
+                                  </LineChart>
+                                </ResponsiveContainer>
+
+                                {/* Legend for news markers */}
+                                {newsMarkers.length > 0 && (
+                                  <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap', fontSize: '0.75rem' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{ width: 16, height: 2, background: '#10b981', borderStyle: 'dashed', borderWidth: '1px' }} />
+                                      <Typography variant="caption" color="text.secondary">Positive News</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{ width: 16, height: 2, background: '#ef4444', borderStyle: 'dashed', borderWidth: '1px' }} />
+                                      <Typography variant="caption" color="text.secondary">Negative News</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{ width: 16, height: 2, background: '#6b7280', borderStyle: 'dashed', borderWidth: '1px' }} />
+                                      <Typography variant="caption" color="text.secondary">Neutral News</Typography>
+                                    </Box>
+                                  </Box>
+                                )}
+                              </Box>
+
+                              {/* Financial Metrics Table */}
+                              <Grid container spacing={3} sx={{ mt: 2 }}>
+                                <Grid item xs={6} md={3}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    Open
+                                  </Typography>
+                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {openingPrice ? `$${openingPrice.toFixed(2)}` : 'N/A'}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} md={3}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    High
+                                  </Typography>
+                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {chartData.length > 0
+                                      ? `$${Math.max(...chartData.map((d: any) => d.price).filter(Boolean)).toFixed(2)}`
+                                      : 'N/A'}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} md={3}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    Low
+                                  </Typography>
+                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {chartData.length > 0
+                                      ? `$${Math.min(...chartData.map((d: any) => d.price).filter(Boolean)).toFixed(2)}`
+                                      : 'N/A'}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} md={3}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    Volume
+                                  </Typography>
+                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {chartData.length > 0
+                                      ? `${chartData.reduce((sum: number, d: any) => sum + (d.volume || 0), 0).toLocaleString()}`
+                                      : 'N/A'}
+                                  </Typography>
+                                </Grid>
+                              </Grid>
                             </Box>
                           ) : (
                             <Box sx={{ textAlign: 'center', py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 No intraday data available for {selectedTicker}
-                              </Typography>
-                            </Box>
-                          )}
-                          {livePriceData && (
-                            <Box sx={{ mt: 2, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                              <Typography variant="body2">
-                                <strong>Current:</strong> ${livePriceData.price?.toFixed(2)}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: livePriceData.daily_change_percent >= 0 ? '#10b981' : '#ef4444' }}>
-                                <strong>Change:</strong> {livePriceData.daily_change_percent >= 0 ? '+' : ''}
-                                {livePriceData.daily_change_percent?.toFixed(2)}%
                               </Typography>
                             </Box>
                           )}

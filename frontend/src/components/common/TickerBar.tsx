@@ -5,18 +5,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useQuery } from 'react-query';
 import { useTheme } from '@/contexts/ThemeContext';
 import { universeApi, marketApi } from '@/services/api';
-
-interface TickerPrice {
-  symbol: string;
-  price: number | null;
-  daily_change: number | null;
-  daily_change_percent: number | null;
-  universe: string;
-}
 
 interface TickerItem {
   symbol: string;

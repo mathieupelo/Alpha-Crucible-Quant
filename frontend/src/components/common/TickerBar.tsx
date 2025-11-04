@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useQuery } from 'react-query';
 import { useTheme } from '@/contexts/ThemeContext';
 import { universeApi, marketApi } from '@/services/api';
@@ -245,7 +245,7 @@ const TickerBar: React.FC = () => {
               transformStyle: 'preserve-3d',
             }}
           >
-            {frontGroup.map((item, index) => {
+            {frontGroup.map((item) => {
               const isPositive = (item.dailyChangePercent ?? 0) >= 0;
               const changeColor = isPositive
                 ? (isDarkMode ? '#10b981' : '#059669')
@@ -342,7 +342,7 @@ const TickerBar: React.FC = () => {
               transformStyle: 'preserve-3d',
             }}
           >
-            {backGroup.map((item, index) => {
+            {backGroup.map((item) => {
               const isPositive = (item.dailyChangePercent ?? 0) >= 0;
               const changeColor = isPositive
                 ? (isDarkMode ? '#10b981' : '#059669')

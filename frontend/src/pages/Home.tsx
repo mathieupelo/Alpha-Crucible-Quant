@@ -30,7 +30,6 @@ import {
   Speed as SpeedIcon,
   PlayArrow as PlayArrowIcon,
   Email as EmailIcon,
-  Chat as ChatIcon,
   YouTube as YouTubeIcon,
   Launch as LaunchIcon,
   ArrowForward as ArrowForwardIcon,
@@ -39,18 +38,16 @@ import {
   AutoGraph as AutoGraphIcon,
   Calculate as CalculateIcon,
   Assessment as AssessmentIcon,
-  ShowChart as ShowChartIcon,
-  Security as SecurityIcon,
-  Bolt as BoltIcon,
-  CalendarToday as CalendarTodayIcon,
-  Timeline as TimelineIcon,
+  DataObject as DataObjectIcon,
+  Category as CategoryIcon,
+  SmartToy as SmartToyIcon,
 } from '@mui/icons-material';
-import { motion, useInView } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import AnimatedBackground from '@/components/common/AnimatedBackground';
 import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
-import { backtestApi, newsApi } from '@/services/api';
+import { newsApi } from '@/services/api';
 import SectorsSection from '@/components/sectors/SectorsSection';
 import {
   TrendingDown as TrendingDownIcon,
@@ -59,6 +56,18 @@ import {
   ChevronRight as ChevronRightIcon,
   RadioButtonChecked as RadioButtonCheckedIcon,
 } from '@mui/icons-material';
+
+// Discord Icon Component
+const DiscordIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+  </svg>
+);
 
 // Configuration
 const CONFIG = {
@@ -409,6 +418,7 @@ const LiveNewsPreview: React.FC = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: index * 0.1 }}
+                      onClick={() => navigate('/news-deep-dive')}
                       sx={{
                         width: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
                         minWidth: { xs: 'calc(100% - 24px)', md: 'calc((100% - 48px) / 3)' },
@@ -424,6 +434,7 @@ const LiveNewsPreview: React.FC = () => {
                         borderRadius: 1, // Minimal border radius
                         overflow: 'hidden',
                         position: 'relative',
+                        cursor: 'pointer',
                         transition: 'all 0.3s ease',
                         '&::before': {
                           content: '""',
@@ -622,395 +633,6 @@ const LiveNewsPreview: React.FC = () => {
   );
 };
 
-// Latest Backtest Showcase Component
-const LatestBacktestShowcase: React.FC = () => {
-  const navigate = useNavigate();
-  const { isDarkMode } = useTheme();
-
-  // Fetch most recent backtest
-  const { data: backtestsData, isLoading: backtestsLoading } = useQuery(
-    'latest-backtest',
-    () => backtestApi.getBacktests(1, 1),
-    {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const latestBacktest = backtestsData?.backtests?.[0];
-  const runId = latestBacktest?.run_id;
-
-  // Fetch metrics for the latest backtest
-  const { data: metricsData, isLoading: metricsLoading, isFetching: metricsFetching } = useQuery(
-    ['backtest-metrics', runId],
-    () => backtestApi.getBacktestMetrics(runId!),
-    {
-      enabled: !!runId,
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  // Show skeleton if:
-  // 1. Backtests are loading, OR
-  // 2. We have a runId but metrics are loading/fetching, OR
-  // 3. We have a backtest but no metrics data yet (waiting for metrics to load)
-  // Use isFetching as primary check since it's more reliable for detecting active queries
-  const isLoading = backtestsLoading 
-    || (!!runId && (metricsLoading || metricsFetching)) 
-    || (!!latestBacktest && runId && !metricsData);
-  
-  // Show content only when we have both backtest and metrics data
-  // Ensure metricsData exists and is a valid object
-  const hasData = !!latestBacktest && !!metricsData;
-
-  const metrics = metricsData || undefined;
-  const formatDate = (dateStr: string) => format(parseISO(dateStr), 'MMM dd, yyyy');
-  const formatPercent = (val: number) => `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
-
-  return (
-    <Box
-      sx={{
-        py: { xs: 8, md: 12 },
-        background: 'transparent',
-        position: 'relative',
-        zIndex: 1,
-      }}
-    >
-      <Container maxWidth="lg">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={staggerContainer}
-        >
-          <motion.div variants={fadeInUp}>
-            <Box sx={{ textAlign: 'center', mb: 6 }}>
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 800,
-                  mb: 2,
-                  background: isDarkMode
-                    ? 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)'
-                    : 'linear-gradient(135deg, #0f172a 0%, #475569 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                Latest Backtest Results
-              </Typography>
-              <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 700, mx: 'auto' }}>
-                Explore our most recent quantitative trading strategy performance
-              </Typography>
-            </Box>
-          </motion.div>
-
-          {isLoading ? (
-            // Loading Skeleton for Backtest
-            <Card
-              sx={{
-                background: isDarkMode
-                  ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
-                  : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1, // Minimal border radius
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              <CardContent sx={{ p: { xs: 4, md: 6 } }}>
-                {/* Header Skeleton */}
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4 }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ mb: 1, width: '60%', height: 32, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                      <Box sx={{ width: 200, height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                      <Box sx={{ width: 100, height: 24, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                    </Box>
-                  </Box>
-                  <Box sx={{ mt: { xs: 2, md: 0 }, width: 140, height: 40, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                </Box>
-
-                {/* Metrics Grid Skeleton */}
-                <Grid container spacing={3} sx={{ mb: 4 }} justifyContent="center">
-                  {[1, 2, 3, 4].map((idx) => (
-                    <Grid item xs={6} sm={4} md={3} key={idx}>
-                      <Card
-                        sx={{
-                          background: isDarkMode
-                            ? 'rgba(148, 163, 184, 0.05)'
-                            : 'rgba(148, 163, 184, 0.02)',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1, // Minimal border radius
-                          p: 2,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Box sx={{ mb: 1, width: '70%', mx: 'auto', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                        <Box sx={{ width: '50%', mx: 'auto', height: 28, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-
-                {/* Additional Metrics Skeleton */}
-                <Grid container spacing={2}>
-                  {[1, 2, 3].map((idx) => (
-                    <Grid item xs={6} sm={4} key={idx}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 20, height: 20, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                        <Box sx={{ width: '80%', height: 16, borderRadius: 1, bgcolor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.05)' }} />
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </Card>
-          ) : hasData ? (
-            <motion.div variants={scaleIn} whileHover={{ y: -10, transition: { duration: 0.3 } }}>
-              <Card
-              sx={{
-                background: isDarkMode
-                  ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
-                  : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1, // Minimal border radius
-                overflow: 'hidden',
-                position: 'relative',
-                boxShadow: '0 30px 80px rgba(0, 0, 0, 0.3)',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%)',
-                  backgroundSize: '200% 100%',
-                  animation: 'gradientFlow 3s linear infinite',
-                  '@keyframes gradientFlow': {
-                    '0%': { backgroundPosition: '0% 0%' },
-                    '100%': { backgroundPosition: '200% 0%' },
-                  },
-                },
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  boxShadow: '0 40px 100px rgba(37, 99, 235, 0.4)',
-                  transform: 'translateY(-5px)',
-                },
-              }}
-            >
-              <CardContent sx={{ p: { xs: 4, md: 6 } }}>
-                {/* Header */}
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4 }}>
-                  <Box>
-                    <Typography
-                      variant="h4"
-                      sx={{
-                        fontWeight: 700,
-                        mb: 1,
-                        background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
-                        backgroundClip: 'text',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                      }}
-                    >
-                      {latestBacktest.name || `Backtest ${latestBacktest.run_id}`}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CalendarTodayIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                        <Typography variant="body2" color="text.secondary">
-                          {formatDate(latestBacktest.start_date)} - {formatDate(latestBacktest.end_date)}
-                        </Typography>
-                      </Box>
-                      {latestBacktest.universe_name && (
-                        <Chip
-                          label={latestBacktest.universe_name}
-                          size="small"
-                          sx={{
-                            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
-                            border: '1px solid',
-                            borderColor: 'primary.main',
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </Box>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate(`/backtest?runId=${latestBacktest.run_id}`)}
-                      sx={{
-                        mt: { xs: 2, md: 0 },
-                        px: 4,
-                        py: 1.5,
-                        background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                        boxShadow: '0 10px 30px rgba(37, 99, 235, 0.4)',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-                          boxShadow: '0 15px 40px rgba(37, 99, 235, 0.5)',
-                        },
-                      }}
-                    >
-                      View Details
-                    </Button>
-                  </motion.div>
-                </Box>
-
-                {/* Key Metrics Grid */}
-                <Grid container spacing={3} sx={{ mb: 4 }} justifyContent="center">
-                  <Grid item xs={6} sm={4} md={3}>
-                    <motion.div whileHover={{ scale: 1.05 }}>
-                      <Card
-                        sx={{
-                          background: isDarkMode
-                            ? 'rgba(37, 99, 235, 0.1)'
-                            : 'rgba(37, 99, 235, 0.05)',
-                          border: '1px solid',
-                          borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.2)',
-                          borderRadius: 1, // Minimal border radius
-                          p: 2,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                          Total Return
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          sx={{
-                            fontWeight: 800,
-                            color: metrics && metrics.total_return >= 0 ? 'success.main' : 'error.main',
-                          }}
-                        >
-                          {formatPercent(metrics?.total_return || 0)}
-                        </Typography>
-                      </Card>
-                    </motion.div>
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={3}>
-                    <motion.div whileHover={{ scale: 1.05 }}>
-                      <Card
-                        sx={{
-                          background: isDarkMode
-                            ? 'rgba(16, 185, 129, 0.1)'
-                            : 'rgba(16, 185, 129, 0.05)',
-                          border: '1px solid',
-                          borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
-                          borderRadius: 1, // Minimal border radius
-                          p: 2,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                          Sharpe Ratio
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>
-                          {(metrics?.sharpe_ratio || 0).toFixed(2)}
-                        </Typography>
-                      </Card>
-                    </motion.div>
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={3}>
-                    <motion.div whileHover={{ scale: 1.05 }}>
-                      <Card
-                        sx={{
-                          background: isDarkMode
-                            ? 'rgba(139, 92, 246, 0.1)'
-                            : 'rgba(139, 92, 246, 0.05)',
-                          border: '1px solid',
-                          borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.3)' : 'rgba(139, 92, 246, 0.2)',
-                          borderRadius: 1, // Minimal border radius
-                          p: 2,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                          Alpha
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          sx={{
-                            fontWeight: 800,
-                            color: metrics && metrics.alpha >= 0 ? 'success.main' : 'error.main',
-                          }}
-                        >
-                          {formatPercent(metrics?.alpha || 0)}
-                        </Typography>
-                      </Card>
-                    </motion.div>
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={3}>
-                    <motion.div whileHover={{ scale: 1.05 }}>
-                      <Card
-                        sx={{
-                          background: isDarkMode
-                            ? 'rgba(245, 158, 11, 0.1)'
-                            : 'rgba(245, 158, 11, 0.05)',
-                          border: '1px solid',
-                          borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
-                          borderRadius: 1, // Minimal border radius
-                          p: 2,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                          Max Drawdown
-                        </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>
-                          {formatPercent(metrics?.max_drawdown || 0)}
-                        </Typography>
-                      </Card>
-                    </motion.div>
-                  </Grid>
-                </Grid>
-
-                {/* Additional Metrics */}
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={4}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <TimelineIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Volatility:</strong> {formatPercent(metrics?.volatility || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={4}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <TrendingUpIcon sx={{ fontSize: 20, color: 'success.main' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Win Rate:</strong> {formatPercent(metrics?.win_rate || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} sm={4}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ShowChartIcon sx={{ fontSize: 20, color: 'info.main' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Annualized Return:</strong> {formatPercent(metrics?.annualized_return || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-            </motion.div>
-          ) : null}
-        </motion.div>
-      </Container>
-    </Box>
-  );
-};
-
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
@@ -1032,39 +654,6 @@ const Home: React.FC = () => {
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
-
-
-  // Animated Counter Component
-  const AnimatedCounter: React.FC<{ end: number; duration?: number; suffix?: string }> = ({ end, duration = 2, suffix = '' }) => {
-    const [count, setCount] = useState(0);
-    const ref = React.useRef<HTMLSpanElement>(null);
-    const isInView = useInView(ref, { once: true, amount: 0.5 });
-
-    React.useEffect(() => {
-      if (!isInView) return;
-      
-      let startTime: number | null = null;
-      const animate = (timestamp: number) => {
-        if (!startTime) startTime = timestamp;
-        const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
-        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-        setCount(Math.floor(easeOutQuart * end));
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        }
-      };
-      requestAnimationFrame(animate);
-    }, [end, duration, isInView]);
-
-    return <span ref={ref}>{count}{suffix}</span>;
-  };
-
-  const stats = [
-    { icon: <ShowChartIcon sx={{ fontSize: 40 }} />, value: 150, suffix: '+', label: 'Signals Analyzed', color: '#2563eb' },
-    { icon: <TrendingUpIcon sx={{ fontSize: 40 }} />, value: 25, suffix: '%', label: 'Avg Alpha', color: '#10b981' },
-    { icon: <SecurityIcon sx={{ fontSize: 40 }} />, value: 95, suffix: '%', label: 'Backtest Accuracy', color: '#8b5cf6' },
-    { icon: <BoltIcon sx={{ fontSize: 40 }} />, value: 10, suffix: 'ms', label: 'Signal Latency', color: '#f59e0b' },
-  ];
 
   const upcomingFeatures = [
     {
@@ -1125,7 +714,7 @@ const Home: React.FC = () => {
       <GradientMesh />
       <AnimatedBackground />
 
-      {/* Hero Section with Netflix-style Background */}
+      {/* Hero Section - Modern Bold Design */}
       <Box
         ref={heroRef}
         sx={{
@@ -1137,183 +726,516 @@ const Home: React.FC = () => {
           overflow: 'hidden',
           background: 'transparent',
           zIndex: 1,
+          pt: 0,
+          pb: { xs: 8, md: 12 },
+          mt: { xs: -4, md: -6 },
         }}
       >
-        {/* Centered Content */}
+        {/* Animated Background Elements */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '10%',
+            right: '5%',
+            width: '400px',
+            height: '400px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+            filter: 'blur(80px)',
+            zIndex: 0,
+          }}
+          component={motion.div}
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: '15%',
+            left: '5%',
+            width: '300px',
+            height: '300px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.15) 0%, rgba(96, 165, 250, 0.15) 100%)',
+            filter: 'blur(60px)',
+            zIndex: 0,
+          }}
+          component={motion.div}
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.3, 0.6, 0.3],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 1,
+          }}
+        />
+
         <Container
-          maxWidth="md"
+          maxWidth="xl"
           sx={{
             position: 'relative',
             zIndex: 3,
-            textAlign: 'center',
             px: { xs: 3, md: 4 },
           }}
         >
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-          >
-            <motion.div variants={fadeInUp}>
-              <Typography
-                variant="h1"
-                sx={{
-                  fontSize: { xs: '2.5rem', md: '4rem', lg: '5.5rem' },
-                  fontWeight: 900,
-                  mb: 3,
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.03em',
-                  color: '#ffffff',
-                  textShadow: '0 2px 20px rgba(0, 0, 0, 0.5)',
-                }}
+          <Grid container spacing={4} alignItems="center">
+            {/* Left Side - Main Title & Description */}
+            <Grid item xs={12} md={7}>
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
               >
-                <motion.span
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.2 }}
-                >
-                  Quantitative Trading Signals
-                </motion.span>
-                <br />
-                <motion.span
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.4 }}
-                >
-                  <Box
-                    component="span"
+                {/* Badge */}
+                <motion.div variants={fadeInUp}>
+                  <Chip
+                    label="Quantitative Trading Platform"
                     sx={{
-                      background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 50%, #ec4899 100%)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundSize: '200% 200%',
-                      animation: 'gradientShift 3s ease infinite',
-                      '@keyframes gradientShift': {
-                        '0%, 100%': { backgroundPosition: '0% 50%' },
-                        '50%': { backgroundPosition: '100% 50%' },
-                      },
+                      mb: 3,
+                      px: 2,
+                      py: 0.5,
+                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      color: '#ffffff',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  />
+                </motion.div>
+
+                {/* Main Title */}
+                <motion.div variants={fadeInUp}>
+                  <Typography
+                    variant="h1"
+                    sx={{
+                      fontSize: { xs: '2.5rem', md: '4rem', lg: '5rem' },
+                      fontWeight: 900,
+                      mb: 4,
+                      lineHeight: 1.1,
+                      letterSpacing: '-0.04em',
+                      color: '#ffffff',
+                      textShadow: '0 4px 30px rgba(0, 0, 0, 0.5)',
                     }}
                   >
-                    Validated by Backtesting
-                  </Box>
-                </motion.span>
-              </Typography>
-            </motion.div>
+                    Where{' '}
+                    <Box
+                      component="span"
+                      sx={{
+                        background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        position: 'relative',
+                      }}
+                    >
+                      Alternative Data
+                    </Box>
+                    <br />
+                    Meets{' '}
+                    <Box
+                      component="span"
+                      sx={{
+                        background: 'linear-gradient(135deg, #34d399 0%, #60a5fa 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                      }}
+                    >
+                      Sector-Specific
+                    </Box>
+                    <br />
+                    <Box
+                      component="span"
+                      sx={{
+                        background: 'linear-gradient(135deg, #a78bfa 0%, #f472b6 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundSize: '200% 200%',
+                        animation: 'gradientShift 3s ease infinite',
+                        '@keyframes gradientShift': {
+                          '0%, 100%': { backgroundPosition: '0% 50%' },
+                          '50%': { backgroundPosition: '100% 50%' },
+                        },
+                      }}
+                    >
+                      AI-Processed Signals
+                    </Box>
+                  </Typography>
+                </motion.div>
 
-            <motion.div variants={fadeInUp}>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 4,
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  fontWeight: 400,
-                  lineHeight: 1.8,
-                  fontSize: { xs: '1rem', md: '1.25rem' },
-                  textShadow: '0 1px 10px rgba(0, 0, 0, 0.5)',
-                  maxWidth: '90%',
-                  mx: 'auto',
-                }}
-              >
-                Alpha Crucible leverages <strong>AI-powered analysis of alternative data</strong> to generate
-                sector-specific trading signals. We capture insights traditional financial analysis misses,
-                providing you with rigorously backtested quantitative strategies validated through comprehensive testing.
-              </Typography>
-            </motion.div>
-
-            <motion.div variants={fadeInUp}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  gap: 2,
-                  flexWrap: 'wrap',
-                  justifyContent: 'center',
-                  mb: 4,
-                }}
-              >
-                <motion.div
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.6 }}
-                >
-                  <Button
-                    variant="contained"
-                    size="large"
-                    endIcon={<ArrowForwardIcon />}
-                    onClick={() => navigate('/backtest')}
+                {/* Description */}
+                <motion.div variants={fadeInUp}>
+                  <Typography
+                    variant="h6"
                     sx={{
-                      px: 5,
-                      py: 2,
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                      boxShadow: '0 20px 40px rgba(37, 99, 235, 0.4)',
+                      mb: 5,
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      fontWeight: 400,
+                      lineHeight: 1.8,
+                      fontSize: { xs: '1rem', md: '1.25rem' },
+                      textShadow: '0 1px 10px rgba(0, 0, 0, 0.5)',
+                      maxWidth: '90%',
+                    }}
+                  >
+                    Transform unconventional data into actionable trading signals through sector-focused AI analysis. 
+                    Our platform processes alternative data sources to generate rigorously backtested quantitative strategies 
+                    that traditional analysis can't see.
+                  </Typography>
+                </motion.div>
+
+                {/* CTA Buttons */}
+                <motion.div variants={fadeInUp}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 2,
+                      flexWrap: 'wrap',
+                      mb: 4,
+                    }}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        variant="contained"
+                        size="large"
+                        endIcon={<ArrowForwardIcon />}
+                        onClick={() => navigate('/backtest')}
+                        sx={{
+                          px: 5,
+                          py: 2,
+                          fontSize: '1.1rem',
+                          fontWeight: 600,
+                          background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                          boxShadow: '0 20px 40px rgba(37, 99, 235, 0.4)',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                            boxShadow: '0 25px 50px rgba(37, 99, 235, 0.6)',
+                            transform: 'translateY(-2px)',
+                          },
+                        }}
+                      >
+                        Explore Backtests
+                      </Button>
+                    </motion.div>
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<DiscordIcon style={{ width: 24, height: 24 }} />}
+                        endIcon={<LaunchIcon />}
+                        href={CONFIG.discordUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          px: 5,
+                          py: 2,
+                          fontSize: '1.1rem',
+                          fontWeight: 600,
+                          borderWidth: 2,
+                          borderColor: 'rgba(255, 255, 255, 0.5)',
+                          color: '#ffffff',
+                          backdropFilter: 'blur(10px)',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          '&:hover': {
+                            borderWidth: 2,
+                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                          },
+                        }}
+                      >
+                        Join Discord
+                      </Button>
+                    </motion.div>
+                  </Box>
+                </motion.div>
+              </motion.div>
+            </Grid>
+
+            {/* Right Side - Three Pillars Cards */}
+            <Grid item xs={12} md={5}>
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.3 }}
+                variants={staggerContainer}
+              >
+                {/* Pillar 01 - Alternative Data */}
+                <motion.div
+                  variants={fadeInUp}
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  style={{ marginBottom: '1.5rem' }}
+                >
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3.5,
+                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%)',
+                      backdropFilter: 'blur(30px)',
+                      border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                      borderRadius: 3,
                       position: 'relative',
                       overflow: 'hidden',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       '&::before': {
-                        content: '""',
+                        content: '"01"',
                         position: 'absolute',
-                        top: 0,
-                        left: '-100%',
-                        width: '100%',
-                        height: '100%',
-                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                        transition: 'left 0.5s',
+                        top: -10,
+                        right: -10,
+                        fontSize: '8rem',
+                        fontWeight: 900,
+                        lineHeight: 1,
+                        background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        opacity: 0.3,
+                        pointerEvents: 'none',
                       },
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-                        boxShadow: '0 25px 50px rgba(37, 99, 235, 0.6)',
-                        transform: 'translateY(-2px)',
-                        '&::before': {
-                          left: '100%',
-                        },
+                        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.35) 0%, rgba(139, 92, 246, 0.35) 100%)',
+                        borderColor: 'rgba(255, 255, 255, 0.4)',
+                        boxShadow: '0 20px 60px rgba(37, 99, 235, 0.5)',
                       },
                     }}
                   >
-                    View Backtests
-                  </Button>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 10px 30px rgba(96, 165, 250, 0.4)',
+                        }}
+                      >
+                        <DataObjectIcon sx={{ fontSize: 32, color: '#ffffff' }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontSize: { xs: '1.25rem', md: '1.5rem' },
+                          }}
+                        >
+                          Alternative Data
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.75rem' }}>
+                          Non-traditional sources
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        lineHeight: 1.7,
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      Social sentiment, news flow, web traffic, and more - uncovering insights before they are reflected on the market.
+                    </Typography>
+                  </Paper>
                 </motion.div>
+
+                {/* Pillar 02 - Sector-Specific */}
                 <motion.div
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.7 }}
+                  variants={fadeInUp}
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  style={{ marginBottom: '1.5rem' }}
                 >
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    endIcon={<LaunchIcon />}
-                    href={CONFIG.discordUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Paper
+                    elevation={0}
                     sx={{
-                      px: 5,
-                      py: 2,
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      borderWidth: 2,
-                      borderColor: 'rgba(255, 255, 255, 0.5)',
-                      color: '#ffffff',
-                      backdropFilter: 'blur(10px)',
-                      background: 'rgba(255, 255, 255, 0.1)',
+                      p: 3.5,
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)',
+                      backdropFilter: 'blur(30px)',
+                      border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                      borderRadius: 3,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&::before': {
+                        content: '"02"',
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        fontSize: '8rem',
+                        fontWeight: 900,
+                        lineHeight: 1,
+                        background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.1) 0%, rgba(96, 165, 250, 0.1) 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        opacity: 0.3,
+                        pointerEvents: 'none',
+                      },
                       '&:hover': {
-                        borderWidth: 2,
-                        borderColor: 'rgba(255, 255, 255, 0.8)',
-                        transform: 'translateY(-2px)',
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(59, 130, 246, 0.35) 100%)',
+                        borderColor: 'rgba(255, 255, 255, 0.4)',
+                        boxShadow: '0 20px 60px rgba(16, 185, 129, 0.5)',
                       },
                     }}
                   >
-                    Join Discord
-                  </Button>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #34d399 0%, #60a5fa 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 10px 30px rgba(52, 211, 153, 0.4)',
+                        }}
+                      >
+                        <CategoryIcon sx={{ fontSize: 32, color: '#ffffff' }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            background: 'linear-gradient(135deg, #34d399 0%, #60a5fa 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontSize: { xs: '1.25rem', md: '1.5rem' },
+                          }}
+                        >
+                          Sector-Specific
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.75rem' }}>
+                          Industry-focused signals
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        lineHeight: 1.7,
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      Every signal tailored to unique industry dynamics and drivers, not generic market-wide approaches.
+                    </Typography>
+                  </Paper>
                 </motion.div>
-              </Box>
-            </motion.div>
-          </motion.div>
+
+                {/* Pillar 03 - AI-Processed Signals */}
+                <motion.div
+                  variants={fadeInUp}
+                  whileHover={{ scale: 1.02, y: -8 }}
+                >
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3.5,
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%)',
+                      backdropFilter: 'blur(30px)',
+                      border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                      borderRadius: 3,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&::before': {
+                        content: '"03"',
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        fontSize: '8rem',
+                        fontWeight: 900,
+                        lineHeight: 1,
+                        background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.1) 0%, rgba(244, 114, 182, 0.1) 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        opacity: 0.3,
+                        pointerEvents: 'none',
+                      },
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(236, 72, 153, 0.35) 100%)',
+                        borderColor: 'rgba(255, 255, 255, 0.4)',
+                        boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #a78bfa 0%, #f472b6 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 10px 30px rgba(167, 139, 250, 0.4)',
+                        }}
+                      >
+                        <SmartToyIcon sx={{ fontSize: 32, color: '#ffffff' }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            background: 'linear-gradient(135deg, #a78bfa 0%, #f472b6 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontSize: { xs: '1.25rem', md: '1.5rem' },
+                          }}
+                        >
+                          AI-Processed Signals
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.75rem' }}>
+                          Advanced algorithms
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        lineHeight: 1.7,
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      AI algorithms identify patterns and correlations invisible to traditional analysis, generating actionable signals.
+                    </Typography>
+                  </Paper>
+                </motion.div>
+              </motion.div>
+            </Grid>
+          </Grid>
         </Container>
 
         {/* Scroll Indicator */}
@@ -1323,7 +1245,7 @@ const Home: React.FC = () => {
           transition={{ duration: 1, delay: 1.5 }}
           style={{
             position: 'absolute',
-            bottom: 40,
+            bottom: 80,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10,
@@ -1338,7 +1260,7 @@ const Home: React.FC = () => {
                 width: 30,
                 height: 50,
                 border: `2px solid ${isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}`,
-                borderRadius: 1, // Minimal border radius
+                borderRadius: 1,
                 position: 'relative',
                 '&::before': {
                   content: '""',
@@ -1366,121 +1288,6 @@ const Home: React.FC = () => {
       >
         {/* Sectors Section */}
         <SectorsSection />
-
-      {/* Animated Stats Section */}
-      <Box
-        sx={{
-          py: { xs: 8, md: 12 },
-          background: 'transparent',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <Container maxWidth="lg">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={staggerContainer}
-          >
-            <motion.div variants={fadeInUp}>
-              <Typography
-                variant="h2"
-                align="center"
-                sx={{
-                  fontWeight: 800,
-                  mb: 8,
-                  background: isDarkMode
-                    ? 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)'
-                    : 'linear-gradient(135deg, #0f172a 0%, #475569 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                By The Numbers
-              </Typography>
-            </motion.div>
-
-            <Grid container spacing={4} justifyContent="center">
-              {stats.map((stat, index) => (
-                <Grid item xs={6} md={3} key={index}>
-                  <motion.div
-                    variants={scaleIn}
-                    whileHover={{ 
-                      scale: 1.1,
-                      y: -10,
-                      transition: { duration: 0.3 }
-                    }}
-                  >
-                    <Card
-                      sx={{
-                        height: '100%',
-                        background: isDarkMode
-                          ? `linear-gradient(145deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.7) 100%)`
-                          : `linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)`,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1, // Minimal border radius
-                        p: 4,
-                        textAlign: 'center',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: '4px',
-                          background: `linear-gradient(135deg, ${stat.color} 0%, ${stat.color}dd 100%)`,
-                        },
-                        '&:hover': {
-                          boxShadow: `0 20px 60px ${stat.color}40`,
-                        },
-                      }}
-                    >
-                      <motion.div
-                        animate={{ 
-                          rotate: [0, 360],
-                        }}
-                        transition={{ 
-                          duration: 20,
-                          repeat: Infinity,
-                          ease: 'linear'
-                        }}
-                      >
-                        <Box sx={{ color: stat.color, mb: 2, display: 'flex', justifyContent: 'center' }}>
-                          {stat.icon}
-                        </Box>
-                      </motion.div>
-                      <Typography
-                        variant="h3"
-                        sx={{
-                          fontWeight: 800,
-                          mb: 1,
-                          background: `linear-gradient(135deg, ${stat.color} 0%, ${stat.color}dd 100%)`,
-                          backgroundClip: 'text',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                        }}
-                      >
-                        <AnimatedCounter end={stat.value} suffix={stat.suffix} />
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        {stat.label}
-                      </Typography>
-                    </Card>
-                  </motion.div>
-                </Grid>
-              ))}
-            </Grid>
-          </motion.div>
-        </Container>
-      </Box>
-
-      {/* Latest Backtest Showcase */}
-      <LatestBacktestShowcase />
 
       {/* Live News Preview */}
       <LiveNewsPreview />
@@ -1907,25 +1714,20 @@ const Home: React.FC = () => {
                     >
                       <CardContent sx={{ p: 4 }}>
                         <Box sx={{ mb: 3 }}>
-                          <motion.div
-                            whileHover={{ rotate: 360 }}
-                            transition={{ duration: 0.6 }}
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 80,
+                              height: 80,
+                              borderRadius: 1, // Minimal border radius
+                              background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
+                              color: 'white',
+                            }}
                           >
-                            <Box
-                              sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 80,
-                                height: 80,
-                                borderRadius: 1, // Minimal border radius
-                                background: 'linear-gradient(135deg, #2563eb 0%, #8b5cf6 100%)',
-                                color: 'white',
-                              }}
-                            >
-                              {feature.icon}
-                            </Box>
-                          </motion.div>
+                            {feature.icon}
+                          </Box>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', mb: 2 }}>
                           <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
@@ -2062,7 +1864,7 @@ const Home: React.FC = () => {
                         <Button
                           fullWidth
                           variant="contained"
-                          startIcon={<ChatIcon />}
+                          startIcon={<DiscordIcon style={{ width: 24, height: 24 }} />}
                           endIcon={<LaunchIcon />}
                           href={CONFIG.discordUrl}
                           target="_blank"

@@ -41,6 +41,7 @@ import {
   DataObject as DataObjectIcon,
   Category as CategoryIcon,
   SmartToy as SmartToyIcon,
+  Reddit as RedditIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -48,6 +49,7 @@ import AnimatedBackground from '@/components/common/AnimatedBackground';
 import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
 import { newsApi } from '@/services/api';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import SectorsSection from '@/components/sectors/SectorsSection';
 import {
   TrendingDown as TrendingDownIcon,
@@ -627,6 +629,441 @@ const LiveNewsPreview: React.FC = () => {
               </Box>
             </motion.div>
           )}
+        </motion.div>
+      </Container>
+    </Box>
+  );
+};
+
+// Our Signals Component
+const OurSignalsSection: React.FC = () => {
+  const { isDarkMode } = useTheme();
+  const [redditSentiment, setRedditSentiment] = useState(0);
+  const [youtubeSentiment, setYoutubeSentiment] = useState(0);
+  const [googleTrends, setGoogleTrends] = useState(0);
+
+  // Mock data
+  const redditPost = {
+    username: 'u/TradingPro2024',
+    subreddit: 'r/wallstreetbets',
+    timeAgo: '2 hours ago',
+    title: 'TSLA looking bullish after the latest earnings call',
+    content: 'Just analyzed the Q4 earnings and the guidance looks solid. Production numbers are up and they\'re expanding into new markets. Bullish signal here!',
+    stock: 'TSLA',
+    targetSentiment: 72,
+  };
+
+  const youtubeComment = {
+    username: 'MarketWatcher99',
+    timeAgo: '3 hours ago',
+    content: 'This stock has been on fire lately! The fundamentals are solid and the technicals are pointing to continued growth. Definitely worth watching.',
+    stock: 'NVDA',
+    targetSentiment: 85,
+  };
+
+  const googleTrendsData = {
+    keyword: 'AI Stocks',
+    targetScore: 92,
+    chartData: [
+      { time: '00:00', value: 45 },
+      { time: '04:00', value: 52 },
+      { time: '08:00', value: 68 },
+      { time: '12:00', value: 75 },
+      { time: '16:00', value: 82 },
+      { time: '20:00', value: 88 },
+      { time: '24:00', value: 92 },
+    ],
+  };
+
+  // Tickering animation for sentiment scores
+  React.useEffect(() => {
+    const duration = 3000; // 3 seconds for slow tickering
+    const steps = 60;
+    const interval = duration / steps;
+
+    // Reddit sentiment animation
+    let redditStep = 0;
+    const redditIncrement = redditPost.targetSentiment / steps;
+    const redditTimer = setInterval(() => {
+      redditStep++;
+      const current = Math.min(redditPost.targetSentiment, redditIncrement * redditStep);
+      setRedditSentiment(Math.floor(current));
+      if (redditStep >= steps) clearInterval(redditTimer);
+    }, interval);
+
+    // YouTube sentiment animation
+    let youtubeStep = 0;
+    const youtubeIncrement = youtubeComment.targetSentiment / steps;
+    const youtubeTimer = setInterval(() => {
+      youtubeStep++;
+      const current = Math.min(youtubeComment.targetSentiment, youtubeIncrement * youtubeStep);
+      setYoutubeSentiment(Math.floor(current));
+      if (youtubeStep >= steps) clearInterval(youtubeTimer);
+    }, interval);
+
+    // Google Trends animation
+    let trendsStep = 0;
+    const trendsIncrement = googleTrendsData.targetScore / steps;
+    const trendsTimer = setInterval(() => {
+      trendsStep++;
+      const current = Math.min(googleTrendsData.targetScore, trendsIncrement * trendsStep);
+      setGoogleTrends(Math.floor(current));
+      if (trendsStep >= steps) clearInterval(trendsTimer);
+    }, interval);
+
+    return () => {
+      clearInterval(redditTimer);
+      clearInterval(youtubeTimer);
+      clearInterval(trendsTimer);
+    };
+  }, []);
+
+  const getSentimentLabel = (score: number) => {
+    if (score >= 50) return 'Positive';
+    if (score <= -50) return 'Negative';
+    return 'Neutral';
+  };
+
+  const getSentimentColor = (score: number) => {
+    if (score >= 50) return '#10b981';
+    if (score <= -50) return '#ef4444';
+    return '#6b7280';
+  };
+
+  return (
+    <Box
+      sx={{
+        py: { xs: 8, md: 12 },
+        background: 'transparent',
+        position: 'relative',
+        zIndex: 1,
+      }}
+    >
+      <Container maxWidth="lg">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={staggerContainer}
+        >
+          <motion.div variants={fadeInUp}>
+            <Box sx={{ textAlign: 'center', mb: 6 }}>
+              <Typography
+                variant="h2"
+                sx={{
+                  fontWeight: 800,
+                  mb: 2,
+                  background: isDarkMode
+                    ? 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)'
+                    : 'linear-gradient(135deg, #0f172a 0%, #475569 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                Our Signals
+              </Typography>
+              <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 700, mx: 'auto' }}>
+                Real-time sentiment analysis from multiple data sources
+              </Typography>
+            </Box>
+          </motion.div>
+
+          <Grid container spacing={3} sx={{ mt: 2 }}>
+            {/* Reddit Sentiment Card */}
+            <Grid item xs={12} md={4}>
+              <motion.div variants={scaleIn} whileHover={{ y: -5, transition: { duration: 0.3 } }}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                      : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <RedditIcon sx={{ color: '#ff4500', fontSize: 24 }} />
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Reddit Sentiment
+                      </Typography>
+                    </Box>
+
+                    {/* Reddit Post Card */}
+                    <Paper
+                      sx={{
+                        p: 2,
+                        mb: 3,
+                        background: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.8)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {redditPost.username}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          •
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {redditPost.subreddit}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                          {redditPost.timeAgo}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={redditPost.stock}
+                        size="small"
+                        sx={{
+                          mb: 1,
+                          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+                          border: '1px solid',
+                          borderColor: 'primary.main',
+                        }}
+                      />
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                        {redditPost.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {redditPost.content}
+                      </Typography>
+                    </Paper>
+
+                    {/* Sentiment Score */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Sentiment Score:
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            color: getSentimentColor(redditSentiment),
+                            minWidth: 60,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {redditSentiment > 0 ? '+' : ''}{redditSentiment}%
+                        </Typography>
+                        <Chip
+                          label={getSentimentLabel(redditSentiment)}
+                          size="small"
+                          sx={{
+                            background: `${getSentimentColor(redditSentiment)}20`,
+                            color: getSentimentColor(redditSentiment),
+                            border: `1px solid ${getSentimentColor(redditSentiment)}`,
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Grid>
+
+            {/* YouTube Sentiment Card */}
+            <Grid item xs={12} md={4}>
+              <motion.div variants={scaleIn} whileHover={{ y: -5, transition: { duration: 0.3 } }}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                      : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <YouTubeIcon sx={{ color: '#ff0000', fontSize: 24 }} />
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        YouTube Sentiment
+                      </Typography>
+                    </Box>
+
+                    {/* YouTube Comment Card */}
+                    <Paper
+                      sx={{
+                        p: 2,
+                        mb: 3,
+                        background: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.8)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                          {youtubeComment.username}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {youtubeComment.timeAgo}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={youtubeComment.stock}
+                        size="small"
+                        sx={{
+                          mb: 1,
+                          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+                          border: '1px solid',
+                          borderColor: 'primary.main',
+                        }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        {youtubeComment.content}
+                      </Typography>
+                    </Paper>
+
+                    {/* Sentiment Score */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Sentiment Score:
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            color: getSentimentColor(youtubeSentiment),
+                            minWidth: 60,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {youtubeSentiment > 0 ? '+' : ''}{youtubeSentiment}%
+                        </Typography>
+                        <Chip
+                          label={getSentimentLabel(youtubeSentiment)}
+                          size="small"
+                          sx={{
+                            background: `${getSentimentColor(youtubeSentiment)}20`,
+                            color: getSentimentColor(youtubeSentiment),
+                            border: `1px solid ${getSentimentColor(youtubeSentiment)}`,
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Grid>
+
+            {/* Google Trends Card */}
+            <Grid item xs={12} md={4}>
+              <motion.div variants={scaleIn} whileHover={{ y: -5, transition: { duration: 0.3 } }}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    background: isDarkMode
+                      ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(51, 65, 85, 0.85) 100%)'
+                      : 'linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <TrendingUpIcon sx={{ color: '#4285f4', fontSize: 24 }} />
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Google Trends
+                      </Typography>
+                    </Box>
+
+                    {/* Trending Keyword */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        Trending Keyword:
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {googleTrendsData.keyword}
+                      </Typography>
+                    </Box>
+
+                    {/* Chart */}
+                    <Box sx={{ height: 120, mb: 2 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={googleTrendsData.chartData}>
+                          <XAxis
+                            dataKey="time"
+                            tick={{ fontSize: 10, fill: isDarkMode ? '#94a3b8' : '#64748b' }}
+                            axisLine={{ stroke: isDarkMode ? '#475569' : '#cbd5e1' }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 10, fill: isDarkMode ? '#94a3b8' : '#64748b' }}
+                            axisLine={{ stroke: isDarkMode ? '#475569' : '#cbd5e1' }}
+                            domain={[0, 100]}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: isDarkMode ? '#1e293b' : '#ffffff',
+                              border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                              borderRadius: '8px',
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke="#4285f4"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </Box>
+
+                    {/* Popularity Score */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Popularity Score:
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography
+                          variant="h5"
+                          sx={{
+                            fontWeight: 800,
+                            color: '#4285f4',
+                            minWidth: 60,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {googleTrends}%
+                        </Typography>
+                        <Chip
+                          label="Trending"
+                          size="small"
+                          sx={{
+                            background: '#4285f420',
+                            color: '#4285f4',
+                            border: '1px solid #4285f4',
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Grid>
+          </Grid>
         </motion.div>
       </Container>
     </Box>
@@ -1288,6 +1725,9 @@ const Home: React.FC = () => {
       >
         {/* Sectors Section */}
         <SectorsSection />
+
+      {/* Our Signals Section */}
+      <OurSignalsSection />
 
       {/* Live News Preview */}
       <LiveNewsPreview />

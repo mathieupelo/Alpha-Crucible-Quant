@@ -13,7 +13,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
-from typing import List
 from dotenv import load_dotenv
 
 # Load environment variables from .env file

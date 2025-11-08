@@ -1,6 +1,6 @@
 # Repository Cleanup Plan
 
-**Date:** 2024  
+**Date:** 2024 (Updated)  
 **Goal:** Identify everything that can be removed, moved, or simplified to make the codebase cleaner and architecture clearer.
 
 ---
@@ -8,33 +8,35 @@
 ## 📊 Executive Summary
 
 ### Quick Stats
-- **Large files (>1000 lines):** 7 files
+- **Large files (>1000 lines):** ~5 files (frontend pages + backtest engine)
 - **Duplicate validation functions:** 3 sets
-- **Unused/rarely used modules:** 2
-- **Duplicate asset directories:** 2
-- **Empty/minimal files:** 1
-- **Scripts to consolidate:** ~15
-- **Root-level docs to move:** 5
+- **Unused/rarely used modules:** 1 (`src/data/validation.py` - only in example script)
+- **Duplicate asset directories:** ✅ **ALREADY CLEANED** (no `frontend/Assets/` found)
+- **Empty/minimal files:** 0 (all `__init__.py` files have proper exports)
+- **Scripts to consolidate:** Already well-organized in subdirectories
+- **Root-level docs to move:** 0 (all docs already in `docs/` directory)
+- **Unused imports:** `backend/main.py` imports `List` from typing (verify usage)
+
+### ✅ Already Completed
+- ✅ Database manager refactored to use mixins (`src/database/manager.py` uses operation mixins)
+- ✅ Assets consolidated to `frontend/public/` only
+- ✅ Scripts organized into logical subdirectories
+- ✅ Documentation organized in `docs/` directory
 
 ---
 
 ## 🔴 HIGH PRIORITY - Quick Wins (Low Risk)
 
-### 1. Remove Duplicate Asset Directories
-**Issue:** Assets exist in both `frontend/Assets/` and `frontend/public/`
-- `frontend/Assets/Images/` duplicates `frontend/public/sectors/`
-- `frontend/Assets/videos/` appears unused
+### 1. Remove Unused Import in `backend/main.py`
+**Issue:** `from typing import List` imported but may not be used
 
 **Action:**
-- ✅ **Remove:** `frontend/Assets/` directory (use `frontend/public/` only)
-- ✅ **Verify:** All imports reference `public/` paths
+- ⚠️ **Verify:** Check if `List` is actually used in `backend/main.py`
+- ✅ **Remove:** If unused, remove the import
 
-**Risk:** Low - just asset consolidation  
+**Risk:** Very Low  
 **Files:**
-- `frontend/Assets/Images/gaming.webp` → delete (duplicate)
-- `frontend/Assets/Images/movies.png` → delete (duplicate)  
-- `frontend/Assets/Images/Sports.png` → delete (duplicate)
-- `frontend/Assets/videos/gaming.mp4` → verify usage, then delete if unused
+- `backend/main.py` (line 16) - remove unused `List` import
 
 ---
 
@@ -68,32 +70,20 @@
 
 ---
 
-### 3. Remove Empty/Minimal Files
-**Issue:** Empty or near-empty `__init__.py` files
+### 3. Review `src/data/validation.py` Usage
+**Issue:** `src/data/validation.py` (437 lines) only used in `scripts/utils/run_backtest.py` (example script)
 
 **Action:**
-- ✅ **Remove:** `backend/services/__init__.py` (only contains comment "# Backend services package")
-- ✅ **Keep:** Other `__init__.py` files that export symbols
+- ⚠️ **Decision needed:** 
+  - Option A: Remove if truly unused in production code
+  - Option B: Keep if it's useful for data quality checks (it's a comprehensive validator)
+  - Option C: Move to `src/utils/` if it's a utility (but `src/utils/data_validation.py` already exists)
 
-**Risk:** Very Low  
+**Recommendation:** Keep for now - it's a comprehensive validator used in example scripts. Consider consolidating with `src/utils/data_validation.py` if there's overlap.
+
+**Risk:** Low if keeping, Medium if refactoring  
 **Files:**
-- `backend/services/__init__.py` → delete or add proper exports
-
----
-
-### 4. Move Root-Level Documentation
-**Issue:** Documentation files scattered in root directory
-
-**Action:**
-- ✅ **Move to `docs/`:**
-  - `ANALYSIS_REPORT.md` → `docs/ANALYSIS_REPORT.md`
-  - `DEVELOPMENT_WORKFLOW.md` → `docs/DEVELOPMENT_WORKFLOW.md`
-  - `IMPROVEMENTS_SUMMARY.md` → `docs/IMPROVEMENTS_SUMMARY.md`
-  - `NEWS_SETUP.md` → `docs/NEWS_SETUP.md`
-  - `RUN.md` → `docs/RUN.md`
-
-**Risk:** Low - update any references  
-**Files:** 5 markdown files in root
+- `src/data/validation.py` - verify usage, then decide
 
 ---
 
@@ -101,39 +91,39 @@
 
 ### 5. Split Large Files
 
-#### 5.1 `src/database/manager.py` (1104 lines) - **GOD MODULE**
-**Issue:** Single file handles all database operations (signals, portfolios, backtests, universes, NAV, etc.)
+#### 5.1 `src/database/manager.py` - ✅ **ALREADY REFACTORED**
+**Status:** ✅ **COMPLETED** - Already uses mixin pattern!
 
-**Action:**
-- ✅ **Split into:**
-  - `src/database/manager.py` - Core connection and base operations (keep ~200 lines)
-  - `src/database/signal_operations.py` - Signal-related operations
-  - `src/database/portfolio_operations.py` - Portfolio operations
-  - `src/database/backtest_operations.py` - Backtest operations
-  - `src/database/universe_operations.py` - Universe operations
-  - `src/database/nav_operations.py` - NAV operations
+**Current Structure:**
+- `src/database/manager.py` - Core connection and base operations (~226 lines)
+- `src/database/signal_operations.py` - Signal-related operations (mixin)
+- `src/database/portfolio_operations.py` - Portfolio operations (mixin)
+- `src/database/backtest_operations.py` - Backtest operations (mixin)
+- `src/database/universe_operations.py` - Universe operations (mixin)
+- `src/database/score_operations.py` - Score operations (mixin)
 
-**Risk:** Medium - requires careful import refactoring  
-**Files:**
-- `src/database/manager.py` → split into 6 files
-- Update all imports in: `backend/services/database_service.py`, `src/backtest/engine.py`, etc.
+**Action:** ✅ No action needed - architecture is clean!
 
 ---
 
-#### 5.2 `src/backtest/engine.py` (1313 lines)
-**Issue:** Very large backtest engine file
+#### 5.2 `src/backtest/engine.py` (~1328 lines)
+**Issue:** Very large backtest engine file, but already partially modularized
+
+**Current Structure:**
+- ✅ `src/backtest/data_preparation.py` - Already exists
+- ✅ `src/backtest/portfolio_rebalancing.py` - Already exists
+- ✅ `src/backtest/metrics_calculation.py` - Already exists
+- ✅ `src/backtest/results_storage.py` - Already exists
+- ✅ `src/backtest/simulation.py` - Already exists
 
 **Action:**
-- ✅ **Split into:**
-  - `src/backtest/engine.py` - Main engine class (~400 lines)
-  - `src/backtest/data_preparation.py` - Data fetching and preparation
-  - `src/backtest/portfolio_rebalancing.py` - Rebalancing logic
-  - `src/backtest/metrics_calculation.py` - Performance metrics
-  - `src/backtest/results_storage.py` - Database storage
+- ⚠️ **Review:** `src/backtest/engine.py` still has ~1328 lines
+- ✅ **Consider:** Move remaining helper methods to appropriate modules
+- ✅ **Target:** Reduce `engine.py` to ~400-500 lines (orchestration only)
 
 **Risk:** Medium - ensure all methods remain accessible  
 **Files:**
-- `src/backtest/engine.py` → split into 5 files
+- `src/backtest/engine.py` - refactor to use helper modules more extensively
 
 ---
 
@@ -209,53 +199,27 @@
 ---
 
 ### 6. Consolidate Scripts Directory
-**Issue:** 30+ scripts, many with overlapping functionality
+**Status:** ✅ **ALREADY WELL-ORGANIZED**
 
-**Action:**
-- ✅ **Group by category:**
-  - `scripts/dev/` - Development scripts
-    - `dev_all.bat`, `dev_backend.bat`, `dev_frontend.bat`, `dev_docker.bat`
-  - `scripts/deploy/` - Deployment scripts
-    - `deploy.bat`, `deploy.sh`, `rebuild_docker_no_cache.bat`
-  - `scripts/ops/` - Operational scripts
-    - `restart_all.bat`, `restart_backend.bat`, `full_restart.bat`, `full_restart_with_docker.bat`
-  - `scripts/ngrok/` - Ngrok-related scripts
-    - `start_ngrok.bat`, `kill_ngrok.bat`, `check_ngrok.bat`, `prepare_and_start_ngrok_final.bat`, `setup_ngrok.py`
-  - `scripts/setup/` - Setup scripts
-    - `setup_database.py`, `setup_dev.py`, `setup_ngrok.py`
-  - `scripts/test/` - Test scripts
-    - `test_db_connection.bat`, `test_imports.py`, `test_openai_key.py`, `verify_connectivity.bat`
-  - `scripts/troubleshoot/` - Troubleshooting scripts
-    - `check_and_fix_iis.bat`, `fix_frontend_cache.bat`, `fix_nginx_ips_v2.bat`, `kill_port_3000.bat`
-    - `CACHE_TROUBLESHOOTING.md`, `FIX_PORT_3000.md`
-  - `scripts/utils/` - Utility scripts
-    - `cleanup_all.bat`, `clear_all_cache.bat`, `quick_start.bat`, `run_backtest.py`, `migrate_to_signals_table.py`
+**Current Structure:**
+- ✅ `scripts/dev/` - Development scripts
+- ✅ `scripts/deploy/` - Deployment scripts
+- ✅ `scripts/ops/` - Operational scripts
+- ✅ `scripts/ngrok/` - Ngrok-related scripts
+- ✅ `scripts/setup/` - Setup scripts
+- ✅ `scripts/test/` - Test scripts
+- ✅ `scripts/troubleshoot/` - Troubleshooting scripts
+- ✅ `scripts/utils/` - Utility scripts
 
-**Risk:** Low - just reorganization  
-**Files:** 30+ scripts → organized into 7 subdirectories
+**Action:** ✅ No action needed - scripts are already well-organized!
 
 ---
 
 ## 🟠 LOW PRIORITY - Architectural Cleanup (Higher Risk)
 
-### 7. Review Unused/Rarely Used Modules
+### 7. Review Price Fetcher Modules
 
-#### 7.1 `src/data/validation.py` (437 lines)
-**Issue:** Only used in `scripts/run_backtest.py` (example script)
-
-**Action:**
-- ⚠️ **Decision needed:** 
-  - Option A: Remove if truly unused in production code
-  - Option B: Keep if it's useful for data quality checks
-  - Option C: Move to `src/utils/` if it's a utility
-
-**Risk:** Low if removing, Medium if refactoring  
-**Files:**
-- `src/data/validation.py` - verify usage, then remove or move
-
----
-
-#### 7.2 `src/data/realtime_fetcher.py` vs `src/utils/price_fetcher.py`
+#### 7.1 `src/data/realtime_fetcher.py` vs `src/utils/price_fetcher.py`
 **Issue:** Two similar modules for fetching price data
 
 **Current usage:**
@@ -324,35 +288,43 @@
 ---
 
 ### 10. Consolidate Requirements Files
-**Issue:** Two requirements files:
-- `requirements.txt` (root)
-- `backend/requirements.txt`
+**Issue:** Two requirements files with different purposes:
+- `requirements.txt` (root) - Core library dependencies (plotting, testing, dev tools)
+- `backend/requirements.txt` - Backend-specific dependencies (FastAPI, database, ML)
+
+**Current State:**
+- ✅ Both files serve distinct purposes
+- ✅ Root `requirements.txt` is for `src/` directory (core quant library)
+- ✅ `backend/requirements.txt` is for FastAPI backend
 
 **Action:**
-- ⚠️ **Review:** Determine if both are needed
-- ⚠️ **Consolidate:** If possible, use single requirements file
-- ⚠️ **Document:** Clarify which file is for what purpose
+- ✅ **Keep both** - They serve different purposes
+- ⚠️ **Document:** Add comment in root `requirements.txt` explaining the split (already has comment)
+- ⚠️ **Consider:** Rename root `requirements.txt` to `requirements-core.txt` or `requirements-src.txt` for clarity
 
-**Risk:** Medium - may affect deployment  
+**Risk:** Low - just documentation/clarification  
 **Files:**
-- `requirements.txt`
-- `backend/requirements.txt`
+- `requirements.txt` - Add/improve documentation
+- `backend/requirements.txt` - Already clear
 
 ---
 
 ## 📋 Implementation Plan
 
 ### Phase 1: Quick Wins (1-2 PRs)
-1. Remove duplicate asset directories
-2. Move root-level documentation
-3. Remove empty `__init__.py`
-4. Consolidate validation function usage
+1. Remove unused `List` import from `backend/main.py`
+2. Consolidate validation function usage (refactor `src/data/realtime_fetcher.py` to use utils)
+3. Review and document `src/data/validation.py` usage decision
 
 ### Phase 2: Structural Improvements (3-5 PRs)
-5. Split `src/database/manager.py`
-6. Split `src/backtest/engine.py`
-7. Split large frontend pages (one PR per page)
-8. Reorganize scripts directory
+5. ✅ `src/database/manager.py` - Already refactored (no action needed)
+6. Further refactor `src/backtest/engine.py` to reduce size
+7. Split large frontend pages (one PR per page):
+   - `frontend/src/pages/Home.tsx` (~2585 lines) ⚠️ **CRITICAL**
+   - `frontend/src/pages/NewsDeepDive.tsx` (~1399 lines)
+   - `frontend/src/pages/BacktestManager.tsx` (~1237 lines)
+   - `frontend/src/pages/RunBacktest.tsx` (~1057 lines)
+8. ✅ Scripts directory - Already well-organized (no action needed)
 
 ### Phase 3: Architectural Cleanup (2-3 PRs)
 9. Review and consolidate `src/data/` modules
@@ -385,4 +357,58 @@
 ---
 
 **Next Step:** Review this plan and approve specific items before implementation begins.
+
+---
+
+## 📝 Summary of Findings
+
+### ✅ Good News - Already Clean
+1. **Database Architecture:** `src/database/manager.py` already uses mixin pattern - well architected!
+2. **Assets:** No duplicate asset directories found - already consolidated
+3. **Scripts:** Already well-organized into logical subdirectories
+4. **Documentation:** All docs already in `docs/` directory
+5. **Init Files:** All `__init__.py` files have proper exports
+
+### 🔴 Priority Actions (Low Risk)
+1. **Remove unused import:** `backend/main.py` - verify and remove `List` from typing if unused
+2. **Consolidate validation:** Refactor `src/data/realtime_fetcher.py` to use `src/utils/data_validation.py`
+3. **Document decision:** Review `src/data/validation.py` usage and document decision
+
+### 🟡 Medium Priority (Medium Risk)
+1. **Large frontend pages:** Split 4 large page components (Home.tsx is critical at ~2585 lines)
+2. **Backtest engine:** Further modularize `src/backtest/engine.py` (currently ~1328 lines)
+
+### 🟠 Low Priority (Higher Risk)
+1. **API structure:** Consider versioning and feature-based organization
+2. **Component organization:** Consider feature-based component structure
+3. **Requirements files:** Document the split between root and backend requirements
+
+### ⚠️ Risky Items (Require Approval)
+1. **Unused imports:** Use tooling to detect and remove (test thoroughly)
+2. **Requirements consolidation:** Keep both files but improve documentation
+
+---
+
+## 🎯 Recommended PR Sequence
+
+### PR 1: Quick Wins (Low Risk)
+- Remove unused `List` import from `backend/main.py`
+- Document `src/data/validation.py` decision
+
+### PR 2: Validation Consolidation (Low Risk)
+- Refactor `src/data/realtime_fetcher.py` to use `src/utils/data_validation.py`
+
+### PR 3-6: Frontend Page Splits (Medium Risk, One Per PR)
+- PR 3: Split `Home.tsx` (largest, most critical)
+- PR 4: Split `NewsDeepDive.tsx`
+- PR 5: Split `BacktestManager.tsx`
+- PR 6: Split `RunBacktest.tsx`
+
+### PR 7: Backtest Engine Refactor (Medium Risk)
+- Further modularize `src/backtest/engine.py`
+
+### PR 8+: Architectural Improvements (Higher Risk, Requires Approval)
+- API structure reorganization
+- Component organization changes
+- Unused import cleanup (with tooling)
 

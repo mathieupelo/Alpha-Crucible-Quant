@@ -54,8 +54,22 @@ def build_docker_image(repo_path: str, repo_name: str) -> bool:
     """Build Docker image for a repository."""
     try:
         logger.info(f"Building Docker image for {repo_name}")
+        
+        # Check for Dockerfile or Dockerfile.txt
+        dockerfile_path = Path(repo_path) / 'Dockerfile'
+        dockerfile_txt_path = Path(repo_path) / 'Dockerfile.txt'
+        
+        build_cmd = ['docker', 'build', '-t', f'{repo_name}:latest']
+        
+        # Use Dockerfile.txt if Dockerfile doesn't exist
+        if not dockerfile_path.exists() and dockerfile_txt_path.exists():
+            logger.info(f"Using Dockerfile.txt (Dockerfile not found)")
+            build_cmd.extend(['-f', 'Dockerfile.txt'])
+        
+        build_cmd.append('.')
+        
         result = subprocess.run(
-            ['docker', 'build', '-t', f'{repo_name}:latest', '.'],
+            build_cmd,
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -86,7 +100,16 @@ def run_repo_container(repo_config: Dict, repo_path: str) -> int:
         'DB_USER': os.getenv('DB_USER', ''),
         'DB_PASSWORD': os.getenv('DB_PASSWORD', ''),
         'DB_NAME': os.getenv('DB_NAME', ''),
+        # Reddit API credentials
+        'DATABASE_ORE_URL': os.getenv('DATABASE_ORE_URL', ''),
+        'REDDIT_CLIENT_ID': os.getenv('REDDIT_CLIENT_ID', ''),
+        'REDDIT_CLIENT_SECRET': os.getenv('REDDIT_CLIENT_SECRET', ''),
+        'REDDIT_USER_AGENT': os.getenv('REDDIT_USER_AGENT', ''),
     }
+    
+    # Add PYTHONPATH if workdir is specified in repo_config (for module imports)
+    if 'workdir' in repo_config:
+        env_vars['PYTHONPATH'] = repo_config['workdir']
     
     # Build env list for docker run
     env_list = []
@@ -97,12 +120,29 @@ def run_repo_container(repo_config: Dict, repo_path: str) -> int:
     try:
         logger.info(f"Running Docker container for {repo_name}")
         
-        # Run the container
+        # Build docker run command
         cmd = [
             'docker', 'run', '--rm',
             *env_list,
             f'{repo_name}:latest'
         ]
+        
+        # If custom command is specified, append it (overrides CMD in Dockerfile)
+        if 'command' in repo_config:
+            custom_cmd = repo_config['command']
+            if isinstance(custom_cmd, list):
+                cmd.extend(custom_cmd)
+            else:
+                cmd.append(custom_cmd)
+            logger.info(f"Using custom command: {' '.join(custom_cmd) if isinstance(custom_cmd, list) else custom_cmd}")
+        
+        # Set working directory if specified (for module imports)
+        if 'workdir' in repo_config:
+            # Insert workdir flag before the image name
+            workdir_idx = cmd.index(f'{repo_name}:latest')
+            cmd.insert(workdir_idx, '-w')
+            cmd.insert(workdir_idx + 1, repo_config['workdir'])
+            logger.info(f"Setting working directory to: {repo_config['workdir']}")
         
         result = subprocess.run(
             cmd,

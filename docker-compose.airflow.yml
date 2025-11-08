@@ -155,12 +155,19 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      # Reddit API credentials
+      - DATABASE_ORE_URL=${DATABASE_ORE_URL}
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - REDDIT_USER_AGENT=${REDDIT_USER_AGENT}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/repos:/opt/airflow/repos
       - ./airflow/config:/opt/airflow/config
+      - ./backend:/opt/airflow/backend  # Mount backend for database service
+      - ./src:/opt/airflow/src  # Mount src for backtest engine
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for building/running containers
     ports:
       - "8081:8080"  # Changed to 8081 to avoid conflict with main app
@@ -206,12 +213,19 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      # Reddit API credentials
+      - DATABASE_ORE_URL=${DATABASE_ORE_URL}
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - REDDIT_USER_AGENT=${REDDIT_USER_AGENT}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/repos:/opt/airflow/repos
       - ./airflow/config:/opt/airflow/config
+      - ./backend:/opt/airflow/backend  # Mount backend for database service
+      - ./src:/opt/airflow/src  # Mount src for backtest engine
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for building/running containers
     user: "${AIRFLOW_UID:-50000}:0"
     networks:

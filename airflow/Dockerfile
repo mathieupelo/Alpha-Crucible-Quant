@@ -16,8 +16,16 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /
 
 USER airflow
 
-# Install additional Python packages if needed
+# Install additional Python packages for backtest execution
 RUN pip install --no-cache-dir \
     psycopg2-binary \
-    docker
+    docker \
+    mysql-connector-python \
+    pandas \
+    numpy \
+    python-dotenv \
+    yfinance \
+    cvxopt \
+    fastapi \
+    pydantic
 

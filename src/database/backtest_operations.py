@@ -278,7 +278,12 @@ class BacktestOperationsMixin:
             query += " AND date <= %s"
             params.append(end_date)
         
-        query += " ORDER BY run_id, date"
+        # Optimize ORDER BY: if filtering by run_id, only need to order by date
+        # The unique index on (run_id, date) will be used efficiently
+        if run_id:
+            query += " ORDER BY date"
+        else:
+            query += " ORDER BY run_id, date"
         
         return self.execute_query(query, tuple(params) if params else None)
 

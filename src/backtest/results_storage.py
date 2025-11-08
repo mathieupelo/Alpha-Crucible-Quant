@@ -12,7 +12,8 @@ from datetime import date, datetime
 from typing import List
 import pandas as pd
 
-from .models import BacktestResult, BacktestNav, Portfolio, PortfolioPosition
+from .models import BacktestResult
+from src.database.models import BacktestNav, Portfolio, PortfolioPosition
 from .config import BacktestConfig
 
 logger = logging.getLogger(__name__)

@@ -171,7 +171,7 @@ class DatabaseService:
             raise
     
     def get_backtest_portfolios(self, run_id: str) -> List[Dict[str, Any]]:
-        """Get all portfolios for a backtest."""
+        """Get all portfolios for a backtest (optimized with batch fetching)."""
         try:
             portfolios_df = self.db_manager.get_portfolios(run_id=run_id)
             
@@ -180,16 +180,45 @@ class DatabaseService:
             
             portfolios = portfolios_df.to_dict('records')
             
-            # Parse JSON fields and add position count and universe information for each portfolio
+            # Batch fetch all positions for all portfolios
+            portfolio_ids = [int(p['id']) for p in portfolios]
+            all_positions_df = self.db_manager.get_portfolio_positions(portfolio_ids=portfolio_ids)
+            
+            # Group positions by portfolio_id for quick lookup (more efficient than filtering in loop)
+            positions_by_portfolio = {}
+            if not all_positions_df.empty:
+                grouped = all_positions_df.groupby('portfolio_id')
+                for portfolio_id in portfolio_ids:
+                    if portfolio_id in grouped.groups:
+                        positions_by_portfolio[portfolio_id] = grouped.get_group(portfolio_id)
+                    else:
+                        positions_by_portfolio[portfolio_id] = pd.DataFrame()
+            
+            # Batch fetch all universes
+            universe_ids = list(set(int(p.get('universe_id', 0)) for p in portfolios if p.get('universe_id')))
+            universes_df = self.db_manager.get_universes_by_ids(universe_ids) if universe_ids else pd.DataFrame()
+            
+            # Create universe lookup dictionary
+            universe_lookup = {}
+            if not universes_df.empty:
+                for _, row in universes_df.iterrows():
+                    universe_lookup[int(row['id'])] = str(row['name'])
+            
+            # Process portfolios with pre-fetched data
             for portfolio in portfolios:
                 portfolio['params'] = self._parse_json_field(portfolio.get('params'))
-                positions_df = self.db_manager.get_portfolio_positions(portfolio['id'])
-                portfolio['position_count'] = len(positions_df)
-                # total_value is already in the database, no need to override it
                 
-                # Get universe information
-                universe = self.db_manager.get_universe_by_id(portfolio.get('universe_id'))
-                portfolio['universe_name'] = universe.name if universe else "Unknown Universe"
+                # Get position count from pre-fetched data
+                portfolio_id = int(portfolio['id'])
+                positions_df = positions_by_portfolio.get(portfolio_id, pd.DataFrame())
+                portfolio['position_count'] = len(positions_df)
+                
+                # Get universe name from pre-fetched data
+                universe_id = portfolio.get('universe_id')
+                if universe_id:
+                    portfolio['universe_name'] = universe_lookup.get(int(universe_id), "Unknown Universe")
+                else:
+                    portfolio['universe_name'] = "Unknown Universe"
             
             return portfolios
             

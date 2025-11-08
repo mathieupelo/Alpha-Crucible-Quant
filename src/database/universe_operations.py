@@ -26,6 +26,7 @@ class UniverseOperationsMixin:
         ON CONFLICT (name) DO UPDATE SET
             description = EXCLUDED.description,
             updated_at = EXCLUDED.updated_at
+        RETURNING id
         """
         
         params = (
@@ -156,6 +157,7 @@ class UniverseOperationsMixin:
         VALUES (%s, %s, %s)
         ON CONFLICT (universe_id, ticker) DO UPDATE SET
             added_at = EXCLUDED.added_at
+        RETURNING id
         """
         
         params = (

@@ -2,73 +2,54 @@
 
 This document provides an overview of all documentation files and their purposes.
 
-## Current/Active Documentation
+## Core Documentation
 
 ### Getting Started
 - **`README.md`** (root) - Main project README with quick start guide
-- **`docs/QUICK_START_DEVELOPMENT.md`** - Fast development setup guide
-- **`docs/USAGE.md`** - Complete usage instructions
-- **`docs/RUN.md`** - Comprehensive run/deployment guide
+- **`docs/DEVELOPMENT.md`** - Development workflow and local setup
+- **`docs/DEPLOYMENT.md`** - Deployment guide for all environments
+- **`docs/USAGE.md`** - Complete usage instructions and examples
 
 ### Architecture & Design
 - **`docs/ARCHITECTURE.md`** - System architecture overview
 - **`docs/DIRECTORY_STRUCTURE.md`** - Codebase organization
-- **`docs/NGINX_CONFIG.md`** - Nginx configuration documentation
 
 ### API & Features
 - **`docs/API.md`** - REST API endpoints documentation
-- **`docs/UNIVERSE_MANAGEMENT.md`** - Universe management guide
-- **`docs/PORTFOLIO_STORAGE.md`** - Portfolio storage documentation
-- **`docs/FORWARD_FILL_SIGNALS.md`** - Forward-fill signals documentation
-- **`docs/EQUAL_WEIGHT_BENCHMARK.md`** - Equal-weight benchmark documentation
-- **`docs/DYNAMIC_SIGNAL_COLUMNS.md`** - Dynamic signal columns documentation
-- **`docs/RATE_LIMITING.md`** - Rate limiting documentation
+- **`docs/FEATURES.md`** - Key features and their implementation
 
-### Deployment
-- **`docs/DEPLOYMENT.md`** - Deployment guide
-- **`docs/DOCKER_DEPLOYMENT.md`** - Docker-specific deployment
-- **`docs/NEWS_SETUP.md`** - News feature setup guide
-
-### Development
-- **`docs/DEVELOPMENT_WORKFLOW.md`** - Development workflow quick reference
-- **`docs/DEVELOPMENT_IMPROVEMENTS.md`** - Development improvements details
-- **`scripts/README.md`** - Scripts directory documentation
-
-## Historical/Reference Documentation
-
-These documents are kept for historical reference but may contain outdated information:
-
-- **`docs/ANALYSIS_REPORT.md`** - One-time codebase analysis report
-- **`docs/IMPROVEMENTS_SUMMARY.md`** - Summary of past improvements (referenced by ANALYSIS_REPORT.md)
+### Specialized Topics
+- **`docs/AIRFLOW.md`** - Airflow setup and usage for scheduled tasks
 
 ## Documentation by Use Case
 
 ### For New Developers
-1. Start with `README.md`
-2. Read `docs/QUICK_START_DEVELOPMENT.md` for fast setup
+1. Start with `README.md` in the project root
+2. Read `docs/DEVELOPMENT.md` for fast local setup
 3. Review `docs/ARCHITECTURE.md` for system overview
-4. Check `docs/DEVELOPMENT_WORKFLOW.md` for daily workflow
+4. Check `docs/DIRECTORY_STRUCTURE.md` for code organization
 
 ### For Deployment
-1. `docs/RUN.md` - Comprehensive deployment guide
-2. `docs/DEPLOYMENT.md` - General deployment
-3. `docs/DOCKER_DEPLOYMENT.md` - Docker-specific
-4. `scripts/README.md` - Available scripts
+1. `docs/DEPLOYMENT.md` - Comprehensive deployment guide covering all options
+2. `scripts/README.md` - Available scripts
 
 ### For API Development
-1. `docs/API.md` - API endpoints
+1. `docs/API.md` - Complete API endpoints reference
 2. `docs/ARCHITECTURE.md` - System design
 3. Backend code in `backend/` directory
 
 ### For Feature Development
-1. Feature-specific docs in `docs/` (e.g., `UNIVERSE_MANAGEMENT.md`)
+1. `docs/FEATURES.md` - Feature documentation
 2. `docs/ARCHITECTURE.md` - System design
 3. `docs/DIRECTORY_STRUCTURE.md` - Code organization
 
+### For Scheduled Tasks
+1. `docs/AIRFLOW.md` - Airflow setup and configuration
+2. `docs/FEATURES.md` - Feature details
+
 ## Notes
 
-- Root-level markdown files (`*.md`) are typically high-level overviews (README.md, CLEANUP_PLAN.md)
+- Root-level markdown files (`*.md`) are typically high-level overviews
 - Detailed documentation is in the `docs/` directory
 - Script documentation is in `scripts/README.md`
-- Historical documents are kept for reference but may be outdated
-
+- All documentation is kept up-to-date with the current system

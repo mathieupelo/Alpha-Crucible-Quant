@@ -17,6 +17,7 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
+        timeout: 900000,  // 15 minutes for long-running backtests
       },
     },
   },

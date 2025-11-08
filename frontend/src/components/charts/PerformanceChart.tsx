@@ -183,7 +183,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
             ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
             : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
           backdropFilter: 'none',
-          borderRadius: 2,
+          borderRadius: 1, // Minimal border radius
           border: '1px solid',
           borderColor: isDarkMode
             ? 'rgba(148, 163, 184, 0.1)'
@@ -325,7 +325,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
             ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
             : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
           backdropFilter: 'none',
-          borderRadius: 3,
+          borderRadius: 1, // Minimal border radius
           border: '1px solid',
           borderColor: isDarkMode
             ? 'rgba(148, 163, 184, 0.1)'
@@ -373,7 +373,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
                 contentStyle={{
                   background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                   border: 'none',
-                  borderRadius: 12,
+                  borderRadius: 1, // Minimal border radius for tooltips
                   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
                   backdropFilter: 'blur(10px)',
                 }}
@@ -455,7 +455,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({
             ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
             : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
           backdropFilter: 'none',
-          borderRadius: 3,
+          borderRadius: 1, // Minimal border radius
           border: '1px solid',
           borderColor: isDarkMode 
             ? 'rgba(148, 163, 184, 0.1)'

@@ -146,7 +146,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
               width="60%" 
               height={40} 
               sx={{ 
-                borderRadius: 2,
+                borderRadius: 1, // Minimal border radius
                 background: isDarkMode 
                   ? 'linear-gradient(90deg, rgba(148, 163, 184, 0.1) 0%, rgba(148, 163, 184, 0.2) 50%, rgba(148, 163, 184, 0.1) 100%)'
                   : 'linear-gradient(90deg, rgba(148, 163, 184, 0.1) 0%, rgba(148, 163, 184, 0.2) 50%, rgba(148, 163, 184, 0.1) 100%)',

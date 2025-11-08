@@ -13,9 +13,18 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
-from typing import List
+from dotenv import load_dotenv
 
-from api import backtests, portfolios, signals, nav, universes, market
+# Load environment variables from .env file
+# Try loading from parent directory (repo root) first, then current directory
+env_path = Path(__file__).parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Fallback to current directory (for Docker)
+    load_dotenv()
+
+from api import backtests, portfolios, signals, nav, universes, market, news
 from models import ErrorResponse
 
 # Configure logging
@@ -24,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Security configuration
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080,https://*.ngrok-free.dev").split(",")
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-API_KEY = os.getenv("API_KEY", "dev-key-change-in-production")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,*.ngrok-free.dev").split(",")
+API_KEY = os.getenv("API_KEY", "my-awesome-key-123")
 
 # Create FastAPI app
 app = FastAPI(
@@ -37,11 +46,33 @@ app = FastAPI(
     openapi_url="/api/openapi.json"
 )
 
-# Security middleware
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=ALLOWED_HOSTS
-)
+# Security middleware - Allow ngrok domains dynamically
+def is_allowed_host(host: str) -> bool:
+    """Check if host is allowed, including dynamic ngrok domains"""
+    if host in ALLOWED_HOSTS:
+        return True
+    # Allow any ngrok domain
+    if host and ('.ngrok-free.dev' in host or '.ngrok.io' in host):
+        return True
+    return False
+
+# Note: FastAPI's TrustedHostMiddleware doesn't support regex patterns
+# For ngrok support, we need to skip this middleware since ngrok domains are dynamic
+# The CORS middleware will handle origin validation properly
+is_production = os.getenv("NODE_ENV") == "production"
+has_ngrok_config = any('.ngrok' in h.lower() for h in ALLOWED_HOSTS)
+
+# Only add TrustedHostMiddleware in production without ngrok
+if is_production and not has_ngrok_config and ALLOWED_HOSTS and ALLOWED_HOSTS != ["localhost", "127.0.0.1"]:
+    # In strict production mode, use host checking
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=ALLOWED_HOSTS
+    )
+    logger.info(f"TrustedHostMiddleware enabled for production with hosts: {ALLOWED_HOSTS}")
+else:
+    # Skip TrustedHostMiddleware for ngrok compatibility and development
+    logger.info("Skipping TrustedHostMiddleware for ngrok/development compatibility")
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -129,6 +160,7 @@ app.include_router(signals.router, prefix="/api", tags=["signals"], dependencies
 app.include_router(nav.router, prefix="/api", tags=["nav"], dependencies=[Depends(verify_api_key)])
 app.include_router(universes.router, prefix="/api", tags=["universes"], dependencies=[Depends(verify_api_key)])
 app.include_router(market.router, prefix="/api", tags=["market"], dependencies=[Depends(verify_api_key)])
+app.include_router(news.router, prefix="/api", tags=["news"], dependencies=[Depends(verify_api_key)])
 
 @app.get("/")
 async def root():

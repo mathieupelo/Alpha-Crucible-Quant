@@ -454,7 +454,12 @@ class RealTimeDataFetcher:
     
     def validate_ticker(self, ticker: str) -> bool:
         """
-        Validate if a ticker symbol is valid.
+        Validate if a ticker symbol is valid by checking yfinance API.
+        
+        NOTE: This is a simple validation method for internal use.
+        For API endpoints, use backend/services/ticker_validation_service.py
+        which provides retry logic and rate limiting.
+        For format validation, use src/utils/data_validation.validate_ticker_list().
         
         Args:
             ticker: Ticker symbol to validate

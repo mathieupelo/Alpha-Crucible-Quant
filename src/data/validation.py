@@ -2,6 +2,11 @@
 Data validation module for the Alpha Crucible Quant system.
 
 Provides comprehensive data validation and quality checks for market data.
+
+NOTE: This module is primarily used in example/utility scripts (e.g., scripts/utils/run_backtest.py).
+For production code, use src/utils/data_validation.py for simpler validation functions.
+This DataValidator class provides more comprehensive validation including outlier detection
+and detailed quality reports, making it useful for data quality checks in scripts.
 """
 
 import pandas as pd

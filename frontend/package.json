@@ -10,20 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.1",
-    "react-query": "^3.39.3",
-    "recharts": "^2.8.0",
-    "@mui/material": "^5.15.0",
-    "@mui/icons-material": "^5.15.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/material": "^5.15.0",
     "@mui/x-data-grid": "^6.18.2",
     "@mui/x-date-pickers": "^6.18.2",
-    "date-fns": "^2.30.0",
     "axios": "^1.6.2",
-    "framer-motion": "^10.16.5"
+    "date-fns": "^2.30.0",
+    "framer-motion": "^10.16.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.20.1",
+    "recharts": "^2.8.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -38,4 +39,3 @@
     "vite": "^5.0.8"
   }
 }
-

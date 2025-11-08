@@ -1,0 +1,98 @@
+# Docker Compose for Development with Hot Reload
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+services:
+  # FastAPI Backend with Hot Reload
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: alpha-crucible-backend-dev
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - PYTHONPATH=/app:/app/src
+      - NODE_ENV=development
+      - API_KEY=${API_KEY}
+    ports:
+      - "8000:8000"
+    networks:
+      - alpha-crucible-network
+    volumes:
+      # Mount source code for hot reload
+      - ./backend:/app:rw
+      - ./src:/app/src:rw
+    env_file:
+      - .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # React Frontend with Hot Reload (Development Mode)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    container_name: alpha-crucible-frontend-dev
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_API_KEY=${API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - alpha-crucible-network
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:rw
+      - ./frontend/public:/app/public:ro
+      - ./frontend/package.json:/app/package.json:ro
+      - ./frontend/package-lock.json:/app/package-lock.json:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/tsconfig.json:/app/tsconfig.json:ro
+      - ./frontend/index.html:/app/index.html:ro
+      # Exclude node_modules from mount (use container's)
+      - /app/node_modules
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Nginx Reverse Proxy (optional for development)
+  nginx:
+    image: nginx:alpine
+    container_name: alpha-crucible-nginx-dev
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - alpha-crucible-network
+    profiles:
+      # Only start nginx when explicitly requested
+      - proxy
+
+networks:
+  alpha-crucible-network:
+    driver: bridge
+

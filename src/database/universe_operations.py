@@ -107,6 +107,15 @@ class UniverseOperationsMixin:
             updated_at=row.get('updated_at')
         )
     
+    def get_universes_by_ids(self, universe_ids: List[int]) -> pd.DataFrame:
+        """Get multiple universes by their IDs (for batch fetching)."""
+        if not universe_ids:
+            return pd.DataFrame()
+        
+        placeholders = ','.join(['%s'] * len(universe_ids))
+        query = f"SELECT * FROM universes WHERE id IN ({placeholders})"
+        return self.execute_query(query, tuple(universe_ids))
+    
     def get_universe_by_name(self, name: str) -> Optional[Universe]:
         """Get a specific universe by name."""
         query = "SELECT * FROM universes WHERE name = %s"

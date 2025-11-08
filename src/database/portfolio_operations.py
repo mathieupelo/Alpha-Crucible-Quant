@@ -134,14 +134,25 @@ class PortfolioOperationsMixin:
         return self.execute_many(query, params_list)
     
     def get_portfolio_positions(self, portfolio_id: Optional[int] = None,
-                               tickers: Optional[List[str]] = None) -> pd.DataFrame:
-        """Retrieve portfolio positions from the database."""
+                               tickers: Optional[List[str]] = None,
+                               portfolio_ids: Optional[List[int]] = None) -> pd.DataFrame:
+        """Retrieve portfolio positions from the database.
+        
+        Args:
+            portfolio_id: Single portfolio ID to filter by
+            tickers: List of tickers to filter by
+            portfolio_ids: List of portfolio IDs to filter by (for batch fetching)
+        """
         query = "SELECT * FROM portfolio_positions WHERE 1=1"
         params = []
         
         if portfolio_id:
             query += " AND portfolio_id = %s"
             params.append(portfolio_id)
+        elif portfolio_ids:
+            placeholders = ','.join(['%s'] * len(portfolio_ids))
+            query += f" AND portfolio_id IN ({placeholders})"
+            params.extend(portfolio_ids)
         
         if tickers:
             placeholders = ','.join(['%s'] * len(tickers))

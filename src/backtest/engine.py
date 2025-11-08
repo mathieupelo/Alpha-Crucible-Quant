@@ -19,6 +19,13 @@ from src.database import DatabaseManager, Backtest, BacktestNav, Portfolio, Port
 from src.utils import PriceFetcher, DateUtils, TradingCalendar
 from src.utils.error_handling import BacktestError, SignalError, validate_signal_scores_completeness
 
+# Import helper modules
+from .data_preparation import BacktestDataPreparation
+from .portfolio_rebalancing import BacktestPortfolioRebalancing
+from .simulation import BacktestSimulation
+from .metrics_calculation import BacktestMetricsCalculator
+from .results_storage import BacktestResultsStorage
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,6 +79,15 @@ class BacktestEngine:
             price_fetcher=self.price_fetcher
         )
         self.trading_calendar = trading_calendar or TradingCalendar()
+        
+        # Initialize helper modules
+        self.data_preparation = BacktestDataPreparation(
+            self.price_fetcher, self.signal_reader, self.trading_calendar
+        )
+        self.portfolio_rebalancing = BacktestPortfolioRebalancing(self.portfolio_service)
+        self.metrics_calculator = BacktestMetricsCalculator()
+        self.results_storage = BacktestResultsStorage(self.database_manager, self.price_fetcher)
+        self.simulation = BacktestSimulation(self.price_fetcher, self.metrics_calculator)
         
         # Data for plotting
         self.strategy_returns = None

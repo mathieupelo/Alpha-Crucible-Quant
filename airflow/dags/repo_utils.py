@@ -105,6 +105,9 @@ def run_repo_container(repo_config: Dict, repo_path: str) -> int:
         'REDDIT_CLIENT_ID': os.getenv('REDDIT_CLIENT_ID', ''),
         'REDDIT_CLIENT_SECRET': os.getenv('REDDIT_CLIENT_SECRET', ''),
         'REDDIT_USER_AGENT': os.getenv('REDDIT_USER_AGENT', ''),
+        # Date range for data processing
+        'START_DATE': os.getenv('START_DATE', ''),
+        'END_DATE': os.getenv('END_DATE', ''),
     }
     
     # Add PYTHONPATH if workdir is specified in repo_config (for module imports)

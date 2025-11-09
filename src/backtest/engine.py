@@ -130,13 +130,15 @@ class BacktestEngine:
                 logger.error("Failed to fetch signal scores")
                 return result
             
-            # Step 3: Validate signal completeness - fail if any missing
+            # Step 3: Check signal completeness - log warnings but don't fail
+            # Missing signals will be handled by filtering tickers during portfolio creation
             try:
                 validate_signal_scores_completeness(tickers, signals, rebalancing_dates, self.signal_reader)
+                logger.info("All required signals are available for all tickers and dates")
             except SignalError as e:
-                logger.error(f"Signal validation failed: {e}")
-                result.error_message = str(e)
-                return result
+                logger.warning(f"Some signal scores are missing: {e}")
+                logger.info("Backtest will proceed with available tickers only. Missing tickers will be excluded from portfolios.")
+                # Don't fail - continue with available data
             
             # Step 4: Create portfolios for all rebalancing dates
             logger.info("Creating portfolios for rebalancing dates...")
@@ -312,19 +314,39 @@ class BacktestEngine:
                     logger.warning(f"No signal scores available for {rebal_date}")
                     continue
                 
+                # Filter out NaN values - only include tickers with actual signal data
+                date_scores_clean = date_scores.iloc[0].dropna()
+                if date_scores_clean.empty:
+                    logger.warning(f"No valid signal scores available for {rebal_date} after filtering NaN values")
+                    continue
+                
+                # Get list of tickers that have data for this date
+                available_tickers = date_scores_clean.index.tolist()
+                logger.debug(f"Date {rebal_date}: {len(available_tickers)} tickers have signal data out of {len(tickers)} total")
+                
+                # Adjust max_weight if we have very few tickers
+                # If we have N tickers, we need max_weight >= 1/N to create a valid portfolio
+                effective_max_weight = config.max_weight
+                min_required_weight = 1.0 / len(available_tickers) if available_tickers else 1.0
+                if min_required_weight > config.max_weight:
+                    effective_max_weight = min_required_weight
+                    logger.info(f"Date {rebal_date}: Adjusting max_weight from {config.max_weight:.2%} to {effective_max_weight:.2%} "
+                              f"to accommodate {len(available_tickers)} tickers with data")
+                
                 # Convert to the format expected by portfolio service
                 combined_scores_df = pd.DataFrame({
                     'asof_date': rebal_date,
-                    'ticker': date_scores.columns,
-                    'score': date_scores.iloc[0].values
+                    'ticker': available_tickers,
+                    'score': date_scores_clean.values
                 })
                 
+                # Only pass tickers that have data for this date
                 portfolio_result = self.portfolio_service.create_portfolio_from_scores(
-                    combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id,
-                    max_weight=config.max_weight
+                    combined_scores_df, available_tickers, rebal_date, config.universe_id, run_id=run_id,
+                    max_weight=effective_max_weight
                 )
                 portfolios_created.append(portfolio_result)
-                logger.info(f"Created portfolio for {rebal_date}")
+                logger.info(f"Created portfolio for {rebal_date} with {len(available_tickers)} tickers")
             except Exception as e:
                 error_msg = f"Failed to create portfolio for {rebal_date}: {e}"
                 logger.error(error_msg)
@@ -1256,7 +1278,12 @@ class BacktestEngine:
                         required_signals = set(signals)
                         
                         if available_signals == required_signals:
-                            combined_score = date_signals['value'].mean()
+                            # Filter out NULL/NaN values before calculating mean
+                            valid_values = date_signals['value'].dropna()
+                            if valid_values.empty:
+                                logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                                continue
+                            combined_score = valid_values.mean()
                         else:
                             logger.warning(f"Missing signals for {ticker} on {asof_date}. "
                                          f"Available: {available_signals}, Required: {required_signals}")
@@ -1267,25 +1294,36 @@ class BacktestEngine:
                         total_weight = 0
                         weighted_sum = 0
                         for _, row in date_signals.iterrows():
+                            # Skip NULL/NaN values
+                            signal_value = row['value']
+                            if pd.isna(signal_value) or signal_value is None:
+                                continue
                             weight = weights.get(row['signal_name'], 1.0)
-                            weighted_sum += row['value'] * weight
+                            weighted_sum += signal_value * weight
                             total_weight += weight
-                        combined_score = weighted_sum / total_weight if total_weight > 0 else 0
+                        combined_score = weighted_sum / total_weight if total_weight > 0 else None
                         
                     elif config.signal_combination_method == 'zscore':
                         # Z-score normalization
-                        values = date_signals['value'].values
-                        if len(values) > 1:
-                            mean_val = np.mean(values)
-                            std_val = np.std(values)
-                            combined_score = (values - mean_val) / std_val if std_val > 0 else 0
+                        # Filter out NULL/NaN values
+                        valid_values = date_signals['value'].dropna().values
+                        if len(valid_values) == 0:
+                            logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                            continue
+                        elif len(valid_values) > 1:
+                            mean_val = np.mean(valid_values)
+                            std_val = np.std(valid_values)
+                            combined_score = (valid_values - mean_val) / std_val if std_val > 0 else 0
+                            # For zscore, we take the mean of normalized values
+                            combined_score = np.mean(combined_score)
                         else:
-                            combined_score = values[0] if len(values) == 1 else 0
+                            combined_score = valid_values[0]
                     else:
                         logger.warning(f"Unknown combination method: {config.signal_combination_method}")
                         continue
                     
-                    if not np.isnan(combined_score):
+                    # Skip if combined_score is NULL, NaN, or None
+                    if combined_score is not None and not (isinstance(combined_score, (int, float)) and np.isnan(combined_score)):
                         combined_scores.append({
                             'asof_date': asof_date,
                             'ticker': ticker,

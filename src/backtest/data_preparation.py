@@ -312,7 +312,12 @@ class BacktestDataPreparation:
                         required_signals = set(signals)
                         
                         if available_signals == required_signals:
-                            combined_score = date_signals['value'].mean()
+                            # Filter out NULL/NaN values before calculating mean
+                            valid_values = date_signals['value'].dropna()
+                            if valid_values.empty:
+                                logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                                continue
+                            combined_score = valid_values.mean()
                         else:
                             logger.warning(f"Missing signals for {ticker} on {asof_date}. "
                                          f"Available: {available_signals}, Required: {required_signals}")
@@ -323,25 +328,36 @@ class BacktestDataPreparation:
                         total_weight = 0
                         weighted_sum = 0
                         for _, row in date_signals.iterrows():
+                            # Skip NULL/NaN values
+                            signal_value = row['value']
+                            if pd.isna(signal_value) or signal_value is None:
+                                continue
                             weight = weights.get(row['signal_name'], 1.0)
-                            weighted_sum += row['value'] * weight
+                            weighted_sum += signal_value * weight
                             total_weight += weight
-                        combined_score = weighted_sum / total_weight if total_weight > 0 else 0
+                        combined_score = weighted_sum / total_weight if total_weight > 0 else None
                         
                     elif config.signal_combination_method == 'zscore':
                         # Z-score normalization
-                        values = date_signals['value'].values
-                        if len(values) > 1:
-                            mean_val = np.mean(values)
-                            std_val = np.std(values)
-                            combined_score = (values - mean_val) / std_val if std_val > 0 else 0
+                        # Filter out NULL/NaN values
+                        valid_values = date_signals['value'].dropna().values
+                        if len(valid_values) == 0:
+                            logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                            continue
+                        elif len(valid_values) > 1:
+                            mean_val = np.mean(valid_values)
+                            std_val = np.std(valid_values)
+                            combined_score = (valid_values - mean_val) / std_val if std_val > 0 else 0
+                            # For zscore, we take the mean of normalized values
+                            combined_score = np.mean(combined_score)
                         else:
-                            combined_score = values[0] if len(values) == 1 else 0
+                            combined_score = valid_values[0]
                     else:
                         logger.warning(f"Unknown combination method: {config.signal_combination_method}")
                         continue
                     
-                    if not np.isnan(combined_score):
+                    # Skip if combined_score is NULL, NaN, or None
+                    if combined_score is not None and not (isinstance(combined_score, (int, float)) and np.isnan(combined_score)):
                         combined_scores.append({
                             'asof_date': asof_date,
                             'ticker': ticker,

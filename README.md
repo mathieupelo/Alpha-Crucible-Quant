@@ -45,12 +45,59 @@ This system is part of a two-repository architecture:
 ## 🚀 Quick Start
 
 ### **Prerequisites**
-- Docker and Docker Compose
 - Node.js 18+ (for development)
 - Python 3.11+ (for development)
 - PostgreSQL database (Supabase recommended)
+- Docker and Docker Compose (for production/testing)
 
-### **Option 1: Docker Deployment (Recommended)**
+### **⚡ Fastest: Local Development (Recommended for Daily Work)**
+
+**Start both frontend and backend instantly with hot reload:**
+
+```bash
+# Windows
+scripts\dev_all.bat
+
+# Or start individually:
+scripts\dev_backend.bat    # Terminal 1: Backend
+scripts\dev_frontend.bat   # Terminal 2: Frontend
+```
+
+**Access:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/api/docs
+
+**Benefits:**
+- ⚡ **Instant hot reload** (changes reflect in < 1 second)
+- 🚀 **Fast startup** (< 5 seconds)
+- 🔧 **Better debugging experience**
+- 📝 **See [Quick Start Guide](docs/QUICK_START_DEVELOPMENT.md) for details**
+
+**Initial Setup (one-time):**
+```bash
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
+cd frontend && npm install && cd ..
+```
+
+### **🐳 Docker Development (With Hot Reload)**
+
+For Docker environment with code hot reload:
+
+```bash
+# Uses docker-compose.dev.yml with volume mounts
+scripts\dev_docker.bat
+```
+
+### **🐳 Docker Production (Full Stack Testing)**
+
+For production-like testing:
 
 ```bash
 # Clone the repository
@@ -69,26 +116,9 @@ docker-compose up -d
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/api/docs
 # Nginx Proxy: http://localhost:8080
-```
 
-### **Option 2: Development Setup**
-
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
-pip install -r backend/requirements.txt
-
-# Install Node.js dependencies
-cd frontend && npm install && cd ..
-
-# Setup database
-python scripts/setup_database.py
-
-# Start backend (Terminal 1)
-cd backend && python main.py
-
-# Start frontend (Terminal 2)
-cd frontend && npm run dev
+# For external access via ngrok
+scripts\prepare_and_start_ngrok_final.bat
 ```
 
 ## 📊 Database Schema

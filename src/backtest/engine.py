@@ -19,6 +19,13 @@ from src.database import DatabaseManager, Backtest, BacktestNav, Portfolio, Port
 from src.utils import PriceFetcher, DateUtils, TradingCalendar
 from src.utils.error_handling import BacktestError, SignalError, validate_signal_scores_completeness
 
+# Import helper modules
+from .data_preparation import BacktestDataPreparation
+from .portfolio_rebalancing import BacktestPortfolioRebalancing
+from .simulation import BacktestSimulation
+from .metrics_calculation import BacktestMetricsCalculator
+from .results_storage import BacktestResultsStorage
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,6 +80,15 @@ class BacktestEngine:
         )
         self.trading_calendar = trading_calendar or TradingCalendar()
         
+        # Initialize helper modules
+        self.data_preparation = BacktestDataPreparation(
+            self.price_fetcher, self.signal_reader, self.trading_calendar
+        )
+        self.portfolio_rebalancing = BacktestPortfolioRebalancing(self.portfolio_service)
+        self.metrics_calculator = BacktestMetricsCalculator()
+        self.results_storage = BacktestResultsStorage(self.database_manager, self.price_fetcher)
+        self.simulation = BacktestSimulation(self.price_fetcher, self.metrics_calculator)
+        
         # Data for plotting
         self.strategy_returns = None
         self.benchmark_returns = None
@@ -114,13 +130,15 @@ class BacktestEngine:
                 logger.error("Failed to fetch signal scores")
                 return result
             
-            # Step 3: Validate signal completeness - fail if any missing
+            # Step 3: Check signal completeness - log warnings but don't fail
+            # Missing signals will be handled by filtering tickers during portfolio creation
             try:
                 validate_signal_scores_completeness(tickers, signals, rebalancing_dates, self.signal_reader)
+                logger.info("All required signals are available for all tickers and dates")
             except SignalError as e:
-                logger.error(f"Signal validation failed: {e}")
-                result.error_message = str(e)
-                return result
+                logger.warning(f"Some signal scores are missing: {e}")
+                logger.info("Backtest will proceed with available tickers only. Missing tickers will be excluded from portfolios.")
+                # Don't fail - continue with available data
             
             # Step 4: Create portfolios for all rebalancing dates
             logger.info("Creating portfolios for rebalancing dates...")
@@ -157,7 +175,20 @@ class BacktestEngine:
             if 'result' in locals():
                 result.execution_time_seconds = time.time() - start_time
                 result.error_message = str(e)
-            return result
+                return result
+            else:
+                # If result was never created, create a minimal error result
+                from .models import BacktestResult
+                error_result = BacktestResult(
+                    backtest_id=f"error_{int(time.time())}",
+                    start_date=config.start_date,
+                    end_date=config.end_date,
+                    tickers=tickers,
+                    signals=signals,
+                    error_message=str(e),
+                    execution_time_seconds=time.time() - start_time
+                )
+                return error_result
     
     def _initialize_backtest(self, tickers: List[str], signals: List[str], 
                            config: BacktestConfig) -> Tuple[str, BacktestResult]:
@@ -203,10 +234,46 @@ class BacktestEngine:
         
         # Store backtest configuration in database
         try:
-            self.database_manager.store_backtest(backtest_config)
+            # Convert signal names to signal IDs for the signals table
+            signal_ids = []
+            signal_weights_dict = {}
+            if signals:
+                logger.info(f"Converting {len(signals)} signal names to signal IDs...")
+                for signal_name in signals:
+                    try:
+                        signal_obj = self.database_manager.get_signal_by_name(signal_name)
+                        if signal_obj:
+                            signal_ids.append(signal_obj.id)
+                            # Map signal name weights to signal ID weights
+                            weight = config.signal_weights.get(signal_name, 1.0) if config.signal_weights else 1.0
+                            signal_weights_dict[signal_obj.id] = weight
+                            logger.debug(f"Found signal '{signal_name}' -> ID {signal_obj.id}")
+                        else:
+                            # Signal doesn't exist, try to create it
+                            logger.warning(f"Signal '{signal_name}' not found in database, creating it...")
+                            signal_obj = self.database_manager.get_or_create_signal(signal_name)
+                            signal_ids.append(signal_obj.id)
+                            weight = config.signal_weights.get(signal_name, 1.0) if config.signal_weights else 1.0
+                            signal_weights_dict[signal_obj.id] = weight
+                            logger.info(f"Created signal '{signal_name}' -> ID {signal_obj.id}")
+                    except Exception as sig_error:
+                        # If signal lookup fails, log but continue - we'll store backtest without signal relationships
+                        logger.error(f"Error looking up signal '{signal_name}': {sig_error}")
+                        logger.warning(f"Will store backtest without signal relationship for '{signal_name}'")
+            
+            # Store backtest with signal relationships if we have any
+            if signal_ids:
+                logger.info(f"Storing backtest with {len(signal_ids)} signal relationships...")
+                self.database_manager.store_backtest(backtest_config, signal_ids=signal_ids, signal_weights=signal_weights_dict)
+            else:
+                # No signals or couldn't resolve them, store without signal relationships
+                logger.info("Storing backtest without signal relationships (signals parameter was None or empty)")
+                self.database_manager.store_backtest(backtest_config)
             logger.info(f"Stored backtest configuration with run_id: {run_id}")
         except Exception as e:
             logger.error(f"Error storing backtest configuration: {e}")
+            logger.exception("Full exception traceback:")
+            raise  # Re-raise to be caught by outer exception handler
         
         # Initialize result
         result = BacktestResult(
@@ -247,19 +314,39 @@ class BacktestEngine:
                     logger.warning(f"No signal scores available for {rebal_date}")
                     continue
                 
+                # Filter out NaN values - only include tickers with actual signal data
+                date_scores_clean = date_scores.iloc[0].dropna()
+                if date_scores_clean.empty:
+                    logger.warning(f"No valid signal scores available for {rebal_date} after filtering NaN values")
+                    continue
+                
+                # Get list of tickers that have data for this date
+                available_tickers = date_scores_clean.index.tolist()
+                logger.debug(f"Date {rebal_date}: {len(available_tickers)} tickers have signal data out of {len(tickers)} total")
+                
+                # Adjust max_weight if we have very few tickers
+                # If we have N tickers, we need max_weight >= 1/N to create a valid portfolio
+                effective_max_weight = config.max_weight
+                min_required_weight = 1.0 / len(available_tickers) if available_tickers else 1.0
+                if min_required_weight > config.max_weight:
+                    effective_max_weight = min_required_weight
+                    logger.info(f"Date {rebal_date}: Adjusting max_weight from {config.max_weight:.2%} to {effective_max_weight:.2%} "
+                              f"to accommodate {len(available_tickers)} tickers with data")
+                
                 # Convert to the format expected by portfolio service
                 combined_scores_df = pd.DataFrame({
                     'asof_date': rebal_date,
-                    'ticker': date_scores.columns,
-                    'score': date_scores.iloc[0].values
+                    'ticker': available_tickers,
+                    'score': date_scores_clean.values
                 })
                 
+                # Only pass tickers that have data for this date
                 portfolio_result = self.portfolio_service.create_portfolio_from_scores(
-                    combined_scores_df, tickers, rebal_date, config.universe_id, run_id=run_id,
-                    max_weight=config.max_weight
+                    combined_scores_df, available_tickers, rebal_date, config.universe_id, run_id=run_id,
+                    max_weight=effective_max_weight
                 )
                 portfolios_created.append(portfolio_result)
-                logger.info(f"Created portfolio for {rebal_date}")
+                logger.info(f"Created portfolio for {rebal_date} with {len(available_tickers)} tickers")
             except Exception as e:
                 error_msg = f"Failed to create portfolio for {rebal_date}: {e}"
                 logger.error(error_msg)
@@ -1184,43 +1271,85 @@ class BacktestEngine:
                     if date_signals.empty:
                         continue
                     
+                    # Filter to only include selected signals
+                    # Prefer signal_name_display (from signals table) over signal_name (from signal_raw)
+                    signal_name_col = None
+                    if 'signal_name_display' in date_signals.columns:
+                        signal_name_col = 'signal_name_display'
+                    elif 'signal_name' in date_signals.columns:
+                        signal_name_col = 'signal_name'
+                    
+                    if signal_name_col:
+                        date_signals = date_signals[date_signals[signal_name_col].isin(signals)]
+                        if date_signals.empty:
+                            logger.debug(f"No selected signals found for {ticker} on {asof_date} after filtering")
+                    else:
+                        logger.warning(f"Could not find signal_name column in date_signals for {ticker} on {asof_date}. Available columns: {date_signals.columns.tolist()}")
+                    
+                    if date_signals.empty:
+                        continue
+                    
                     # Apply combination method
                     if config.signal_combination_method == 'equal_weight':
-                        # Only calculate mean if we have all required signals
-                        available_signals = set(date_signals['signal_name'].unique())
-                        required_signals = set(signals)
-                        
-                        if available_signals == required_signals:
-                            combined_score = date_signals['value'].mean()
-                        else:
-                            logger.warning(f"Missing signals for {ticker} on {asof_date}. "
-                                         f"Available: {available_signals}, Required: {required_signals}")
+                        # Filter out NULL/NaN values and average the remaining signals
+                        # Don't require all signals to be present - just average what's available
+                        valid_values = date_signals['value'].dropna()
+                        if valid_values.empty:
+                            logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
                             continue
+                        # Simple average of non-null signals (no reweighting)
+                        combined_score = valid_values.mean()
                             
                     elif config.signal_combination_method == 'weighted':
                         weights = config.signal_weights or {}
-                        total_weight = 0
-                        weighted_sum = 0
+                        # Collect valid signals with their values
+                        valid_signals = []
                         for _, row in date_signals.iterrows():
-                            weight = weights.get(row['signal_name'], 1.0)
-                            weighted_sum += row['value'] * weight
-                            total_weight += weight
-                        combined_score = weighted_sum / total_weight if total_weight > 0 else 0
+                            signal_value = row['value']
+                            # Skip NULL/NaN values
+                            if pd.isna(signal_value) or signal_value is None:
+                                continue
+                            signal_name = row['signal_name']
+                            weight = weights.get(signal_name, 1.0)
+                            valid_signals.append((signal_value, weight))
+                        
+                        if not valid_signals:
+                            logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                            continue
+                        
+                        # Use original weights for non-null signals, but don't reweight
+                        # If user wants equal weighting when signals are missing, average equally
+                        # Otherwise, use weighted average with original weights
+                        if len(valid_signals) == len(signals):
+                            # All signals present - use weighted average
+                            weighted_sum = sum(val * weight for val, weight in valid_signals)
+                            total_weight = sum(weight for _, weight in valid_signals)
+                            combined_score = weighted_sum / total_weight if total_weight > 0 else None
+                        else:
+                            # Some signals missing - use equal weight average (don't reweight)
+                            combined_score = np.mean([val for val, _ in valid_signals])
                         
                     elif config.signal_combination_method == 'zscore':
                         # Z-score normalization
-                        values = date_signals['value'].values
-                        if len(values) > 1:
-                            mean_val = np.mean(values)
-                            std_val = np.std(values)
-                            combined_score = (values - mean_val) / std_val if std_val > 0 else 0
+                        # Filter out NULL/NaN values
+                        valid_values = date_signals['value'].dropna().values
+                        if len(valid_values) == 0:
+                            logger.debug(f"All signal values are NULL/NaN for {ticker} on {asof_date}, skipping")
+                            continue
+                        elif len(valid_values) > 1:
+                            mean_val = np.mean(valid_values)
+                            std_val = np.std(valid_values)
+                            combined_score = (valid_values - mean_val) / std_val if std_val > 0 else 0
+                            # For zscore, we take the mean of normalized values
+                            combined_score = np.mean(combined_score)
                         else:
-                            combined_score = values[0] if len(values) == 1 else 0
+                            combined_score = valid_values[0]
                     else:
                         logger.warning(f"Unknown combination method: {config.signal_combination_method}")
                         continue
                     
-                    if not np.isnan(combined_score):
+                    # Skip if combined_score is NULL, NaN, or None
+                    if combined_score is not None and not (isinstance(combined_score, (int, float)) and np.isnan(combined_score)):
                         combined_scores.append({
                             'asof_date': asof_date,
                             'ticker': ticker,

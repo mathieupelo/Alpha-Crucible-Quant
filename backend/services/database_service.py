@@ -13,7 +13,7 @@ import pandas as pd
 import logging
 
 from src.database import DatabaseManager
-from src.database.models import Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
+from src.database.models import Signal, Backtest, BacktestNav, Portfolio, PortfolioPosition, SignalRaw, ScoreCombined, Universe, UniverseTicker
 
 # Import response models
 from models import PositionResponse
@@ -171,7 +171,7 @@ class DatabaseService:
             raise
     
     def get_backtest_portfolios(self, run_id: str) -> List[Dict[str, Any]]:
-        """Get all portfolios for a backtest."""
+        """Get all portfolios for a backtest (optimized with batch fetching)."""
         try:
             portfolios_df = self.db_manager.get_portfolios(run_id=run_id)
             
@@ -180,16 +180,45 @@ class DatabaseService:
             
             portfolios = portfolios_df.to_dict('records')
             
-            # Parse JSON fields and add position count and universe information for each portfolio
+            # Batch fetch all positions for all portfolios
+            portfolio_ids = [int(p['id']) for p in portfolios]
+            all_positions_df = self.db_manager.get_portfolio_positions(portfolio_ids=portfolio_ids)
+            
+            # Group positions by portfolio_id for quick lookup (more efficient than filtering in loop)
+            positions_by_portfolio = {}
+            if not all_positions_df.empty:
+                grouped = all_positions_df.groupby('portfolio_id')
+                for portfolio_id in portfolio_ids:
+                    if portfolio_id in grouped.groups:
+                        positions_by_portfolio[portfolio_id] = grouped.get_group(portfolio_id)
+                    else:
+                        positions_by_portfolio[portfolio_id] = pd.DataFrame()
+            
+            # Batch fetch all universes
+            universe_ids = list(set(int(p.get('universe_id', 0)) for p in portfolios if p.get('universe_id')))
+            universes_df = self.db_manager.get_universes_by_ids(universe_ids) if universe_ids else pd.DataFrame()
+            
+            # Create universe lookup dictionary
+            universe_lookup = {}
+            if not universes_df.empty:
+                for _, row in universes_df.iterrows():
+                    universe_lookup[int(row['id'])] = str(row['name'])
+            
+            # Process portfolios with pre-fetched data
             for portfolio in portfolios:
                 portfolio['params'] = self._parse_json_field(portfolio.get('params'))
-                positions_df = self.db_manager.get_portfolio_positions(portfolio['id'])
-                portfolio['position_count'] = len(positions_df)
-                # total_value is already in the database, no need to override it
                 
-                # Get universe information
-                universe = self.db_manager.get_universe_by_id(portfolio.get('universe_id'))
-                portfolio['universe_name'] = universe.name if universe else "Unknown Universe"
+                # Get position count from pre-fetched data
+                portfolio_id = int(portfolio['id'])
+                positions_df = positions_by_portfolio.get(portfolio_id, pd.DataFrame())
+                portfolio['position_count'] = len(positions_df)
+                
+                # Get universe name from pre-fetched data
+                universe_id = portfolio.get('universe_id')
+                if universe_id:
+                    portfolio['universe_name'] = universe_lookup.get(int(universe_id), "Unknown Universe")
+                else:
+                    portfolio['universe_name'] = "Unknown Universe"
             
             return portfolios
             
@@ -345,27 +374,67 @@ class DatabaseService:
     
     def get_backtest_signals(self, run_id: str, start_date: Optional[date] = None,
                            end_date: Optional[date] = None) -> List[Dict[str, Any]]:
-        """Get raw signals for a backtest period."""
+        """Get raw signals for a backtest period, filtered to only signals used in this backtest."""
         try:
-            # Get backtest to determine date range
+            # Check if backtest exists
             backtest = self.db_manager.get_backtest_by_run_id(run_id)
             if backtest is None:
                 return []
             
+            # Get the signals that were actually used for this backtest from backtest_signals table
+            backtest_signals_df = self.db_manager.get_backtest_signals(run_id)
+            
+            if backtest_signals_df.empty:
+                logger.warning(f"No signals found in backtest_signals table for run_id: {run_id}")
+                return []
+            
+            # Extract signal IDs directly (more reliable than name lookup)
+            signal_ids = []
+            if 'signal_id' in backtest_signals_df.columns:
+                # Convert numpy types to native Python ints to avoid database adapter issues
+                signal_ids = [int(sid) for sid in backtest_signals_df['signal_id'].unique().tolist()]
+            
+            # Also extract signal names for logging
+            signal_names = []
+            if 'signal_name' in backtest_signals_df.columns:
+                signal_names = backtest_signals_df['signal_name'].unique().tolist()
+            
+            if not signal_ids:
+                logger.warning(f"Could not extract signal IDs from backtest_signals for run_id: {run_id}. Columns: {list(backtest_signals_df.columns)}")
+                return []
+            
+            logger.info(f"Found {len(signal_ids)} unique signal(s) for backtest {run_id}: signal_ids={signal_ids}, names={signal_names}")
+            
+            # Get date range if not provided
             if start_date is None:
                 start_date = backtest.start_date
             if end_date is None:
                 end_date = backtest.end_date
             
+            # Get universe tickers for this backtest
+            universe_tickers_df = self.db_manager.get_universe_tickers(backtest.universe_id)
+            tickers = universe_tickers_df['ticker'].tolist() if not universe_tickers_df.empty else []
+            
+            # Get signal raw data filtered by signal IDs (more reliable than names)
             signals_df = self.db_manager.get_signals_raw(
+                tickers=tickers if tickers else None,
+                signal_ids=signal_ids,  # Use signal_ids instead of signal_names for more reliable filtering
                 start_date=start_date,
                 end_date=end_date
             )
             
+            logger.info(f"Retrieved {len(signals_df)} signal records after filtering by signal_ids={signal_ids}")
+            
             if signals_df.empty:
                 return []
-            
-            return signals_df.to_dict('records')
+
+            # Normalize signal name field to avoid mixed naming in frontend
+            signal_records = signals_df.to_dict('records')
+            for rec in signal_records:
+                # Prefer joined signal name over raw table column
+                if 'signal_name_display' in rec and rec['signal_name_display']:
+                    rec['signal_name'] = rec['signal_name_display']
+            return signal_records
             
         except Exception as e:
             logger.error(f"Error getting signals for {run_id}: {e}")
@@ -397,6 +466,55 @@ class DatabaseService:
             
         except Exception as e:
             logger.error(f"Error getting scores for {run_id}: {e}")
+            raise
+
+    def get_backtest_used_signals(self, run_id: str) -> List[Dict[str, Any]]:
+        """Return the list of signals explicitly associated with a backtest (by run_id).
+        
+        Fetches all signals from backtest_signals table and joins with signals table
+        to return the name and description of each signal.
+        """
+        try:
+            # Get backtest signals with join to signals table
+            # get_backtest_signals already performs: SELECT bs.*, s.name as signal_name, s.description as signal_description
+            # FROM backtest_signals bs LEFT JOIN signals s ON bs.signal_id = s.id WHERE bs.run_id = %s
+            df = self.db_manager.get_backtest_signals(run_id)
+            if df.empty:
+                logger.info(f"No backtest_signals records found for run_id: {run_id}")
+                return []
+            
+            # Get unique signal_ids and their corresponding name/description
+            result = []
+            seen_signal_ids = set()
+            
+            for _, row in df.iterrows():
+                signal_id = int(row['signal_id']) if pd.notna(row['signal_id']) else None
+                if signal_id is None or signal_id in seen_signal_ids:
+                    continue
+                
+                seen_signal_ids.add(signal_id)
+                
+                # Extract name from joined signals table (signal_name column)
+                name = None
+                if 'signal_name' in row and pd.notna(row['signal_name']):
+                    name = str(row['signal_name']).strip()
+                
+                # Extract description from joined signals table (signal_description column)
+                description = None
+                if 'signal_description' in row and pd.notna(row['signal_description']):
+                    description = str(row['signal_description']).strip()
+                
+                result.append({
+                    'signal_id': signal_id,
+                    'name': name if name else f"SIGNAL_{signal_id}",
+                    'description': description
+                })
+            
+            logger.info(f"Successfully retrieved {len(result)} unique signal(s) for backtest {run_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting used signals for {run_id}: {e}", exc_info=True)
             raise
     
     def get_backtest_metrics(self, run_id: str) -> Optional[Dict[str, Any]]:
@@ -708,8 +826,57 @@ class DatabaseService:
             logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
             raise
     
+    def get_all_signals(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """Get all signal definitions."""
+        try:
+            signals_df = self.db_manager.get_all_signals(enabled_only=enabled_only)
+            
+            if signals_df.empty:
+                return []
+            
+            signals = []
+            for _, row in signals_df.iterrows():
+                signal_data = {
+                    "id": int(row['id']),
+                    "name": str(row['name']),
+                    "description": str(row.get('description')) if pd.notna(row.get('description')) else None,
+                    "enabled": bool(row.get('enabled', True)),
+                    "parameters": self._parse_json_field(row.get('parameters')),
+                    "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None,
+                    "updated_at": row['updated_at'].isoformat() if pd.notna(row.get('updated_at')) else None
+                }
+                signals.append(signal_data)
+            
+            return signals
+            
+        except Exception as e:
+            logger.error(f"Error getting signals: {e}")
+            raise
+    
+    def get_signal_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get a signal definition by name."""
+        try:
+            signal = self.db_manager.get_signal_by_name(name)
+            if signal is None:
+                return None
+            
+            return {
+                "id": signal.id,
+                "name": signal.name,
+                "description": signal.description,
+                "enabled": signal.enabled,
+                "parameters": signal.parameters,
+                "created_at": signal.created_at.isoformat() if signal.created_at else None,
+                "updated_at": signal.updated_at.isoformat() if signal.updated_at else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting signal {name}: {e}")
+            raise
+    
     def get_signals_raw(self, tickers: Optional[List[str]] = None, 
                        signal_names: Optional[List[str]] = None,
+                       signal_ids: Optional[List[int]] = None,
                        start_date: Optional[date] = None, 
                        end_date: Optional[date] = None) -> List[Dict[str, Any]]:
         """Get raw signals with optional filtering."""
@@ -717,6 +884,7 @@ class DatabaseService:
             signals_df = self.db_manager.get_signals_raw(
                 tickers=tickers,
                 signal_names=signal_names,
+                signal_ids=signal_ids,
                 start_date=start_date,
                 end_date=end_date
             )
@@ -731,7 +899,8 @@ class DatabaseService:
                     "id": int(row.get('id')) if pd.notna(row.get('id')) else None,
                     "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
                     "ticker": str(row['ticker']),
-                    "signal_name": str(row['signal_name']),
+                    "signal_id": int(row['signal_id']) if pd.notna(row.get('signal_id')) else None,
+                    "signal_name": str(row.get('signal_name_display') or row.get('signal_name', '')) if pd.notna(row.get('signal_name_display') or row.get('signal_name')) else None,
                     "value": float(row['value']) if pd.notna(row['value']) else None,
                     "metadata": self._parse_json_field(row.get('metadata')),
                     "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None

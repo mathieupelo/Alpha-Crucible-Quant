@@ -5,10 +5,11 @@ FastAPI routes for market data related endpoints.
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
-from datetime import date
+from typing import Optional, List, Dict
+from datetime import date, datetime, timedelta
 import logging
 import pandas as pd
+import yfinance as yf
 
 from security.input_validation import validate_ticker, validate_date_range, validate_numeric_range
 from models import ErrorResponse
@@ -120,4 +121,193 @@ async def get_normalized_market_data(
         raise
     except Exception as e:
         logger.error(f"Error getting normalized market data for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/market-data/live/{symbol}")
+async def get_live_price(symbol: str):
+    """Get live/current price and daily variation for a symbol."""
+    try:
+        # Validate ticker
+        validated_symbol = validate_ticker(symbol)
+        
+        # Fetch live data using yfinance
+        ticker = yf.Ticker(validated_symbol)
+        info = ticker.info
+        
+        # Get current price
+        current_price = info.get('currentPrice') or info.get('regularMarketPrice')
+        previous_close = info.get('previousClose')
+        
+        if current_price is None or previous_close is None:
+            # Fallback: try to get from history
+            try:
+                hist = ticker.history(period="2d")
+                if not hist.empty:
+                    current_price = float(hist['Close'].iloc[-1])
+                    previous_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
+                else:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"No live price data available for symbol {symbol}"
+                    )
+            except Exception as e:
+                logger.error(f"Error fetching live price for {symbol}: {e}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No live price data available for symbol {symbol}"
+                )
+        
+        # Calculate daily variation
+        daily_change = current_price - previous_close
+        daily_change_percent = (daily_change / previous_close) * 100 if previous_close > 0 else 0
+        
+        return {
+            "symbol": validated_symbol,
+            "price": round(current_price, 2),
+            "previous_close": round(previous_close, 2),
+            "daily_change": round(daily_change, 2),
+            "daily_change_percent": round(daily_change_percent, 2),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting live price for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/market-data/live/batch")
+async def get_live_prices_batch(tickers: List[str]):
+    """Get live prices for multiple tickers."""
+    try:
+        results = []
+        
+        for ticker_symbol in tickers:
+            try:
+                validated_symbol = validate_ticker(ticker_symbol)
+                ticker = yf.Ticker(validated_symbol)
+                info = ticker.info
+                
+                current_price = info.get('currentPrice') or info.get('regularMarketPrice')
+                previous_close = info.get('previousClose')
+                
+                if current_price is None or previous_close is None:
+                    # Fallback to history
+                    hist = ticker.history(period="2d")
+                    if not hist.empty:
+                        current_price = float(hist['Close'].iloc[-1])
+                        previous_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
+                    else:
+                        results.append({
+                            "symbol": validated_symbol,
+                            "price": None,
+                            "previous_close": None,
+                            "daily_change": None,
+                            "daily_change_percent": None,
+                            "error": "No data available"
+                        })
+                        continue
+                
+                daily_change = current_price - previous_close
+                daily_change_percent = (daily_change / previous_close) * 100 if previous_close > 0 else 0
+                
+                results.append({
+                    "symbol": validated_symbol,
+                    "price": round(current_price, 2),
+                    "previous_close": round(previous_close, 2),
+                    "daily_change": round(daily_change, 2),
+                    "daily_change_percent": round(daily_change_percent, 2),
+                    "timestamp": datetime.now().isoformat()
+                })
+            except Exception as e:
+                logger.warning(f"Error fetching live price for {ticker_symbol}: {e}")
+                results.append({
+                    "symbol": ticker_symbol,
+                    "price": None,
+                    "previous_close": None,
+                    "daily_change": None,
+                    "daily_change_percent": None,
+                    "error": str(e)
+                })
+        
+        return {
+            "results": results,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting live prices batch: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/market-data/{symbol}/intraday")
+async def get_intraday_price_data(symbol: str):
+    """
+    Get intraday price data for today (5-minute intervals from market open to current time).
+    If market is closed, returns the last trading day's data.
+    
+    Args:
+        symbol: Stock ticker symbol
+        
+    Returns:
+        Intraday price data with timestamps
+    """
+    try:
+        validated_symbol = validate_ticker(symbol)
+        
+        # Fetch intraday data using yfinance (5-minute intervals)
+        ticker = yf.Ticker(validated_symbol)
+        
+        # Get intraday data - yfinance will return the last available trading day if market is closed
+        # Use '1d' period with '5m' interval for intraday
+        intraday_data = ticker.history(period="1d", interval="5m")
+        
+        if intraday_data.empty:
+            # Try to get data from the last 5 days
+            intraday_data = ticker.history(period="5d", interval="5m")
+            if intraday_data.empty:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No intraday data available for symbol {symbol}"
+                )
+            # Use the most recent day's data
+            last_date = intraday_data.index[-1].date()
+            # Filter by date: convert index to date and compare
+            intraday_data = intraday_data[[idx.date() == last_date for idx in intraday_data.index]]
+        
+        # Extract the actual date from the data (use the first timestamp's date)
+        if not intraday_data.empty:
+            data_date = intraday_data.index[0].date()
+        else:
+            data_date = date.today()
+        
+        # Convert to list of dictionaries
+        intraday_points = []
+        for timestamp, row in intraday_data.iterrows():
+            # Convert to ISO format string
+            timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+            intraday_points.append({
+                "timestamp": timestamp_str,
+                "datetime": timestamp.isoformat(),
+                "open": float(row['Open']) if pd.notna(row['Open']) else None,
+                "high": float(row['High']) if pd.notna(row['High']) else None,
+                "low": float(row['Low']) if pd.notna(row['Low']) else None,
+                "close": float(row['Close']) if pd.notna(row['Close']) else None,
+                "volume": int(row['Volume']) if pd.notna(row['Volume']) else 0
+            })
+        
+        return {
+            "symbol": validated_symbol,
+            "date": data_date.isoformat(),
+            "data": intraday_points,
+            "total_points": len(intraday_points),
+            "interval": "5m"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting intraday price data for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

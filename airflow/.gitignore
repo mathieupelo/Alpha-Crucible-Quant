@@ -1,0 +1,11 @@
+logs/
+*.log
+*.pyc
+__pycache__/
+.pytest_cache/
+repos/
+*.pid
+*.sock
+*.err
+*.out
+

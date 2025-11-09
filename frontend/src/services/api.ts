@@ -29,11 +29,20 @@ const getBaseURL = () => {
   if (window.location.hostname.includes('ngrok-free.dev')) {
     return `${window.location.protocol}//${window.location.hostname}/api`;
   }
-  // Use relative URL to go through nginx proxy when accessing via localhost:8080
-  if (window.location.port === '8080' || window.location.hostname === 'localhost') {
+  
+  // If VITE_API_URL is explicitly set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // For development (Vite dev server on any port), use relative URL
+  // This allows Vite's proxy (configured in vite.config.ts) to forward /api requests to backend
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return '/api';
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  
+  // Fallback: use relative URL
+  return '/api';
 };
 
 const api = axios.create({
@@ -46,10 +55,16 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Request interceptor for logging (avoid TS errors in production builds)
 api.interceptors.request.use(
   (config) => {
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // Note: Do not assume header is a string in production builds
+    try {
+      const auth = (config.headers as any)?.['Authorization'];
+      const preview = typeof auth === 'string' ? `${auth.slice(0, 20)}...` : '[hidden]';
+      console.log(`API Key being sent: ${preview}`);
+    } catch { /* noop */ }
     return config;
   },
   (error) => {
@@ -103,6 +118,12 @@ export const backtestApi = {
         end_date: filters?.endDate
       }
     });
+    return response.data;
+  },
+
+  // Get only used signals (definitions) for a backtest
+  getBacktestUsedSignals: async (runId: string): Promise<{ signals: Array<{ signal_id: number; name: string; description?: string }>; total: number; run_id: string }> => {
+    const response = await api.get(`/backtests/${runId}/used-signals`);
     return response.data;
   },
 
@@ -334,6 +355,249 @@ export const marketApi = {
         start_value: startValue
       }
     });
+    return response.data;
+  },
+
+  // Get live price for a symbol
+  getLivePrice: async (symbol: string): Promise<{
+    symbol: string;
+    price: number;
+    previous_close: number;
+    daily_change: number;
+    daily_change_percent: number;
+    timestamp: string;
+  }> => {
+    const response = await api.get(`/market-data/live/${symbol}`);
+    return response.data;
+  },
+
+  // Get live prices for multiple tickers
+  getLivePricesBatch: async (tickers: string[]): Promise<{
+    results: Array<{
+      symbol: string;
+      price: number | null;
+      previous_close: number | null;
+      daily_change: number | null;
+      daily_change_percent: number | null;
+      timestamp?: string;
+      error?: string;
+    }>;
+    timestamp: string;
+  }> => {
+    const response = await api.post('/market-data/live/batch', tickers);
+    return response.data;
+  },
+
+  // Get intraday price data (5-minute intervals)
+  getIntradayPriceData: async (symbol: string): Promise<{
+    symbol: string;
+    date: string;
+    data: Array<{
+      timestamp: string;
+      datetime: string;
+      open: number | null;
+      high: number | null;
+      low: number | null;
+      close: number | null;
+      volume: number;
+    }>;
+    total_points: number;
+    interval: string;
+  }> => {
+    const response = await api.get(`/market-data/${symbol}/intraday`);
+    return response.data;
+  }
+};
+
+// News API calls
+export const newsApi = {
+  // Get news for a universe
+  getUniverseNews: async (universeName: string, maxItems: number = 10): Promise<{
+    universe_name: string;
+    tickers: string[];
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      image_url?: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}`, {
+      params: { max_items: maxItems }
+    });
+    return response.data;
+  },
+
+  // Get news for a specific ticker
+  getTickerNews: async (ticker: string, maxItems: number = 10): Promise<{
+    ticker: string;
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      image_url?: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get(`/news/ticker/${ticker}`, {
+      params: { max_items: maxItems }
+    });
+    return response.data;
+  },
+
+  // Get news for multiple tickers
+  getMultipleTickersNews: async (tickers: string[], maxItems: number = 10): Promise<{
+    tickers: string[];
+    news: Array<{
+      ticker: string;
+      title: string;
+      summary: string;
+      publisher: string;
+      link: string;
+      pub_date: string;
+      image_url?: string;
+      sentiment: {
+        label: string;
+        score: number;
+        label_display: string;
+        scores?: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        };
+      };
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get('/news/tickers', {
+      params: { 
+        tickers: tickers.join(','),
+        max_items: maxItems 
+      }
+    });
+    return response.data;
+  },
+
+  // Get today's news aggregated by ticker
+  getTodayNewsAggregated: async (universeName: string): Promise<{
+    universe_name: string;
+    date: string;
+    tickers: {
+      [ticker: string]: Array<{
+        ticker: string;
+        title: string;
+        summary: string;
+        publisher: string;
+        link: string;
+        pub_date: string;
+        image_url?: string;
+        sentiment: {
+          label: string;
+          score: number;
+          label_display: string;
+        };
+      }>;
+    };
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}/today-aggregated`);
+    return response.data;
+  },
+
+  // Analyze news with GPT-4o-mini
+  analyzeNews: async (request: {
+    ticker: string;
+    title: string;
+    summary: string;
+    sentiment: {
+      label: string;
+      score: number;
+      label_display: string;
+    };
+    price_data: {
+      price: number;
+      previous_close: number;
+      daily_change: number;
+      daily_change_percent: number;
+    };
+    pub_date: string;
+  }): Promise<{
+    ticker: string;
+    analysis: string;
+    model: string;
+    timestamp: string;
+  }> => {
+    const response = await api.post('/news/analyze', request);
+    return response.data;
+  },
+
+  // Get news statistics
+  getNewsStatistics: async (universeName: string): Promise<{
+    universe_name: string;
+    date: string;
+    top_tickers: Array<{
+      ticker: string;
+      avg_sentiment_score: number;
+      positive_count: number;
+      negative_count: number;
+      neutral_count: number;
+      total_news: number;
+    }>;
+    bottom_tickers: Array<{
+      ticker: string;
+      avg_sentiment_score: number;
+      positive_count: number;
+      negative_count: number;
+      neutral_count: number;
+      total_news: number;
+    }>;
+    sector_trends_today: {
+      positive_percent: number;
+      negative_percent: number;
+      neutral_percent: number;
+      total_news: number;
+    };
+    sector_trends_week: {
+      positive_percent: number;
+      negative_percent: number;
+      neutral_percent: number;
+      total_news: number;
+    };
+    time_based_changes: Array<{
+      hour: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      total: number;
+    }>;
+  }> => {
+    const response = await api.get(`/news/universe/${encodeURIComponent(universeName)}/statistics`);
     return response.data;
   }
 };

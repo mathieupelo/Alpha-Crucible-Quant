@@ -13,18 +13,25 @@ import {
   CardContent,
   Button,
   Chip,
-  Divider,
   Alert,
   Skeleton,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Snackbar,
   Drawer,
   useMediaQuery,
   useTheme as useMuiTheme,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -37,16 +44,25 @@ import {
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  Analytics as AnalyticsIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  BarChart as BarChartIcon,
+  Insights as InsightsIcon,
+  Timeline as TimelineIcon,
 } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import { useQuery, useMutation } from 'react-query';
 
-import { backtestApi, navApi } from '@/services/api';
+import { backtestApi, navApi, portfolioApi } from '@/services/api';
 import { Backtest, Portfolio } from '@/types';
 import PerformanceChart from '@/components/charts/PerformanceChart';
 import MetricCard from '@/components/cards/MetricCard';
 import PortfolioDetail from '@/components/tables/PortfolioDetail';
 import Logo from '@/components/common/Logo';
+import AnimatedBackground from '@/components/common/AnimatedBackground';
+import GradientMesh from '@/components/common/GradientMesh';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const SIDEBAR_WIDTH = 320;
@@ -69,6 +85,15 @@ const BacktestManager: React.FC = () => {
     return runId || localStorage.getItem('selected-backtest-id') || '';
   });
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
+  const [expandedSignals, setExpandedSignals] = useState<Set<string>>(new Set());
+  const [expandedPortfolios, setExpandedPortfolios] = useState<Set<number>>(new Set());
+  const [mainTab, setMainTab] = useState(0);
+  const [portfolioScoreData, setPortfolioScoreData] = useState<Map<number, {
+    signals?: any[];
+    scores?: any[];
+    positions?: any[];
+    universeTickers?: string[];
+  }>>(new Map());
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -129,6 +154,34 @@ const BacktestManager: React.FC = () => {
       enabled: !!selectedBacktestId,
     }
   );
+
+  // Fetch ONLY used signal definitions for the selected backtest
+  const {
+    data: usedSignalsData,
+    isLoading: usedSignalsLoading,
+  } = useQuery(
+    ['backtest-used-signals', selectedBacktestId],
+    () => backtestApi.getBacktestUsedSignals(selectedBacktestId),
+    {
+      enabled: !!selectedBacktestId,
+      staleTime: 0,
+      cacheTime: 0,
+    }
+  );
+
+  // Extract unique signals with descriptions (deduped by name)
+  const uniqueSignals = React.useMemo(() => {
+    if (!usedSignalsData?.signals) return [] as Array<{ name: string; description?: string }>;
+    const nameToDescription = new Map<string, string | undefined>();
+    usedSignalsData.signals.forEach(s => {
+      if (!nameToDescription.has(s.name)) {
+        nameToDescription.set(s.name, s.description);
+      }
+    });
+    return Array.from(nameToDescription.entries())
+      .map(([name, description]) => ({ name, description }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [usedSignalsData]);
 
   // Initialize selected backtest from URL or auto-select most recent
   useEffect(() => {
@@ -232,6 +285,48 @@ const BacktestManager: React.FC = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  const toggleSignalExpansion = (signalName: string) => {
+    setExpandedSignals(prev => {
+      const next = new Set(prev);
+      if (next.has(signalName)) {
+        next.delete(signalName);
+      } else {
+        next.add(signalName);
+      }
+      return next;
+    });
+  };
+
+  const togglePortfolioExpansion = async (portfolioId: number) => {
+    setExpandedPortfolios(prev => {
+      const next = new Set(prev);
+      if (next.has(portfolioId)) {
+        next.delete(portfolioId);
+      } else {
+        next.add(portfolioId);
+        // Fetch portfolio score data when expanding
+        if (!portfolioScoreData.has(portfolioId)) {
+          Promise.all([
+            portfolioApi.getPortfolioSignals(portfolioId),
+            portfolioApi.getPortfolioScores(portfolioId),
+            portfolioApi.getPortfolioUniverseTickers(portfolioId),
+            portfolioApi.getPortfolioPositions(portfolioId),
+          ]).then(([signals, scores, universeTickers, positions]) => {
+            setPortfolioScoreData(prev => new Map(prev).set(portfolioId, {
+              signals: signals.signals,
+              scores: scores.scores,
+              positions: positions.positions,
+              universeTickers: universeTickers.tickers,
+            }));
+          }).catch(err => {
+            console.error('Error fetching portfolio score data:', err);
+          });
+        }
+      }
+      return next;
+    });
+  };
+
   if (backtestsError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -321,13 +416,13 @@ const BacktestManager: React.FC = () => {
           },
           '&::-webkit-scrollbar-track': {
             background: isDarkMode ? '#1e293b' : '#f1f5f9',
-            borderRadius: '3px',
+            borderRadius: '1px', // Minimal border radius
           },
           '&::-webkit-scrollbar-thumb': {
             background: isDarkMode 
               ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
               : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-            borderRadius: '3px',
+            borderRadius: '1px', // Minimal border radius
             '&:hover': {
               background: isDarkMode 
                 ? 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)'
@@ -342,7 +437,7 @@ const BacktestManager: React.FC = () => {
                   key={index} 
                   variant="rectangular" 
                   height={80} 
-                  sx={{ mb: 1, borderRadius: 2 }} 
+                  sx={{ mb: 1, borderRadius: 1 }} // Minimal border radius 
                 />
               ))}
             </Box>
@@ -457,18 +552,19 @@ const BacktestManager: React.FC = () => {
       display: 'flex', 
       height: '100vh', 
       overflow: 'hidden',
+      position: 'relative',
       '&::-webkit-scrollbar': {
         width: '8px',
       },
       '&::-webkit-scrollbar-track': {
         background: isDarkMode ? '#1e293b' : '#f1f5f9',
-        borderRadius: '4px',
+        borderRadius: '1px', // Minimal border radius
       },
       '&::-webkit-scrollbar-thumb': {
         background: isDarkMode 
           ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
           : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-        borderRadius: '4px',
+        borderRadius: '1px', // Minimal border radius
         border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
         '&:hover': {
           background: isDarkMode 
@@ -477,6 +573,10 @@ const BacktestManager: React.FC = () => {
         },
       },
     }}>
+      {/* Animated Backgrounds */}
+      <GradientMesh />
+      <AnimatedBackground />
+
       {/* Sidebar */}
       {isMobile ? (
         <Drawer
@@ -487,9 +587,12 @@ const BacktestManager: React.FC = () => {
             '& .MuiDrawer-paper': {
               width: SIDEBAR_WIDTH,
               background: isDarkMode 
-                ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-                : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                ? 'rgba(30, 41, 59, 0.95)'
+                : 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
               border: 'none',
+              position: 'relative',
+              zIndex: 2,
             },
           }}
         >
@@ -501,12 +604,15 @@ const BacktestManager: React.FC = () => {
             width: sidebarCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH,
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             background: isDarkMode 
-              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-            borderRight: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'}`,
+              ? 'rgba(30, 41, 59, 0.95)'
+              : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRight: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)'}`,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            position: 'relative',
+            zIndex: 2,
           }}
         >
           {sidebarContent}
@@ -523,13 +629,14 @@ const BacktestManager: React.FC = () => {
             left: 16,
             zIndex: 1300,
             background: isDarkMode 
-              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
-              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              ? 'rgba(30, 41, 59, 0.95)'
+              : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
             border: `1px solid ${isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'}`,
             '&:hover': {
               background: isDarkMode 
-                ? 'linear-gradient(145deg, #334155 0%, #475569 100%)'
-                : 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+                ? 'rgba(51, 65, 85, 0.95)'
+                : 'rgba(248, 250, 252, 0.95)',
             },
           }}
         >
@@ -542,18 +649,21 @@ const BacktestManager: React.FC = () => {
         flex: 1, 
         overflow: 'auto', 
         p: 3,
+        pb: 10,
+        position: 'relative',
+        zIndex: 1,
         '&::-webkit-scrollbar': {
           width: '8px',
         },
         '&::-webkit-scrollbar-track': {
           background: isDarkMode ? '#1e293b' : '#f1f5f9',
-          borderRadius: '4px',
+          borderRadius: '1px', // Minimal border radius
         },
         '&::-webkit-scrollbar-thumb': {
           background: isDarkMode 
             ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
             : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-          borderRadius: '4px',
+          borderRadius: '1px', // Minimal border radius
           border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
           '&:hover': {
             background: isDarkMode 
@@ -584,7 +694,7 @@ const BacktestManager: React.FC = () => {
         ) : (
           <Box>
             {/* Header */}
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Button
                   startIcon={<ArrowBackIcon />}
@@ -598,42 +708,41 @@ const BacktestManager: React.FC = () => {
               {backtestLoading ? (
                 <Skeleton variant="rectangular" height={60} />
               ) : backtest ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box>
-                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-                      {backtest.name || backtest.run_id}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      {backtest.start_date} to {backtest.end_date}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Universe: {backtest.universe_name || 'Unknown'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Chip 
-                      label={backtest.frequency} 
-                      color="primary" 
-                      variant="outlined"
-                      size="medium"
-                    />
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={handleDeleteBacktest}
-                      disabled={deleteBacktestMutation.isLoading}
-                      sx={{
-                        '&:hover': {
-                          backgroundColor: 'error.light',
-                          color: 'white'
-                        }
-                      }}
-                    >
-                      Delete Backtest
-                    </Button>
-                  </Box>
-                </Box>
+                <Card sx={{ mb: 3, background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                      <Box sx={{ flex: 1, minWidth: 300 }}>
+                        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+                          {backtest.name || backtest.run_id}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {backtest.start_date} to {backtest.end_date}
+                          </Typography>
+                          <Chip 
+                            label={backtest.frequency} 
+                            color="primary" 
+                            variant="outlined"
+                            size="small"
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            Universe: {backtest.universe_name || 'Unknown'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={handleDeleteBacktest}
+                        disabled={deleteBacktestMutation.isLoading}
+                        size="small"
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
               ) : (
                 <Alert severity="warning">
                   Backtest not found.
@@ -641,136 +750,459 @@ const BacktestManager: React.FC = () => {
               )}
             </Box>
 
-            {/* Performance Metrics */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <MetricCard
-                  title="Total Return"
-                  value={metrics?.total_return}
-                  unit="%"
-                  icon={<TrendingUpIcon />}
-                  color="success"
-                  loading={metricsLoading}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <MetricCard
-                  title="Sharpe Ratio"
-                  value={metrics?.sharpe_ratio}
-                  icon={<AssessmentIcon />}
-                  color="primary"
-                  loading={metricsLoading}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <MetricCard
-                  title="Max Drawdown"
-                  value={metrics?.max_drawdown}
-                  unit="%"
-                  icon={<ShowChartIcon />}
-                  color="error"
-                  loading={metricsLoading}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <MetricCard
-                  title="Volatility"
-                  value={metrics?.volatility}
-                  unit="%"
-                  icon={<SpeedIcon />}
-                  color="warning"
-                  loading={metricsLoading}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Performance Chart */}
-            <Box sx={{ mb: 20, pb: 5 }}>
-              <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                Performance Overview
-              </Typography>
-              {navLoading ? (
-                <Skeleton variant="rectangular" height={450} />
-              ) : (
-                <Box sx={{ mb: 5 }}>
-                  <PerformanceChart
-                    data={navData?.nav_data || []}
-                    height={450}
-                    showBenchmark={true}
-                    backtestStartDate={backtest?.start_date}
-                    backtestEndDate={backtest?.end_date}
-                  />
+            {/* Main Tabbed Content */}
+            {backtest && (
+              <Card sx={{ background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs 
+                    value={mainTab} 
+                    onChange={(_, newValue) => setMainTab(newValue)}
+                    sx={{
+                      '& .MuiTab-root': {
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        minHeight: 64,
+                      },
+                    }}
+                  >
+                    <Tab icon={<BarChartIcon />} iconPosition="start" label="Overview" />
+                    <Tab icon={<AnalyticsIcon />} iconPosition="start" label="Signals" />
+                    <Tab icon={<AccountBalanceWalletIcon />} iconPosition="start" label="Portfolios" />
+                  </Tabs>
                 </Box>
-              )}
-            </Box>
 
-            {/* Portfolios Section */}
-            <Card sx={{ mb: 4 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Portfolio Rebalancing History
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  {portfoliosData?.total || 0} portfolio rebalances
-                </Typography>
+                {/* Overview Tab */}
+                {mainTab === 0 && (
+                  <CardContent>
+                    {/* Performance Metrics */}
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Total Return"
+                          value={metrics?.total_return}
+                          unit="%"
+                          icon={<TrendingUpIcon />}
+                          color="success"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Sharpe Ratio"
+                          value={metrics?.sharpe_ratio}
+                          icon={<AssessmentIcon />}
+                          color="primary"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Max Drawdown"
+                          value={metrics?.max_drawdown}
+                          unit="%"
+                          icon={<ShowChartIcon />}
+                          color="error"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Volatility"
+                          value={metrics?.volatility}
+                          unit="%"
+                          icon={<SpeedIcon />}
+                          color="warning"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Annualized Return"
+                          value={metrics?.annualized_return}
+                          unit="%"
+                          icon={<TrendingUpIcon />}
+                          color="success"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Win Rate"
+                          value={metrics?.win_rate}
+                          unit="%"
+                          icon={<AssessmentIcon />}
+                          color="primary"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Alpha"
+                          value={metrics?.alpha}
+                          icon={<InsightsIcon />}
+                          color="primary"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <MetricCard
+                          title="Beta"
+                          value={metrics?.beta}
+                          icon={<TimelineIcon />}
+                          color="primary"
+                          loading={metricsLoading}
+                        />
+                      </Grid>
+                    </Grid>
 
-                {portfoliosLoading ? (
-                  <Box>
-                    {[...Array(5)].map((_, index) => (
-                      <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1 }} />
-                    ))}
-                  </Box>
-                ) : (
-                  <List>
-                    {portfoliosData?.portfolios.map((portfolio, index) => (
-                      <React.Fragment key={portfolio.id}>
-                        <ListItem
-                          sx={{
-                            cursor: 'pointer',
-                            borderRadius: 1,
-                            mb: 1,
-                            '&:hover': {
-                              backgroundColor: 'action.hover',
-                            },
-                          }}
-                          onClick={() => handlePortfolioClick(portfolio)}
-                        >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                  {portfolio.asof_date}
-                                </Typography>
-                                <Chip 
-                                  label={portfolio.method} 
-                                  size="small" 
-                                  color="secondary" 
-                                  variant="outlined"
-                                />
-                                <Typography variant="body2" color="text.secondary">
-                                  {portfolio.position_count || 0} positions
-                                </Typography>
-                              </Box>
-                            }
-                            secondary={
-                              <Typography variant="body2" color="text.secondary">
-                                Portfolio ID: {portfolio.id} • Portfolio Value: ${portfolio.total_value?.toFixed(2) || 'N/A'}
-                              </Typography>
-                            }
+                    {/* Performance Chart */}
+                    <Box sx={{ mb: 8, pb: 8 }}>
+                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                        Performance Overview
+                      </Typography>
+                      {navLoading ? (
+                        <Skeleton variant="rectangular" height={450} sx={{ borderRadius: 1 }} /> // Minimal border radius
+                      ) : (
+                        <Box sx={{ pb: 6 }}>
+                          <PerformanceChart
+                            data={navData?.nav_data || []}
+                            height={450}
+                            showBenchmark={true}
+                            backtestStartDate={backtest?.start_date}
+                            backtestEndDate={backtest?.end_date}
                           />
-                          <ListItemSecondaryAction>
-                            <IconButton edge="end" size="small">
-                              <VisibilityIcon />
-                            </IconButton>
-                          </ListItemSecondaryAction>
-                        </ListItem>
-                        {index < (portfoliosData?.portfolios.length || 0) - 1 && <Divider />}
-                      </React.Fragment>
-                    ))}
-                  </List>
+                        </Box>
+                      )}
+                    </Box>
+                  </CardContent>
                 )}
-              </CardContent>
-            </Card>
+
+                {/* Signals Tab */}
+                {mainTab === 1 && (
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Signals Used in This Backtest
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      The following signals were used to create this backtest:
+                    </Typography>
+                    {usedSignalsLoading ? (
+                      <Box>
+                        {[...Array(3)].map((_, index) => (
+                          <Skeleton key={index} variant="rectangular" height={100} sx={{ borderRadius: 1, mb: 2 }} /> // Minimal border radius
+                        ))}
+                      </Box>
+                    ) : uniqueSignals.length > 0 ? (
+                      <Box>
+                        {uniqueSignals.map((signal) => {
+                          const isExpanded = expandedSignals.has(signal.name);
+                          const description = signal.description || 'No description provided';
+                          const needsExpansion = description.length > 150;
+                          
+                          return (
+                            <Card
+                              key={signal.name}
+                              variant="outlined"
+                              sx={{
+                                mb: 2,
+                                background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)',
+                                backdropFilter: 'blur(20px)',
+                                borderColor: isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)',
+                                '&:hover': {
+                                  boxShadow: isDarkMode
+                                    ? '0 8px 24px rgba(0,0,0,0.35)'
+                                    : '0 8px 24px rgba(0,0,0,0.15)',
+                                  borderColor: isDarkMode ? 'rgba(148,163,184,0.40)' : 'rgba(148,163,184,0.50)',
+                                },
+                                transition: 'all 0.2s ease-in-out',
+                              }}
+                            >
+                              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                                      <Chip 
+                                        label={signal.name} 
+                                        size="small" 
+                                        variant="outlined" 
+                                        sx={{ 
+                                          fontWeight: 600, 
+                                          height: 24,
+                                          backgroundColor: isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(147,197,253,0.35)',
+                                          borderColor: isDarkMode ? '#60a5fa' : '#60a5fa',
+                                          color: isDarkMode ? '#bfdbfe' : '#1e40af',
+                                        }} 
+                                      />
+                                    </Box>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{
+                                        lineHeight: 1.6,
+                                        whiteSpace: isExpanded ? 'normal' : 'pre-wrap',
+                                        ...(needsExpansion && !isExpanded && {
+                                          display: '-webkit-box',
+                                          WebkitLineClamp: 3,
+                                          WebkitBoxOrient: 'vertical',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                        }),
+                                      }}
+                                    >
+                                      {description}
+                                    </Typography>
+                                  </Box>
+                                  {needsExpansion && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => toggleSignalExpansion(signal.name)}
+                                      sx={{
+                                        ml: 1.5,
+                                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                                        '&:hover': {
+                                          backgroundColor: isDarkMode ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.08)',
+                                        },
+                                      }}
+                                    >
+                                      {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                    </IconButton>
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Alert severity="info" sx={{ mt: 1 }}>
+                        No signals found for this backtest.
+                      </Alert>
+                    )}
+                  </CardContent>
+                )}
+
+                {/* Portfolios Tab */}
+                {mainTab === 2 && (
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Portfolio Rebalancing History
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      {portfoliosData?.total || 0} portfolio rebalances. Click to expand and view signal scores and combined scores.
+                    </Typography>
+
+                    {portfoliosLoading ? (
+                      <Box>
+                        {[...Array(5)].map((_, index) => (
+                          <Skeleton key={index} variant="rectangular" height={80} sx={{ borderRadius: 1, mb: 2 }} /> // Minimal border radius
+                        ))}
+                      </Box>
+                    ) : portfoliosData && portfoliosData.portfolios.length > 0 ? (
+                      <Box>
+                        {portfoliosData.portfolios.map((portfolio) => {
+                          const isExpanded = expandedPortfolios.has(portfolio.id);
+                          const scoreData = portfolioScoreData.get(portfolio.id);
+                          const universeTickers = scoreData?.universeTickers || [];
+                          const signalData = scoreData?.signals || [];
+                          const combinedScores = scoreData?.scores || [];
+                          const positions = scoreData?.positions || [];
+                          
+                          // Create a map of ticker to weight for quick lookup
+                          const tickerToWeight = new Map<string, number>();
+                          positions.forEach((pos: any) => {
+                            tickerToWeight.set(pos.ticker, pos.weight);
+                          });
+                          
+                          // Get available signals from signal data
+                          const availableSignals = signalData.length > 0 && signalData[0]?.available_signals
+                            ? [...new Set(signalData[0].available_signals as string[])].sort()
+                            : [];
+
+                          return (
+                            <Accordion
+                              key={portfolio.id}
+                              expanded={isExpanded}
+                              onChange={() => togglePortfolioExpansion(portfolio.id)}
+                              sx={{
+                                mb: 2,
+                                background: isDarkMode ? 'rgba(30,41,59,0.85)' : 'rgba(255,255,255,0.95)',
+                                backdropFilter: 'blur(20px)',
+                                '&:before': { display: 'none' },
+                                border: `1px solid ${isDarkMode ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.30)'}`,
+                                boxShadow: isExpanded 
+                                  ? (isDarkMode ? '0 8px 24px rgba(0,0,0,0.35)' : '0 8px 24px rgba(0,0,0,0.15)')
+                                  : 'none',
+                              }}
+                            >
+                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 2 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, minWidth: 120 }}>
+                                      {portfolio.asof_date}
+                                    </Typography>
+                                    <Chip 
+                                      label={portfolio.method} 
+                                      size="small" 
+                                      variant="outlined"
+                                      sx={{
+                                        backgroundColor: isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(147,197,253,0.35)',
+                                        borderColor: isDarkMode ? '#60a5fa' : '#60a5fa',
+                                        color: isDarkMode ? '#bfdbfe' : '#1e40af',
+                                      }}
+                                    />
+                                    <Typography variant="body2" color="text.secondary">
+                                      {portfolio.position_count || 0} positions
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      ${portfolio.total_value?.toFixed(2) || 'N/A'}
+                                    </Typography>
+                                  </Box>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePortfolioClick(portfolio);
+                                    }}
+                                    sx={{ mr: 1 }}
+                                  >
+                                    <VisibilityIcon />
+                                  </IconButton>
+                                </Box>
+                              </AccordionSummary>
+                              <AccordionDetails>
+                                {scoreData ? (
+                                  <Box>
+                                    {/* Signal Scores Table */}
+                                    {availableSignals.length > 0 && (
+                                      <Box sx={{ mb: 3 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                                          Signal Scores & Allocated Weights
+                                        </Typography>
+                                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+                                          <Table size="small" stickyHeader>
+                                            <TableHead>
+                                              <TableRow>
+                                                <TableCell sx={{ fontWeight: 600, position: 'sticky', left: 0, zIndex: 2, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }}>
+                                                  Ticker
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 600, position: 'sticky', left: 80, zIndex: 2, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }}>
+                                                  Weight
+                                                </TableCell>
+                                                {availableSignals.map((signalName) => (
+                                                  <TableCell key={signalName} align="right" sx={{ fontWeight: 600 }}>
+                                                    {signalName}
+                                                  </TableCell>
+                                                ))}
+                                              </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                              {universeTickers.map((ticker) => {
+                                                const tickerSignalData = signalData.find((s: any) => s.ticker === ticker);
+                                                const weight = tickerToWeight.get(ticker) || 0;
+                                                return (
+                                                  <TableRow key={ticker} hover>
+                                                    <TableCell sx={{ fontWeight: 500, position: 'sticky', left: 0, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', zIndex: 1 }}>
+                                                      {ticker}
+                                                    </TableCell>
+                                                    <TableCell 
+                                                      align="right" 
+                                                      sx={{ 
+                                                        fontWeight: 500, 
+                                                        position: 'sticky', 
+                                                        left: 80, 
+                                                        backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', 
+                                                        zIndex: 1,
+                                                        color: weight > 0 ? (isDarkMode ? '#10b981' : '#059669') : 'text.secondary'
+                                                      }}
+                                                    >
+                                                      {weight > 0 ? `${(weight * 100).toFixed(2)}%` : '0.00%'}
+                                                    </TableCell>
+                                                    {availableSignals.map((signalName) => (
+                                                      <TableCell key={signalName} align="right">
+                                                        {tickerSignalData && (tickerSignalData as any)[signalName] !== null && (tickerSignalData as any)[signalName] !== undefined
+                                                          ? Number((tickerSignalData as any)[signalName]).toFixed(4)
+                                                          : '—'
+                                                        }
+                                                      </TableCell>
+                                                    ))}
+                                                  </TableRow>
+                                                );
+                                              })}
+                                            </TableBody>
+                                          </Table>
+                                        </TableContainer>
+                                      </Box>
+                                    )}
+
+                                    {/* Combined Scores Table */}
+                                    <Box>
+                                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                                        Combined Scores & Allocated Weights
+                                      </Typography>
+                                      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+                                        <Table size="small" stickyHeader>
+                                          <TableHead>
+                                            <TableRow>
+                                              <TableCell sx={{ fontWeight: 600 }}>Ticker</TableCell>
+                                              <TableCell align="right" sx={{ fontWeight: 600 }}>Weight</TableCell>
+                                              <TableCell align="right" sx={{ fontWeight: 600 }}>Combined Score</TableCell>
+                                              <TableCell align="right" sx={{ fontWeight: 600 }}>Method</TableCell>
+                                            </TableRow>
+                                          </TableHead>
+                                          <TableBody>
+                                            {universeTickers.map((ticker) => {
+                                              const tickerScoreData = combinedScores.find((s: any) => s.ticker === ticker);
+                                              const weight = tickerToWeight.get(ticker) || 0;
+                                              return (
+                                                <TableRow key={ticker} hover>
+                                                  <TableCell sx={{ fontWeight: 500 }}>{ticker}</TableCell>
+                                                  <TableCell 
+                                                    align="right"
+                                                    sx={{
+                                                      fontWeight: 500,
+                                                      color: weight > 0 ? (isDarkMode ? '#10b981' : '#059669') : 'text.secondary'
+                                                    }}
+                                                  >
+                                                    {weight > 0 ? `${(weight * 100).toFixed(2)}%` : '0.00%'}
+                                                  </TableCell>
+                                                  <TableCell align="right">
+                                                    {tickerScoreData && tickerScoreData.combined_score !== null && tickerScoreData.combined_score !== undefined
+                                                      ? Number(tickerScoreData.combined_score).toFixed(4)
+                                                      : '—'
+                                                    }
+                                                  </TableCell>
+                                                  <TableCell align="right">
+                                                    <Chip 
+                                                      label={tickerScoreData?.method || '—'} 
+                                                      size="small" 
+                                                      variant="outlined"
+                                                    />
+                                                  </TableCell>
+                                                </TableRow>
+                                              );
+                                            })}
+                                          </TableBody>
+                                        </Table>
+                                      </TableContainer>
+                                    </Box>
+                                  </Box>
+                                ) : (
+                                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                                    <Skeleton variant="rectangular" height={200} />
+                                  </Box>
+                                )}
+                              </AccordionDetails>
+                            </Accordion>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Alert severity="info">No portfolios found for this backtest.</Alert>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            )}
 
             {/* Portfolio Detail Panel */}
             {selectedPortfolio && (

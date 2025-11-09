@@ -119,26 +119,45 @@ async def get_today_news_aggregated(universe_name: str):
         
         tickers = tickers_df['ticker'].tolist()
         
-        # Get today's date
+        # Get today's date and recent date range (last 7 days)
         today = date.today()
+        days_ago = today - timedelta(days=7)
         
-        # Fetch news for all tickers
-        news_items = news_service.fetch_universe_news(
-            tickers=tickers,
-            max_items_per_ticker=50,
-            total_max_items=500
-        )
+        # Fetch news for all tickers (last 7 days)
+        try:
+            news_items = news_service.fetch_universe_news(
+                tickers=tickers,
+                max_items_per_ticker=50,
+                total_max_items=500,
+                days_back=7  # Get news from last 7 days
+            )
+            logger.info(f"Fetched {len(news_items)} total news items from database (last 7 days)")
+        except ValueError as e:
+            # ORE database connection error
+            logger.error(f"ORE database connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ORE database connection failed: {str(e)}. Please check ORE database configuration."
+            )
+        except Exception as e:
+            logger.error(f"Error fetching news from ORE database: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching news: {str(e)}"
+            )
         
-        # Filter to today's news and aggregate by ticker
+        # Aggregate news by ticker (already filtered to last 7 days by SQL query)
         aggregated = defaultdict(list)
         for item in news_items:
             try:
-                pub_date = datetime.fromisoformat(item['pub_date'].replace('Z', '+00:00')).date()
-                if pub_date == today:
-                    aggregated[item['ticker']].append(item)
+                ticker = item.get('ticker')
+                if ticker:
+                    aggregated[ticker].append(item)
             except (ValueError, KeyError) as e:
-                logger.warning(f"Error parsing date for news item: {e}")
+                logger.warning(f"Error processing news item: {e}, item: {item.get('title', 'Unknown')[:50]}")
                 continue
+        
+        logger.info(f"Aggregated {len(news_items)} news items across {len(aggregated)} tickers")
         
         # Sort news within each ticker by publication date (newest first)
         for ticker in aggregated:
@@ -222,11 +241,25 @@ async def get_news_statistics(universe_name: str):
         week_ago = today - timedelta(days=7)
         
         # Get today's news
-        today_news = news_service.fetch_universe_news(
-            tickers=tickers,
-            max_items_per_ticker=50,
-            total_max_items=500
-        )
+        try:
+            today_news = news_service.fetch_universe_news(
+                tickers=tickers,
+                max_items_per_ticker=50,
+                total_max_items=500
+            )
+        except ValueError as e:
+            # ORE database connection error
+            logger.error(f"ORE database connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ORE database connection failed: {str(e)}. Please check ORE database configuration."
+            )
+        except Exception as e:
+            logger.error(f"Error fetching news from ORE database: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching news: {str(e)}"
+            )
         
         # Filter to today and this week
         today_items = []
@@ -434,11 +467,25 @@ async def get_universe_news(
         logger.info(f"Fetching news for {len(tickers)} tickers: {tickers}")
         
         # Fetch news for all tickers
-        news_items = news_service.fetch_universe_news(
-            tickers=tickers,
-            max_items_per_ticker=5,
-            total_max_items=max_items
-        )
+        try:
+            news_items = news_service.fetch_universe_news(
+                tickers=tickers,
+                max_items_per_ticker=5,
+                total_max_items=max_items
+            )
+        except ValueError as e:
+            # ORE database connection error
+            logger.error(f"ORE database connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ORE database connection failed: {str(e)}. Please check ORE database configuration."
+            )
+        except Exception as e:
+            logger.error(f"Error fetching news from ORE database: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching news: {str(e)}"
+            )
         
         logger.info(f"Retrieved {len(news_items)} news items")
         
@@ -726,11 +773,25 @@ async def get_news_statistics(universe_name: str):
         week_ago = today - timedelta(days=7)
         
         # Get today's news
-        today_news = news_service.fetch_universe_news(
-            tickers=tickers,
-            max_items_per_ticker=50,
-            total_max_items=500
-        )
+        try:
+            today_news = news_service.fetch_universe_news(
+                tickers=tickers,
+                max_items_per_ticker=50,
+                total_max_items=500
+            )
+        except ValueError as e:
+            # ORE database connection error
+            logger.error(f"ORE database connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ORE database connection failed: {str(e)}. Please check ORE database configuration."
+            )
+        except Exception as e:
+            logger.error(f"Error fetching news from ORE database: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error fetching news: {str(e)}"
+            )
         
         # Filter to today and this week
         today_items = []

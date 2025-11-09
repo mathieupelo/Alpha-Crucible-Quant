@@ -1,182 +1,158 @@
 """
 News Service
 
-Service for fetching financial news from Yahoo Finance and analyzing sentiment using FinBERT.
+Service for fetching financial news from ORE database (copper.yfinance_news) with sentiment scores.
 """
 
 import logging
 from typing import List, Dict, Optional, Any
-from datetime import datetime, timedelta
-import yfinance as yf
+from datetime import datetime
+import os
+from pathlib import Path
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import json
 import warnings
+from dotenv import load_dotenv
 
 warnings.filterwarnings('ignore')
 
+# Load .env file to ensure environment variables are available
+env_path = Path(__file__).parent.parent.parent / '.env'  # Go up to repo root
+if env_path.exists():
+    load_dotenv(env_path, override=True)
+else:
+    # Fallback to backend/.env or current dir
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    else:
+        load_dotenv(override=True)
+
 logger = logging.getLogger(__name__)
 
-# Lazy import transformers to avoid breaking if not installed
-try:
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    import torch
-    TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    TRANSFORMERS_AVAILABLE = False
-    logger.warning("transformers and torch not available. Sentiment analysis will use fallback method.")
-
-# FinBERT model configuration
-# Using yiyanghkust/finbert-tone for sentiment classification
-# Alternative models: ProsusAI/finbert, eliseby/FINBERT-Tone-Evaluation
-FINBERT_MODEL = "yiyanghkust/finbert-tone"
 MAX_NEWS_ITEMS = 10
 
 
 class NewsService:
-    """Service for fetching and analyzing financial news."""
+    """Service for fetching financial news from ORE database."""
     
     def __init__(self):
-        """Initialize news service with FinBERT model."""
-        self.tokenizer = None
-        self.model = None
-        self._model_loaded = False
+        """Initialize news service with ORE database connection."""
+        self._ore_conn = None
         
-    def _load_model(self):
-        """Lazy load FinBERT model."""
-        if self._model_loaded:
-            return
+    def _get_ore_connection(self):
+        """Get connection to ORE database (lazy connection)."""
+        if self._ore_conn is None or (hasattr(self._ore_conn, 'closed') and self._ore_conn.closed):
+            try:
+                # Try ORE_DATABASE_URL first
+                database_url = os.getenv('ORE_DATABASE_URL')
+                if not database_url:
+                    # Try alternative variable name (used in Airflow)
+                    database_url = os.getenv('DATABASE_ORE_URL')
+                
+                logger.debug(f"ORE_DATABASE_URL present: {database_url is not None}")
+                
+                if database_url:
+                    logger.info("Connecting to ORE database using database URL")
+                    self._ore_conn = psycopg2.connect(database_url)
+                else:
+                    # Fall back to individual connection parameters
+                    host = os.getenv('ORE_DB_HOST')
+                    port = os.getenv('ORE_DB_PORT', '5432')
+                    user = os.getenv('ORE_DB_USER')
+                    password = os.getenv('ORE_DB_PASSWORD')
+                    database = os.getenv('ORE_DB_NAME')
+                    
+                    logger.debug(f"ORE_DB_HOST: {host is not None}, ORE_DB_USER: {user is not None}, ORE_DB_NAME: {database is not None}")
+                    
+                    if not all([host, user, password, database]):
+                        missing = []
+                        if not host: missing.append('ORE_DB_HOST')
+                        if not user: missing.append('ORE_DB_USER')
+                        if not password: missing.append('ORE_DB_PASSWORD')
+                        if not database: missing.append('ORE_DB_NAME')
+                        
+                        error_msg = (
+                            f"ORE database connection requires either ORE_DATABASE_URL, DATABASE_ORE_URL, or "
+                            f"(ORE_DB_HOST, ORE_DB_USER, ORE_DB_PASSWORD, ORE_DB_NAME). "
+                            f"Missing variables: {', '.join(missing)}. "
+                            f"Please configure ORE database connection in environment variables. "
+                            f"Checked .env file at: {env_path}"
+                        )
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
+                    
+                    logger.info(f"Connecting to ORE database at {host}:{port}")
+                    self._ore_conn = psycopg2.connect(
+                        host=host,
+                        port=port,
+                        user=user,
+                        password=password,
+                        database=database
+                    )
+                logger.info("Successfully connected to ORE database")
+            except Exception as e:
+                logger.error(f"Error connecting to ORE database: {e}", exc_info=True)
+                raise
         
-        if not TRANSFORMERS_AVAILABLE:
-            logger.warning("Transformers not available, using simple sentiment fallback")
-            self._model_loaded = False
-            return
-        
-        try:
-            logger.info("Loading FinBERT model for sentiment analysis...")
-            self.tokenizer = AutoTokenizer.from_pretrained(FINBERT_MODEL)
-            self.model = AutoModelForSequenceClassification.from_pretrained(FINBERT_MODEL)
-            
-            # Set to evaluation mode
-            self.model.eval()
-            
-            # Use GPU if available
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.model.to(self.device)
-            
-            self._model_loaded = True
-            logger.info(f"FinBERT model loaded successfully on {self.device}")
-            
-        except Exception as e:
-            logger.error(f"Error loading FinBERT model: {e}")
-            logger.warning("Falling back to simple sentiment analysis")
-            self._model_loaded = False
+        return self._ore_conn
     
-    def analyze_sentiment(self, text: str) -> Dict[str, Any]:
+    def _format_sentiment_from_db(self, sentiment_label: str, sentiment_score: float, metadata: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        Analyze sentiment of news text using FinBERT or fallback method.
+        Format sentiment data from database to match frontend expectations.
         
         Args:
-            text: News article text
+            sentiment_label: Sentiment label from database (positive/negative/neutral)
+            sentiment_score: Sentiment score from database
+            metadata: Optional metadata JSON from database
             
         Returns:
-            Dictionary with sentiment label and score
+            Dictionary with sentiment label, score, and display format
         """
-        if not TRANSFORMERS_AVAILABLE:
-            # Simple keyword-based fallback sentiment
-            return self._simple_sentiment_analysis(text)
+        # Normalize label to lowercase
+        label = sentiment_label.lower() if sentiment_label else 'neutral'
         
-        if not self._model_loaded:
-            self._load_model()
+        # Ensure label is one of the expected values
+        if label not in ['positive', 'negative', 'neutral']:
+            label = 'neutral'
         
-        # If model loading failed, use simple sentiment
-        if not self._model_loaded or self.model is None:
-            return self._simple_sentiment_analysis(text)
+        # Format label for display
+        label_display = label.capitalize()
         
-        try:
-            # Tokenize and encode
-            inputs = self.tokenizer(
-                text[:512],  # Limit to 512 tokens
-                return_tensors="pt",
-                truncation=True,
-                padding=True,
-                max_length=512
-            ).to(self.device)
-            
-            # Get predictions
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
-            
-            # FinBERT labels: 0=positive, 1=negative, 2=neutral
-            scores = predictions[0].cpu().numpy()
-            labels = ["positive", "negative", "neutral"]
-            
-            # Get highest probability label
-            label_idx = scores.argmax()
-            label = labels[label_idx]
-            score = float(scores[label_idx])
-            
-            # Format label for display
-            label_display = label.capitalize()
-            
-            return {
-                "label": label,
-                "score": score,
-                "label_display": label_display,
-                "scores": {
-                    "positive": float(scores[0]),
-                    "negative": float(scores[1]),
-                    "neutral": float(scores[2])
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error analyzing sentiment: {e}")
-            return self._simple_sentiment_analysis(text)
-    
-    def _simple_sentiment_analysis(self, text: str) -> Dict[str, Any]:
-        """
-        Simple keyword-based sentiment analysis fallback.
-        
-        Args:
-            text: News article text
-            
-        Returns:
-            Dictionary with sentiment label and score
-        """
-        text_lower = text.lower()
-        
-        # Positive keywords
-        positive_keywords = ['up', 'gain', 'rise', 'profit', 'growth', 'strong', 'beat', 'exceed', 'positive', 'bullish', 'surge', 'rally']
-        # Negative keywords
-        negative_keywords = ['down', 'loss', 'fall', 'decline', 'weak', 'miss', 'drop', 'negative', 'bearish', 'crash', 'plunge', 'slump']
-        
-        positive_count = sum(1 for word in positive_keywords if word in text_lower)
-        negative_count = sum(1 for word in negative_keywords if word in text_lower)
-        
-        total = positive_count + negative_count
-        
-        if total == 0:
-            label = "neutral"
-            score = 0.5
-        elif positive_count > negative_count:
-            label = "positive"
-            score = 0.6 + (positive_count / max(total, 5)) * 0.3
-        elif negative_count > positive_count:
-            label = "negative"
-            score = 0.6 + (negative_count / max(total, 5)) * 0.3
-        else:
-            label = "neutral"
-            score = 0.5
-        
-        return {
+        # Build sentiment response
+        sentiment = {
             "label": label,
-            "score": min(max(score, 0.0), 1.0),
-            "label_display": label.capitalize()
+            "score": float(sentiment_score) if sentiment_score is not None else 0.5,
+            "label_display": label_display
         }
+        
+        # Add detailed scores from metadata if available
+        if metadata:
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except (json.JSONDecodeError, TypeError):
+                    metadata = {}
+            
+            if isinstance(metadata, dict):
+                # Extract probability scores if available
+                positive_prob = metadata.get('positive_prob', 0.0)
+                negative_prob = metadata.get('negative_prob', 0.0)
+                neutral_prob = metadata.get('neutral_prob', 0.0)
+                
+                if positive_prob or negative_prob or neutral_prob:
+                    sentiment["scores"] = {
+                        "positive": float(positive_prob),
+                        "negative": float(negative_prob),
+                        "neutral": float(neutral_prob)
+                    }
+        
+        return sentiment
     
     def fetch_ticker_news(self, ticker: str, max_items: int = 5) -> List[Dict[str, Any]]:
         """
-        Fetch news for a specific ticker from Yahoo Finance.
+        Fetch news for a specific ticker from ORE database.
         
         Args:
             ticker: Stock ticker symbol
@@ -186,224 +162,246 @@ class NewsService:
             List of news items with sentiment analysis
         """
         try:
-            logger.info(f"Fetching news for ticker: {ticker}")
+            logger.info(f"Fetching news for ticker: {ticker} from ORE database")
             
-            # Create yfinance ticker object
-            stock = yf.Ticker(ticker)
-            
-            # Fetch news
-            news_list = stock.news
-            
-            if not news_list:
-                logger.info(f"No news found for {ticker}")
-                return []
-            
-            # Process and analyze news
-            processed_news = []
-            for news_item in news_list[:max_items]:
-                try:
-                    # Yahoo Finance news format has changed - data may be in 'content' field as JSON string
-                    # Or direct fields like 'title', 'publisher', etc.
-                    title = ''
-                    summary = ''
-                    publisher = 'Unknown'
-                    link = ''
-                    pub_date = None
-                    image_url = ''
-                    
-                    # Check if data is in 'content' field (new yfinance format)
-                    if 'content' in news_item and news_item['content']:
-                        try:
-                            content = news_item['content']
-                            # Handle both string (JSON) and dict content
-                            if isinstance(content, str):
-                                content = json.loads(content)
-                            
-                            # Extract fields from content dict
-                            title = content.get('title', '') or ''
-                            
-                            # Description might be HTML, extract text
-                            description = content.get('description', '') or content.get('summary', '') or ''
-                            # Strip HTML tags if present
-                            if description and '<' in description:
-                                import re
-                                description = re.sub(r'<[^>]+>', '', description)
-                            summary = description
-                            
-                            # Extract image URL - try multiple possible fields
-                            image_obj = content.get('thumbnail') or content.get('thumbnailUrl') or content.get('image') or content.get('previewImage') or content.get('mainImage') or news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
-                            if isinstance(image_obj, dict):
-                                image_url = image_obj.get('url', '') or image_obj.get('src', '') or image_obj.get('originalUrl', '') or ''
-                            elif image_obj:
-                                image_url = str(image_obj)
+            conn = self._get_ore_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                # Query news with sentiment join
+                cursor.execute("""
+                    SELECT 
+                        n.id,
+                        n.ticker,
+                        n.title,
+                        n.summary,
+                        n.publisher,
+                        n.link,
+                        n.published_date,
+                        n.image_url,
+                        s.sentiment_label,
+                        s.sentiment_score,
+                        s.metadata
+                    FROM copper.yfinance_news n
+                    LEFT JOIN copper.yfinance_news_sentiment s ON n.id = s.yfinance_news_id
+                    WHERE n.ticker = %s
+                    ORDER BY n.published_date DESC
+                    LIMIT %s;
+                """, (ticker.upper(), max_items))
+                
+                rows = cursor.fetchall()
+                
+                if not rows:
+                    logger.info(f"No news found for {ticker} in ORE database")
+                    # Debug: Check if there's any news at all for this ticker
+                    cursor.execute("""
+                        SELECT COUNT(*) 
+                        FROM copper.yfinance_news 
+                        WHERE ticker = %s;
+                    """, (ticker.upper(),))
+                    total_count = cursor.fetchone()[0]
+                    logger.debug(f"Total news count for {ticker}: {total_count}")
+                    return []
+                
+                processed_news = []
+                for row in rows:
+                    try:
+                        # Extract sentiment data - handle NULL values
+                        sentiment_label = row.get('sentiment_label') or 'neutral'
+                        sentiment_score = row.get('sentiment_score')
+                        if sentiment_score is None:
+                            sentiment_score = 0.5
+                        metadata = row.get('metadata')
+                        
+                        # Format sentiment
+                        sentiment = self._format_sentiment_from_db(
+                            sentiment_label, 
+                            sentiment_score, 
+                            metadata
+                        )
+                        
+                        # Format publication date
+                        pub_date = row.get('published_date')
+                        if pub_date:
+                            if isinstance(pub_date, datetime):
+                                pub_date_str = pub_date.isoformat()
                             else:
-                                image_url = ''
-                            
-                            # Publisher - check multiple locations
-                            pub_info = content.get('publisher') or news_item.get('publisher')
-                            if isinstance(pub_info, dict):
-                                publisher = pub_info.get('name', 'Unknown') or 'Unknown'
-                            elif pub_info:
-                                publisher = str(pub_info)
-                            else:
-                                publisher = 'Unknown'
-                            
-                            # Link/URL - try multiple fields
-                            # canonicalUrl is usually the main article URL
-                            url_obj = content.get('canonicalUrl') or content.get('url') or content.get('previewUrl') or content.get('clickThroughUrl') or content.get('link') or news_item.get('link')
-                            if isinstance(url_obj, dict):
-                                link = url_obj.get('url', '') or ''
-                            elif url_obj:
-                                link = str(url_obj)
-                            else:
-                                link = ''
-                            
-                            # Publisher - check provider field (has displayName)
-                            provider = content.get('provider')
-                            if provider:
-                                if isinstance(provider, dict):
-                                    # Provider has 'displayName' field
-                                    pub_name = provider.get('displayName') or provider.get('name')
-                                    if pub_name:
-                                        publisher = pub_name
-                                elif isinstance(provider, str):
-                                    publisher = provider
-                            
-                            # Timestamp - try multiple fields
-                            pub_date = content.get('providerPublishTime') or content.get('pubDate') or content.get('publishedAt') or content.get('publishTime')
-                            
-                        except (json.JSONDecodeError, TypeError, AttributeError, KeyError) as e:
-                            logger.warning(f"Error parsing content field for {ticker}: {e}")
-                            # Fall back to direct fields
-                            title = news_item.get('title', '')
-                            summary = news_item.get('summary', '') or news_item.get('description', '')
-                            publisher = news_item.get('publisher', 'Unknown')
-                            link = news_item.get('link', '') or news_item.get('url', '')
-                            pub_date = news_item.get('providerPublishTime') or news_item.get('pubDate')
-                            # Try to get image from top level
-                            image_obj = news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
-                            if isinstance(image_obj, dict):
-                                image_url = image_obj.get('url', '') or image_obj.get('src', '') or ''
-                            elif image_obj:
-                                image_url = str(image_obj)
-                            else:
-                                image_url = ''
-                    else:
-                        # Old format - direct fields
-                        title = news_item.get('title', '') or ''
-                        summary = news_item.get('summary', '') or news_item.get('description', '') or ''
-                        publisher = news_item.get('publisher', 'Unknown') or 'Unknown'
-                        link = news_item.get('link', '') or news_item.get('url', '') or ''
-                        pub_date = news_item.get('providerPublishTime') or news_item.get('pubDate') or news_item.get('publishedAt')
-                        # Try to get image from top level
-                        image_obj = news_item.get('thumbnail') or news_item.get('thumbnailUrl') or news_item.get('image')
-                        if isinstance(image_obj, dict):
-                            image_url = image_obj.get('url', '') or image_obj.get('src', '') or ''
-                        elif image_obj:
-                            image_url = str(image_obj)
+                                pub_date_str = str(pub_date)
                         else:
-                            image_url = ''
-                    
-                    # Ensure we have at least a title or summary
-                    if not title and not summary:
-                        # Try to extract from other fields
-                        title = news_item.get('headline', '') or content.get('headline', '') or str(news_item.get('id', 'News Article'))
-                    
-                    # Clean up title - remove any remaining "Unknown" or empty strings
-                    if not title or title.strip() == '' or title.strip().lower() == 'unknown':
-                        if summary:
-                            # Use first part of summary as title
-                            title = summary.split('.')[0].strip()[:100] or 'News Article'
-                        else:
-                            title = 'News Article'
-                    
-                    # Clean up summary - ensure it's not just "Unknown"
-                    if summary and (summary.strip().lower() == 'unknown' or len(summary.strip()) < 5):
-                        summary = ''  # Don't show meaningless summary
-                    
-                    # Convert timestamp to datetime
-                    if pub_date:
-                        try:
-                            # Handle both Unix timestamp (int/float) and ISO string
-                            if isinstance(pub_date, (int, float)):
-                                pub_date = datetime.fromtimestamp(pub_date)
-                            else:
-                                # Try parsing ISO format string
-                                pub_date = datetime.fromisoformat(str(pub_date).replace('Z', '+00:00'))
-                        except (ValueError, TypeError, OSError) as e:
-                            logger.warning(f"Error parsing date for {ticker}: {e}, using current time")
-                            pub_date = datetime.now()
-                    else:
-                        pub_date = datetime.now()
-                    
-                    # Combine title and summary if available for sentiment analysis
-                    text_for_sentiment = f"{title}. {summary}".strip()
-                    
-                    # Skip if no meaningful content
-                    if not text_for_sentiment or len(text_for_sentiment) < 10:
-                        logger.warning(f"Skipping news item for {ticker} - no meaningful content")
+                            pub_date_str = datetime.now().isoformat()
+                        
+                        processed_item = {
+                            "ticker": str(row.get('ticker', ticker)),
+                            "title": str(row.get('title', '')) or 'News Article',
+                            "summary": str(row.get('summary', '')) or '',
+                            "publisher": str(row.get('publisher', 'Unknown')) or 'Unknown',
+                            "link": str(row.get('link', '')) or '',
+                            "pub_date": pub_date_str,
+                            "sentiment": sentiment,
+                            "image_url": str(row.get('image_url', '')) or ''
+                        }
+                        
+                        processed_news.append(processed_item)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error processing news item for {ticker}: {e}", exc_info=True)
                         continue
-                    
-                    # Analyze sentiment
-                    sentiment = self.analyze_sentiment(text_for_sentiment)
-                    
-                    processed_item = {
-                        "ticker": ticker,
-                        "title": title,
-                        "summary": summary,
-                        "publisher": publisher,
-                        "link": link,
-                        "pub_date": pub_date.isoformat(),
-                        "sentiment": sentiment,
-                        "image_url": image_url,
-                        "raw_data": news_item
-                    }
-                    
-                    processed_news.append(processed_item)
-                    
-                except Exception as e:
-                    logger.warning(f"Error processing news item for {ticker}: {e}")
-                    continue
-            
-            logger.info(f"Fetched {len(processed_news)} news items for {ticker}")
-            return processed_news
-            
+                
+                logger.info(f"Fetched {len(processed_news)} news items for {ticker} from ORE database")
+                return processed_news
+                
         except Exception as e:
-            logger.error(f"Error fetching news for {ticker}: {e}")
+            logger.error(f"Error fetching news for {ticker} from ORE database: {e}", exc_info=True)
+            # Return empty list on error to prevent breaking the API
             return []
     
     def fetch_universe_news(
         self, 
         tickers: List[str], 
         max_items_per_ticker: int = 5,
-        total_max_items: int = MAX_NEWS_ITEMS
+        total_max_items: int = MAX_NEWS_ITEMS,
+        days_back: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
-        Fetch and aggregate news for multiple tickers.
+        Fetch and aggregate news for multiple tickers from ORE database.
         
         Args:
             tickers: List of ticker symbols
-            max_items_per_ticker: Maximum news items per ticker
+            max_items_per_ticker: Maximum news items per ticker (used for per-ticker limit in query)
             total_max_items: Maximum total news items to return
+            days_back: Optional number of days to look back (e.g., 7 for last week). If None, returns all news.
             
         Returns:
             List of aggregated news items sorted by date (newest first)
         """
-        all_news = []
-        
-        for ticker in tickers:
-            try:
-                ticker_news = self.fetch_ticker_news(ticker, max_items_per_ticker)
-                all_news.extend(ticker_news)
-            except Exception as e:
-                logger.warning(f"Error fetching news for {ticker}: {e}")
-                continue
-        
-        # Sort by publication date (newest first)
-        all_news.sort(key=lambda x: x.get('pub_date', ''), reverse=True)
-        
-        # Return top N items
-        return all_news[:total_max_items]
+        try:
+            if not tickers:
+                return []
+            
+            logger.info(f"Fetching news for {len(tickers)} tickers from ORE database")
+            
+            conn = self._get_ore_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                # Convert tickers to uppercase and create placeholders
+                ticker_list = [t.upper() for t in tickers]
+                placeholders = ','.join(['%s'] * len(ticker_list))
+                
+                # Build date filter if specified
+                date_filter = ""
+                date_params = []
+                if days_back is not None:
+                    from datetime import date, timedelta
+                    cutoff_date = date.today() - timedelta(days=days_back)
+                    date_filter = "AND n.published_date >= %s"
+                    date_params = [cutoff_date]
+                
+                # Query news with sentiment join for all tickers at once
+                # Use a subquery to limit per ticker, then limit overall
+                cursor.execute(f"""
+                    WITH ranked_news AS (
+                        SELECT 
+                            n.id,
+                            n.ticker,
+                            n.title,
+                            n.summary,
+                            n.publisher,
+                            n.link,
+                            n.published_date,
+                            n.image_url,
+                            s.sentiment_label,
+                            s.sentiment_score,
+                            s.metadata,
+                            ROW_NUMBER() OVER (PARTITION BY n.ticker ORDER BY n.published_date DESC) as rn
+                        FROM copper.yfinance_news n
+                        LEFT JOIN copper.yfinance_news_sentiment s ON n.id = s.yfinance_news_id
+                        WHERE n.ticker IN ({placeholders}) {date_filter}
+                    )
+                    SELECT * FROM ranked_news
+                    WHERE rn <= %s
+                    ORDER BY published_date DESC
+                    LIMIT %s;
+                """, ticker_list + date_params + [max_items_per_ticker, total_max_items])
+                
+                rows = cursor.fetchall()
+                
+                if not rows:
+                    logger.info(f"No news found for tickers {tickers} in ORE database")
+                    # Debug: Check if there's any news at all
+                    cursor.execute(f"""
+                        SELECT COUNT(*) 
+                        FROM copper.yfinance_news 
+                        WHERE ticker IN ({placeholders});
+                    """, ticker_list)
+                    total_count = cursor.fetchone()[0]
+                    logger.debug(f"Total news count for tickers {tickers}: {total_count}")
+                    return []
+                
+                processed_news = []
+                for row in rows:
+                    try:
+                        # Extract sentiment data - handle NULL values
+                        sentiment_label = row.get('sentiment_label') or 'neutral'
+                        sentiment_score = row.get('sentiment_score')
+                        if sentiment_score is None:
+                            sentiment_score = 0.5
+                        metadata = row.get('metadata')
+                        
+                        # Format sentiment
+                        sentiment = self._format_sentiment_from_db(
+                            sentiment_label, 
+                            sentiment_score, 
+                            metadata
+                        )
+                        
+                        # Format publication date
+                        pub_date = row.get('published_date')
+                        if pub_date:
+                            if isinstance(pub_date, datetime):
+                                pub_date_str = pub_date.isoformat()
+                            else:
+                                pub_date_str = str(pub_date)
+                        else:
+                            pub_date_str = datetime.now().isoformat()
+                        
+                        processed_item = {
+                            "ticker": str(row.get('ticker', '')),
+                            "title": str(row.get('title', '')) or 'News Article',
+                            "summary": str(row.get('summary', '')) or '',
+                            "publisher": str(row.get('publisher', 'Unknown')) or 'Unknown',
+                            "link": str(row.get('link', '')) or '',
+                            "pub_date": pub_date_str,
+                            "sentiment": sentiment,
+                            "image_url": str(row.get('image_url', '')) or ''
+                        }
+                        
+                        processed_news.append(processed_item)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error processing news item: {e}", exc_info=True)
+                        continue
+                
+                # Sort by publication date (newest first) - already sorted by query but ensure it
+                processed_news.sort(key=lambda x: x.get('pub_date', ''), reverse=True)
+                
+                logger.info(f"Fetched {len(processed_news)} news items from ORE database for {len(tickers)} tickers")
+                return processed_news
+                
+        except Exception as e:
+            logger.error(f"Error fetching universe news from ORE database: {e}", exc_info=True)
+            # Fallback: try fetching per ticker
+            logger.info("Falling back to per-ticker fetching")
+            all_news = []
+            for ticker in tickers:
+                try:
+                    ticker_news = self.fetch_ticker_news(ticker, max_items_per_ticker)
+                    all_news.extend(ticker_news)
+                except Exception as e:
+                    logger.warning(f"Error fetching news for {ticker}: {e}", exc_info=True)
+                    continue
+            
+            # Sort by publication date (newest first)
+            all_news.sort(key=lambda x: x.get('pub_date', ''), reverse=True)
+            
+            # Return top N items
+            return all_news[:total_max_items]
 
 
 # Global instance

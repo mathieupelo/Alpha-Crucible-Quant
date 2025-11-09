@@ -9,7 +9,7 @@ Alpha Crucible Quant is a comprehensive quantitative investment system that comb
 ### 1. Full-Stack Architecture
 - **Frontend**: React-based web dashboard with Material-UI components
 - **Backend**: FastAPI REST API with comprehensive endpoints
-- **Database**: MySQL for persistent data storage
+- **Database**: PostgreSQL (Supabase) for persistent data storage
 - **Containerization**: Docker-based deployment with docker-compose
 
 ### 2. Unified Repository
@@ -17,10 +17,10 @@ Alpha Crucible Quant is a comprehensive quantitative investment system that comb
 - **Simplified Dependencies**: No complex inter-repository dependencies
 - **Easy Deployment**: Single installation and configuration
 
-### 3. Local-First Design
-- **Local Database**: MySQL hosted on your machine (127.0.0.1:3306)
+### 3. Cloud-First Database Design
+- **PostgreSQL Database**: Supabase cloud PostgreSQL database
 - **Real-time Data**: yfinance integration for live stock prices
-- **No External Dependencies**: No reliance on external services
+- **Scalable**: Cloud-hosted database for reliability and scalability
 
 ### 4. DataFrame-Centric Communication
 - **Pandas Integration**: All data operations use pandas DataFrames
@@ -84,7 +84,7 @@ Alpha Crucible Quant is a comprehensive quantitative investment system that comb
 
 ### 4. Database Layer (`src/database/`)
 
-**Purpose**: Simplified MySQL database operations
+**Purpose**: PostgreSQL database operations with Supabase integration
 
 **Key Classes**:
 - `DatabaseManager`: Main database interface
@@ -93,9 +93,9 @@ Alpha Crucible Quant is a comprehensive quantitative investment system that comb
 - `BacktestResult`: Backtest result data model
 
 **Design Decisions**:
-- **Simplified Schema**: Only essential data stored
+- **PostgreSQL**: Uses Supabase cloud PostgreSQL database
 - **DataFrame Integration**: All operations return pandas DataFrames
-- **Connection Management**: Automatic connection handling
+- **Connection Management**: Automatic connection handling with SSL
 - **Error Handling**: Robust error handling and logging
 
 ### 5. Web Application (`frontend/` and `backend/`)
@@ -159,7 +159,7 @@ Historical Data → Signal Calculation → Portfolio Optimization → Performanc
 
 ### 4. Web Application Flow
 ```
-Frontend (React) → Backend API (FastAPI) → Database Service → MySQL Database
+Frontend (React) → Backend API (FastAPI) → Database Service → PostgreSQL Database (Supabase)
 ```
 
 ### 5. Real-time Data Flow
@@ -214,11 +214,12 @@ User Request → Frontend → API Endpoint → Database Query → Response → U
 ## Configuration
 
 ### Environment Variables
-- `DB_HOST`: Database host (default: 127.0.0.1)
-- `DB_PORT`: Database port (default: 3306)
-- `DB_USER`: Database username (default: root)
+- `DATABASE_URL`: Full PostgreSQL connection string (Supabase)
+- `DB_HOST`: Database host (Supabase host)
+- `DB_PORT`: Database port (default: 5432)
+- `DB_USER`: Database username (default: postgres)
 - `DB_PASSWORD`: Database password
-- `DB_NAME`: Database name (default: quant_project)
+- `DB_NAME`: Database name (default: postgres)
 - `YFINANCE_TIMEOUT`: yfinance timeout (default: 10)
 - `YFINANCE_RETRIES`: yfinance retries (default: 3)
 
@@ -304,7 +305,7 @@ User Request → Frontend → API Endpoint → Database Query → Response → U
 ### Backend Architecture
 - **FastAPI**: Modern Python web framework with automatic API documentation
 - **Pydantic**: Data validation and serialization
-- **SQLAlchemy**: Database ORM for MySQL operations
+- **psycopg2**: PostgreSQL database adapter
 - **CORS**: Cross-origin resource sharing for frontend integration
 - **Logging**: Comprehensive logging with different levels
 - **Error Handling**: Global exception handling with proper HTTP status codes
@@ -320,7 +321,7 @@ User Request → Frontend → API Endpoint → Database Query → Response → U
 
 ### 1. Local Development
 - **Virtual Environment**: Isolated Python environment
-- **Database Setup**: Local MySQL database
+- **Database Setup**: Supabase PostgreSQL database (cloud-hosted)
 - **Configuration**: Environment variable configuration
 - **Hot Reload**: Frontend and backend hot reloading for development
 

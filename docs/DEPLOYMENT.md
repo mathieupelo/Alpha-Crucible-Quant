@@ -1,8 +1,6 @@
-# Alpha Crucible Quant Deployment Guide
+# Deployment Guide
 
-## Overview
-
-This guide covers different deployment options for the Alpha Crucible Quant system, from local development to production deployment.
+This guide covers all deployment options for Alpha Crucible Quant, from local development to production deployment with external access.
 
 ## Prerequisites
 
@@ -13,358 +11,371 @@ This guide covers different deployment options for the Alpha Crucible Quant syst
 - **Network**: Internet connection for data fetching
 
 ### Software Requirements
-- **Docker**: Version 20.10+ with Docker Compose
-- **Node.js**: Version 18+ (for development)
-- **Python**: Version 3.9+ (for development)
-- **MySQL**: Version 8.0+ (for local development)
+- **Docker Desktop** (for Docker deployment)
+  - Windows/Mac: Download from [docker.com](https://www.docker.com/products/docker-desktop/)
+  - Linux: `sudo apt-get install docker.io docker-compose`
+  - Verify: `docker --version` and `docker-compose --version`
+- **Python 3.11+** (for local development)
+- **Node.js 18+** (for local development)
+- **PostgreSQL Database** (Supabase recommended - free tier available)
+- **Ngrok** (optional, for external access)
+
+## Environment Configuration
+
+Create a `.env` file in the repository root:
+
+```bash
+cp .env_template .env
+```
+
+Configure with your settings:
+
+```bash
+# Database Configuration (Supabase PostgreSQL)
+DATABASE_URL=postgresql://postgres:password@host:port/database
+DB_HOST=your-supabase-host.supabase.co
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your-password
+DB_NAME=postgres
+
+# Ngrok Configuration (optional)
+NGROK_AUTHTOKEN=your_ngrok_auth_token
+
+# Application Configuration
+API_BASE_URL=http://localhost:8000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173
+```
 
 ## Deployment Options
 
-### 1. Docker Compose (Recommended)
+### Option 1: Local Development (Fastest - Recommended for Development)
 
-The easiest way to deploy the entire system is using Docker Compose.
+For daily development work, run services locally for instant hot reload.
 
-#### Quick Start
+**Start both services:**
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd Alpha-Crucible-Quant
+# Windows
+scripts\dev_all.bat
 
-# Create environment file
-cp .env_template .env
-# Edit .env with your database credentials
+# Linux/Mac
+scripts/dev_all.sh
+```
 
+**Or start individually:**
+```bash
+# Terminal 1 - Backend
+scripts\dev_backend.bat  # Windows
+# or
+cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2 - Frontend
+scripts\dev_frontend.bat  # Windows
+# or
+cd frontend && npm run dev
+```
+
+**Access Points:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/api/docs
+
+**Benefits:**
+- ⚡ Instant hot reload (< 1 second for frontend, < 5 seconds for backend)
+- 🚀 Fast startup (< 5 seconds)
+- 🔧 Better debugging experience
+- 📝 No Docker overhead
+
+**Initial Setup (one-time):**
+```bash
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Install dependencies
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
+cd frontend && npm install && cd ..
+```
+
+### Option 2: Docker Development (With Hot Reload)
+
+For Docker environment with code hot reload:
+
+```bash
+# Uses docker-compose.dev.yml with volume mounts
+scripts\dev_docker.bat  # Windows
+# or
+docker-compose -f docker-compose.dev.yml up
+```
+
+**Benefits:**
+- ✅ Still uses Docker environment
+- ✅ Hot reload enabled (code changes don't require rebuilds)
+- ✅ Faster than full Docker rebuilds
+
+### Option 3: Docker Production (Full Stack)
+
+For production-like testing:
+
+**Quick deployment:**
+```bash
+# Windows
+scripts\deploy.bat
+
+# Linux/Mac
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+```
+
+**Or manually:**
+```bash
 # Start all services
-docker-compose up -d
-
-# Check status
-docker-compose ps
+docker-compose up -d --build
 
 # View logs
 docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
-#### Services
-- **MySQL**: Database server (port 3306)
-- **Backend**: FastAPI application (port 8000)
-- **Frontend**: React application (port 3000)
-- **Nginx**: Reverse proxy (port 80)
+**Access Points:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Nginx Proxy: http://localhost:8080
+- API Docs: http://localhost:8000/api/docs
 
-#### Access Points
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/api/docs
-- **Database**: localhost:3306
+### Option 4: Docker with External Access (Ngrok)
 
-### 2. Local Development Setup
+For external access via ngrok:
 
-For development and testing, you can run services locally.
-
-#### Backend Setup
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
-pip install -r backend/requirements.txt
+# Windows
+scripts\prepare_and_start_ngrok_final.bat
 
-# Setup database
-python scripts/setup_database.py
-
-# Start backend
-cd backend
-python main.py
+# Linux/Mac
+scripts/prepare_and_start_ngrok_final.sh
 ```
 
-#### Frontend Setup
-```bash
-# Install Node.js dependencies
-cd frontend
-npm install
+This script:
+1. Checks and fixes port conflicts
+2. Builds and starts Docker containers
+3. Performs health checks
+4. Starts ngrok tunnel for public access
 
-# Start development server
-npm run dev
+**Access Points:**
+- Local: http://localhost:8080
+- Public: Check ngrok dashboard at http://localhost:4040
+
+## Architecture
+
+The deployment consists of three main services:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Nginx Proxy   │────│  React Frontend │────│  FastAPI Backend│
+│   (Port 8080)   │    │   (Port 3000)   │    │   (Port 8000)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                                               │
+         │              ┌─────────────────┐              │
+         └──────────────│   Supabase       │──────────────┘
+                        │   PostgreSQL    │
+                        │   Database      │
+                        └─────────────────┘
 ```
 
-#### Database Setup
-```bash
-# Install MySQL locally
-# Create database
-mysql -u root -p
-CREATE DATABASE signal_forge;
+### Services
 
-# Run setup script
-python scripts/setup_database.py
-```
+1. **Backend (FastAPI)**
+   - Port: 8000
+   - Database: Supabase PostgreSQL
+   - Features: REST API, CORS enabled, health checks
 
-### 3. Production Deployment
+2. **Frontend (React + Vite)**
+   - Port: 3000
+   - Features: Production build, environment-based API configuration
 
-#### Docker Production Setup
-```bash
-# Create production environment file
-cp .env_template .env.production
-
-# Update environment variables for production
-# DB_PASSWORD=secure_password
-# LOG_LEVEL=WARNING
-
-# Start production services
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-#### Nginx Configuration
-The system includes an Nginx configuration for production:
-
-```nginx
-# nginx.conf
-events {
-    worker_connections 1024;
-}
-
-http {
-    upstream backend {
-        server backend:8000;
-    }
-    
-    upstream frontend {
-        server frontend:3000;
-    }
-    
-    server {
-        listen 80;
-        
-        location /api/ {
-            proxy_pass http://backend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-        
-        location / {
-            proxy_pass http://frontend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-    }
-}
-```
+3. **Nginx (Reverse Proxy)**
+   - Port: 8080 (mapped from container port 80)
+   - Features: Load balancing, rate limiting, security headers, gzip compression
 
 ## Configuration
 
 ### Environment Variables
 
-Create a `.env` file with the following variables:
+Key environment variables:
 
 ```bash
-# Database Configuration
-DB_HOST=mysql
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_secure_password
-DB_NAME=signal_forge
+# Database (Supabase PostgreSQL)
+DATABASE_URL=postgresql://postgres:password@host:port/database
+DB_HOST=your-supabase-host.supabase.co
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your-password
+DB_NAME=postgres
 
-# yfinance Configuration
-YFINANCE_TIMEOUT=10
-YFINANCE_RETRIES=3
+# Application
+API_BASE_URL=http://localhost:8000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173
 
-# Logging Configuration
-LOG_LEVEL=INFO
-LOG_FILE=logs/alpha_crucible.log
-
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# Frontend Configuration
-VITE_API_URL=http://localhost:8000
+# Ngrok (optional)
+NGROK_AUTHTOKEN=your_token
 ```
 
-### Database Configuration
+### Nginx Configuration
 
-#### MySQL Setup
-```sql
--- Create database
-CREATE DATABASE signal_forge;
+The system uses two nginx configuration files:
 
--- Create user (optional)
-CREATE USER 'quant_user'@'%' IDENTIFIED BY 'secure_password';
-GRANT ALL PRIVILEGES ON signal_forge.* TO 'quant_user'@'%';
-FLUSH PRIVILEGES;
-```
+1. **Root `nginx.conf`**: Reverse proxy for Docker Compose (routes `/api/` to backend, everything else to frontend)
+2. **Frontend `frontend/nginx.conf`**: Serves built React app when frontend runs standalone
 
-#### Database Schema
-The system automatically creates the required tables:
-- `signal_scores`: Signal calculation results
-- `portfolios`: Portfolio configurations
-- `backtest_results`: Backtest performance data
-- `portfolio_values`: Daily portfolio values
-- `portfolio_weights`: Portfolio weight allocations
-- `signal_definitions`: Signal parameter definitions
+Both are automatically configured and don't require manual changes.
 
-## Monitoring and Logging
+## Health Checks
 
-### Log Files
-- **Backend Logs**: `logs/alpha_crucible.log`
-- **Database Logs**: Available in Docker logs
-- **Nginx Logs**: Available in Docker logs
+Test these endpoints to verify deployment:
 
-### Health Checks
 ```bash
-# Check backend health
-curl http://localhost:8000/health
+# Backend health
+curl http://localhost:8000/api/health
 
-# Check database connection
-docker-compose exec backend python -c "from src.database import DatabaseManager; print('DB OK' if DatabaseManager().connect() else 'DB Error')"
+# Database health
+curl http://localhost:8000/api/health/db
 
-# Check frontend
-curl http://localhost:3000
+# Frontend (via nginx)
+curl http://localhost:8080/health
+
+# API documentation
+# Open in browser: http://localhost:8000/api/docs
 ```
 
-### Monitoring Commands
+## Monitoring and Logs
+
+### View Logs
+
 ```bash
-# View all logs
+# All services
 docker-compose logs -f
 
-# View specific service logs
+# Specific service
 docker-compose logs -f backend
 docker-compose logs -f frontend
-docker-compose logs -f mysql
+docker-compose logs -f nginx
 
-# Check resource usage
-docker stats
+# With timestamps
+docker-compose logs -f -t
+```
 
-# Check service status
+### Check Status
+
+```bash
+# Container status
 docker-compose ps
-```
 
-## Backup and Recovery
-
-### Database Backup
-```bash
-# Create backup
-docker-compose exec mysql mysqldump -u root -p signal_forge > backup.sql
-
-# Restore backup
-docker-compose exec -T mysql mysql -u root -p signal_forge < backup.sql
-```
-
-### Data Backup
-```bash
-# Backup data directory
-tar -czf data_backup.tar.gz data/
-
-# Restore data
-tar -xzf data_backup.tar.gz
-```
-
-### Configuration Backup
-```bash
-# Backup configuration
-cp .env .env.backup
-cp docker-compose.yml docker-compose.yml.backup
+# Resource usage
+docker stats
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### 1. Database Connection Failed
+**Docker Desktop not running**
+- Start Docker Desktop and wait for it to fully load
+
+**Port already in use**
+- Windows: Deployment scripts automatically stop IIS if port 80 is in use
+- Linux/Mac: `sudo lsof -i :PORT` then `sudo kill -9 <PID>`
+
+**Database connection failed**
+- Verify `.env` file has correct Supabase credentials
+- Check if Supabase database is accessible
+- Test connection: `docker-compose exec backend python -c "from src.database.manager import DatabaseManager; db = DatabaseManager(); print('Connected:', db.connect())"`
+
+**Containers fail to start**
 ```bash
-# Check if MySQL is running
-docker-compose ps mysql
+# Check logs
+docker-compose logs
 
-# Check MySQL logs
-docker-compose logs mysql
-
-# Restart MySQL
-docker-compose restart mysql
+# Rebuild from scratch
+docker-compose down -v
+docker-compose up --build -d
 ```
 
-#### 2. Backend Not Starting
+**Frontend not loading**
+- Check browser console for errors
+- Verify API URL in frontend configuration
+- Check CORS settings in `.env`
+- Verify backend is running: `curl http://localhost:8000/api/health`
+
+**Ngrok issues**
+- Verify auth token: `ngrok config add-authtoken YOUR_TOKEN`
+- Check if ngrok is already running: `scripts\kill_ngrok.bat` (Windows)
+- Restart ngrok tunnel
+
+## Management Commands
+
+### Docker Commands
+
 ```bash
-# Check backend logs
-docker-compose logs backend
+# Start services
+docker-compose up -d
 
-# Check Python dependencies
-docker-compose exec backend pip list
+# Stop services
+docker-compose down
 
-# Restart backend
+# Rebuild and restart
+docker-compose up --build -d
+
+# Restart specific service
 docker-compose restart backend
-```
-
-#### 3. Frontend Not Loading
-```bash
-# Check frontend logs
-docker-compose logs frontend
-
-# Check Node.js dependencies
-docker-compose exec frontend npm list
-
-# Restart frontend
 docker-compose restart frontend
+
+# View running containers
+docker-compose ps
 ```
 
-#### 4. Port Conflicts
+### Cleanup
+
 ```bash
-# Check port usage
-netstat -tulpn | grep :3000
-netstat -tulpn | grep :8000
-netstat -tulpn | grep :3306
+# Stop and remove volumes
+docker-compose down -v
 
-# Stop conflicting services
-sudo systemctl stop apache2  # if using port 80
-sudo systemctl stop mysql    # if using port 3306
-```
+# Remove all images
+docker-compose down --rmi all
 
-### Performance Issues
-
-#### 1. Slow Database Queries
-```bash
-# Check database performance
-docker-compose exec mysql mysql -u root -p
-SHOW PROCESSLIST;
-SHOW STATUS LIKE 'Slow_queries';
-```
-
-#### 2. High Memory Usage
-```bash
-# Check memory usage
-docker stats
-
-# Restart services
-docker-compose restart
-```
-
-#### 3. Slow API Responses
-```bash
-# Check backend logs for errors
-docker-compose logs backend | grep ERROR
-
-# Check database connection pool
-docker-compose exec backend python -c "from src.database import DatabaseManager; db = DatabaseManager(); print(db.get_connection_info())"
+# Full cleanup (Windows)
+scripts\cleanup_all.bat
 ```
 
 ## Security Considerations
 
-### Production Security
-1. **Change Default Passwords**: Update all default passwords
-2. **Use HTTPS**: Configure SSL certificates for production
+1. **Environment Variables**: Never commit `.env` files to version control
+2. **Database Credentials**: Use strong passwords and rotate regularly
+3. **Ngrok Tokens**: Keep auth tokens secure
+4. **CORS Configuration**: Only allow necessary origins
+5. **Rate Limiting**: Configured in nginx for API protection
+6. **HTTPS**: Configure SSL certificates for production
+
+## Production Deployment
+
+### Recommendations
+
+1. **Use HTTPS**: Configure SSL certificates
+2. **Change Default Passwords**: Update all default passwords
 3. **Firewall Rules**: Restrict access to necessary ports only
 4. **Database Security**: Use strong passwords and limit database access
 5. **API Security**: Implement authentication and rate limiting
+6. **Monitoring**: Set up alerts for failed services
+7. **Backups**: Regular database backups
 
-### Environment Security
-```bash
-# Secure environment file
-chmod 600 .env
+### Scaling
 
-# Use secrets management
-# Consider using Docker secrets or external secret management
-```
+For horizontal scaling, modify `docker-compose.yml`:
 
-## Scaling
-
-### Horizontal Scaling
 ```yaml
-# docker-compose.scale.yml
-version: '3.8'
 services:
   backend:
     deploy:
@@ -374,64 +385,14 @@ services:
       replicas: 2
 ```
 
-### Load Balancing
-```nginx
-# nginx.conf for load balancing
-upstream backend {
-    server backend1:8000;
-    server backend2:8000;
-    server backend3:8000;
-}
-```
+## Next Steps
 
-## Maintenance
+1. **For Development**: Use `scripts\dev_all.bat` for fastest iteration
+2. **For Testing**: Use Docker with `docker-compose up -d`
+3. **For Production**: Follow security recommendations and configure HTTPS
+4. **For External Access**: Use ngrok scripts for temporary access
 
-### Regular Maintenance Tasks
-1. **Database Cleanup**: Remove old data periodically
-2. **Log Rotation**: Rotate log files to prevent disk space issues
-3. **Security Updates**: Keep Docker images and dependencies updated
-4. **Backup Verification**: Test backup and recovery procedures
-
-### Update Procedures
-```bash
-# Update application
-git pull origin main
-
-# Rebuild and restart
-docker-compose up --build -d
-
-# Verify update
-docker-compose ps
-curl http://localhost:8000/health
-```
-
-## Support
-
-### Getting Help
-1. **Check Logs**: Always check logs first
-2. **Documentation**: Review this guide and API documentation
-3. **GitHub Issues**: Report issues on the project repository
-4. **Community**: Join the project community for support
-
-### Useful Commands
-```bash
-# System status
-docker-compose ps
-docker-compose logs --tail=50
-
-# Restart services
-docker-compose restart
-docker-compose restart backend frontend
-
-# Clean up
-docker-compose down
-docker system prune -f
-
-# Full reset
-docker-compose down -v
-docker-compose up --build -d
-```
-
-## Conclusion
-
-The Alpha Crucible Quant system is designed to be easily deployable and maintainable. The Docker Compose setup provides a simple way to get started, while the modular architecture allows for flexible deployment options. Follow this guide for successful deployment and operation of the system.
+For more details, see:
+- [Development Guide](DEVELOPMENT.md) - Local development workflow
+- [Architecture](ARCHITECTURE.md) - System design
+- [API Documentation](API.md) - API endpoints

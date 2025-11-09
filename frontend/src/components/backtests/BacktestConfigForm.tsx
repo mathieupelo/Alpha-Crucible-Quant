@@ -289,6 +289,7 @@ export const BacktestConfigForm: React.FC<BacktestConfigFormProps> = ({
                     },
                   }}
                 >
+                  <MenuItem value="daily">Daily</MenuItem>
                   <MenuItem value="weekly">Weekly</MenuItem>
                   <MenuItem value="monthly">Monthly</MenuItem>
                   <MenuItem value="quarterly">Quarterly</MenuItem>

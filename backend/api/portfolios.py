@@ -97,10 +97,13 @@ async def get_portfolio_universe_tickers(portfolio_id: int):
         if portfolio is None:
             raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")
         
-        universe_tickers = db_service.get_universe_tickers(int(portfolio["universe_id"]))
+        # Get companies and extract main tickers
+        companies = db_service.get_universe_companies(int(portfolio["universe_id"]))
+        tickers = [c["main_ticker"] for c in companies if c.get("main_ticker")]
+        
         return {
-            "tickers": [ticker["ticker"] for ticker in universe_tickers],
-            "total": len(universe_tickers),
+            "tickers": tickers,
+            "total": len(tickers),
             "portfolio_id": portfolio_id,
             "universe_id": int(portfolio["universe_id"])
         }

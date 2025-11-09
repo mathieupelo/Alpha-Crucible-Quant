@@ -17,6 +17,32 @@ logger = logging.getLogger(__name__)
 class SignalOperationsMixin:
     """Mixin class providing signal-related database operations."""
     
+    def resolve_ticker_to_company_uid(self, ticker: str) -> Optional[str]:
+        """
+        Resolve a ticker symbol to company_uid via varrock.tickers.
+        
+        Args:
+            ticker: Ticker symbol to resolve
+            
+        Returns:
+            company_uid if found, None if not found (raises error per user requirement)
+            
+        Raises:
+            ValueError: If ticker doesn't exist in Varrock schema
+        """
+        query = """
+        SELECT company_uid 
+        FROM varrock.tickers 
+        WHERE ticker = %s 
+        LIMIT 1
+        """
+        df = self.execute_query(query, (ticker.strip().upper(),))
+        
+        if df.empty:
+            raise ValueError(f"Ticker '{ticker}' not found in Varrock schema. Please add it to a universe first.")
+        
+        return str(df.iloc[0]['company_uid'])
+    
     # Signal Operations
     
     def store_signal(self, signal: Signal) -> int:
@@ -137,11 +163,12 @@ class SignalOperationsMixin:
         
         # Use signal_id if available, otherwise look up by signal_name
         query = """
-        INSERT INTO signal_raw (asof_date, ticker, signal_id, signal_name, value, metadata, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO signal_raw (asof_date, ticker, signal_id, signal_name, value, metadata, company_uid, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (asof_date, ticker, signal_id) DO UPDATE SET 
             value = EXCLUDED.value,
             metadata = EXCLUDED.metadata,
+            company_uid = EXCLUDED.company_uid,
             created_at = EXCLUDED.created_at
         """
         
@@ -166,6 +193,16 @@ class SignalOperationsMixin:
                     signal_obj = self.get_or_create_signal(signal_name)
                     signal_id = signal_obj.id
             
+            # Resolve company_uid from ticker if not already provided
+            company_uid = signal.company_uid
+            if not company_uid and signal.ticker:
+                try:
+                    company_uid = self.resolve_ticker_to_company_uid(signal.ticker)
+                except ValueError as e:
+                    logger.error(f"Failed to resolve ticker {signal.ticker} to company_uid: {e}")
+                    # Continue without company_uid for now (will be populated by migration)
+                    company_uid = None
+            
             params_list.append((
                 signal.asof_date,
                 signal.ticker,
@@ -173,6 +210,7 @@ class SignalOperationsMixin:
                 signal_name,
                 signal.value,
                 metadata_json,
+                company_uid,
                 signal.created_at or datetime.now()
             ))
         
@@ -181,18 +219,88 @@ class SignalOperationsMixin:
     def get_signals_raw(self, tickers: Optional[List[str]] = None,
                        signal_names: Optional[List[str]] = None,
                        signal_ids: Optional[List[int]] = None,
+                       company_uids: Optional[List[str]] = None,
                        start_date: Optional[date] = None,
                        end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve raw signals from the database."""
-        query = """
-        SELECT sr.*, s.name as signal_name_display, s.description as signal_description
-        FROM signal_raw sr
-        LEFT JOIN signals s ON sr.signal_id = s.id
-        WHERE 1=1
         """
+        Retrieve raw signals from the database with company information.
+        
+        Args:
+            tickers: Optional list of tickers (will be resolved to company_uids)
+            signal_names: Optional list of signal names
+            signal_ids: Optional list of signal IDs
+            company_uids: Optional list of company UIDs (preferred over tickers)
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+        """
+        # Check if company_uid column exists in signal_raw
+        column_check_query = """
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'signal_raw' 
+        AND column_name = 'company_uid'
+        """
+        has_company_uid = not self.execute_query(column_check_query).empty
+        
+        if has_company_uid:
+            query = """
+            SELECT 
+                sr.*, 
+                s.name as signal_name_display, 
+                s.description as signal_description,
+                c.company_uid,
+                ci.name as company_name,
+                mt.ticker as main_ticker
+            FROM signal_raw sr
+            LEFT JOIN signals s ON sr.signal_id = s.id
+            LEFT JOIN varrock.companies c ON sr.company_uid = c.company_uid AND sr.company_uid IS NOT NULL
+            LEFT JOIN varrock.company_info ci ON c.company_uid = ci.company_uid
+            LEFT JOIN LATERAL (
+                SELECT ticker 
+                FROM varrock.tickers 
+                WHERE company_uid = c.company_uid 
+                AND is_main_ticker = TRUE 
+                LIMIT 1
+            ) mt ON TRUE
+            WHERE 1=1
+            """
+        else:
+            # Fallback query without company_uid joins
+            query = """
+            SELECT 
+                sr.*, 
+                s.name as signal_name_display, 
+                s.description as signal_description,
+                NULL as company_uid,
+                NULL as company_name,
+                sr.ticker as main_ticker
+            FROM signal_raw sr
+            LEFT JOIN signals s ON sr.signal_id = s.id
+            WHERE 1=1
+            """
         params = []
         
-        if tickers:
+        # Always use ticker filter for now (company_uid may not be populated yet)
+        # Resolve tickers to company_uids if provided and column exists
+        if tickers and not company_uids and has_company_uid:
+            resolved_company_uids = []
+            for ticker in tickers:
+                try:
+                    company_uid = self.resolve_ticker_to_company_uid(ticker)
+                    resolved_company_uids.append(company_uid)
+                except ValueError:
+                    logger.debug(f"Ticker {ticker} not found in Varrock, will use ticker filter")
+            if resolved_company_uids and len(resolved_company_uids) == len(tickers):
+                company_uids = resolved_company_uids
+        
+        if company_uids and has_company_uid:
+            placeholders = ','.join(['%s'] * len(company_uids))
+            query += f" AND (sr.company_uid IN ({placeholders}) OR sr.ticker IN ({','.join(['%s'] * len(tickers))}))"
+            params.extend(company_uids)
+            params.extend(tickers)
+        elif tickers:
+            # Fallback to ticker filter (always works)
             placeholders = ','.join(['%s'] * len(tickers))
             query += f" AND sr.ticker IN ({placeholders})"
             params.extend(tickers)

@@ -15,11 +15,12 @@ import {
   Score,
   FilterOptions,
   Universe,
-  UniverseTicker,
+  UniverseCompany,
+  UniverseCompanyListResponse,
+  UniverseCompanyUpdateRequest,
   TickerValidation,
   UniverseCreateRequest,
   UniverseUpdateRequest,
-  UniverseTickerUpdateRequest,
   BacktestCreateRequest
 } from '@/types';
 
@@ -271,29 +272,29 @@ export const universeApi = {
     return response.data;
   },
 
-  // Get universe tickers
-  getUniverseTickers: async (universeId: number): Promise<{ tickers: UniverseTicker[]; total: number; universe_id: number }> => {
-    const response = await api.get(`/universes/${universeId}/tickers`);
+  // Get universe companies (Varrock schema)
+  getUniverseCompanies: async (universeId: number): Promise<UniverseCompanyListResponse> => {
+    const response = await api.get(`/universes/${universeId}/companies`);
     return response.data;
   },
 
-  // Update universe tickers
-  updateUniverseTickers: async (universeId: number, request: UniverseTickerUpdateRequest): Promise<{ tickers: UniverseTicker[]; total: number; universe_id: number }> => {
-    const response = await api.put(`/universes/${universeId}/tickers`, request);
+  // Update universe companies (accepts tickers, auto-resolves to companies)
+  updateUniverseCompanies: async (universeId: number, request: UniverseCompanyUpdateRequest): Promise<UniverseCompanyListResponse> => {
+    const response = await api.put(`/universes/${universeId}/companies`, request);
     return response.data;
   },
 
-  // Add single ticker to universe
-  addUniverseTicker: async (universeId: number, ticker: string): Promise<UniverseTicker> => {
-    const response = await api.post(`/universes/${universeId}/tickers`, null, {
+  // Add single company to universe (accepts ticker, auto-resolves to company)
+  addUniverseCompany: async (universeId: number, ticker: string): Promise<UniverseCompany> => {
+    const response = await api.post(`/universes/${universeId}/companies`, null, {
       params: { ticker }
     });
     return response.data;
   },
 
-  // Remove ticker from universe
-  removeUniverseTicker: async (universeId: number, ticker: string): Promise<{ success: boolean; message: string }> => {
-    const response = await api.delete(`/universes/${universeId}/tickers/${ticker}`);
+  // Remove company from universe
+  removeUniverseCompany: async (universeId: number, companyUid: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/universes/${universeId}/companies/${companyUid}`);
     return response.data;
   },
 

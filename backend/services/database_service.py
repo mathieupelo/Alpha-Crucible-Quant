@@ -233,7 +233,7 @@ class DatabaseService:
             if portfolio is None:
                 return None
             
-            # Get portfolio positions
+            # Get portfolio positions with company info
             positions_df = self.db_manager.get_portfolio_positions(portfolio_id)
             positions = []
             if not positions_df.empty:
@@ -241,9 +241,12 @@ class DatabaseService:
                     position = PositionResponse(
                         id=int(row['id']),
                         portfolio_id=int(row['portfolio_id']),
-                        ticker=str(row['ticker']),
+                        ticker=str(row.get('main_ticker') or row['ticker']),  # Use main_ticker if available
                         weight=float(row['weight']),
                         price_used=float(row['price_used']),
+                        company_uid=str(row.get('company_uid')) if pd.notna(row.get('company_uid')) else None,
+                        company_name=str(row.get('company_name')) if pd.notna(row.get('company_name')) else None,
+                        main_ticker=str(row.get('main_ticker')) if pd.notna(row.get('main_ticker')) else None,
                         created_at=row['created_at']
                     )
                     positions.append(position)
@@ -279,17 +282,17 @@ class DatabaseService:
             if portfolio is None:
                 return []
             
-            # Get all universe tickers instead of just portfolio positions
-            universe_tickers_df = self.db_manager.get_universe_tickers(portfolio.universe_id)
-            if universe_tickers_df.empty:
+            # Get all universe companies instead of just portfolio positions
+            companies_df = self.db_manager.get_universe_companies(portfolio.universe_id)
+            if companies_df.empty:
                 return []
             
-            # Get the tickers from universe
-            tickers = universe_tickers_df['ticker'].tolist()
+            # Get company_uids from universe
+            company_uids = companies_df['company_uid'].dropna().tolist()
             
-            # Get signal scores for the portfolio date and all universe tickers
+            # Get signal scores for the portfolio date and all universe companies
             signals_df = self.db_manager.get_signals_raw(
-                tickers=tickers,
+                company_uids=company_uids,
                 start_date=portfolio.asof_date,
                 end_date=portfolio.asof_date
             )
@@ -297,23 +300,33 @@ class DatabaseService:
             signals = []
             if not signals_df.empty:
                 # Get all unique signal names from the data
-                available_signals = signals_df['signal_name'].unique().tolist()
+                available_signals = signals_df['signal_name_display'].dropna().unique().tolist()
+                if not available_signals:
+                    available_signals = signals_df['signal_name'].dropna().unique().tolist()
             else:
                 available_signals = []
             
-            # Create signal data for ALL universe tickers, not just those with data
-            for ticker in tickers:
+            # Create signal data for ALL universe companies, not just those with data
+            for _, company_row in companies_df.iterrows():
+                company_uid = str(company_row['company_uid'])
+                main_ticker = str(company_row['main_ticker']) if pd.notna(company_row.get('main_ticker')) else None
+                company_name = str(company_row['company_name']) if pd.notna(company_row.get('company_name')) else None
+                
                 signal_data = {
-                    'ticker': str(ticker),
+                    'company_uid': company_uid,
+                    'company_name': company_name,
+                    'main_ticker': main_ticker,
+                    'ticker': main_ticker,  # Keep for backward compatibility
                     'available_signals': [str(signal) for signal in available_signals]
                 }
                 
-                # Add signal values if they exist for this ticker
+                # Add signal values if they exist for this company
                 if not signals_df.empty:
-                    ticker_signals = signals_df[signals_df['ticker'] == ticker]
-                    for _, row in ticker_signals.iterrows():
-                        signal_name = str(row['signal_name'])
-                        signal_data[signal_name] = float(row['value']) if pd.notna(row['value']) else None
+                    company_signals = signals_df[signals_df['company_uid'] == company_uid]
+                    for _, row in company_signals.iterrows():
+                        signal_name = str(row.get('signal_name_display') or row.get('signal_name', ''))
+                        if signal_name:
+                            signal_data[signal_name] = float(row['value']) if pd.notna(row['value']) else None
                 
                 signals.append(signal_data)
             
@@ -331,36 +344,43 @@ class DatabaseService:
             if portfolio is None:
                 return []
             
-            # Get all universe tickers instead of just portfolio positions
-            universe_tickers_df = self.db_manager.get_universe_tickers(portfolio.universe_id)
-            if universe_tickers_df.empty:
+            # Get all universe companies instead of just portfolio positions
+            companies_df = self.db_manager.get_universe_companies(portfolio.universe_id)
+            if companies_df.empty:
                 return []
             
-            # Get the tickers from universe
-            tickers = universe_tickers_df['ticker'].tolist()
+            # Get company_uids from universe
+            company_uids = companies_df['company_uid'].dropna().tolist()
             
-            # Get combined scores for the portfolio date and all universe tickers
+            # Get combined scores for the portfolio date and all universe companies
             scores_df = self.db_manager.get_scores_combined(
-                tickers=tickers,
+                company_uids=company_uids,
                 start_date=portfolio.asof_date,
                 end_date=portfolio.asof_date
             )
             
             scores = []
             
-            # Create score data for ALL universe tickers, not just those with data
-            for ticker in tickers:
+            # Create score data for ALL universe companies, not just those with data
+            for _, company_row in companies_df.iterrows():
+                company_uid = str(company_row['company_uid'])
+                main_ticker = str(company_row['main_ticker']) if pd.notna(company_row.get('main_ticker')) else None
+                company_name = str(company_row['company_name']) if pd.notna(company_row.get('company_name')) else None
+                
                 score_data = {
-                    'ticker': str(ticker),
+                    'company_uid': company_uid,
+                    'company_name': company_name,
+                    'main_ticker': main_ticker,
+                    'ticker': main_ticker,  # Keep for backward compatibility
                     'combined_score': None,
                     'method': None
                 }
                 
-                # Add score data if it exists for this ticker
+                # Add score data if it exists for this company
                 if not scores_df.empty:
-                    ticker_scores = scores_df[scores_df['ticker'] == ticker]
-                    if not ticker_scores.empty:
-                        row = ticker_scores.iloc[0]
+                    company_scores = scores_df[scores_df['company_uid'] == company_uid]
+                    if not company_scores.empty:
+                        row = company_scores.iloc[0]
                         score_data['combined_score'] = float(row['score']) if pd.notna(row['score']) else None
                         score_data['method'] = str(row['method'])
                 
@@ -411,13 +431,13 @@ class DatabaseService:
             if end_date is None:
                 end_date = backtest.end_date
             
-            # Get universe tickers for this backtest
-            universe_tickers_df = self.db_manager.get_universe_tickers(backtest.universe_id)
-            tickers = universe_tickers_df['ticker'].tolist() if not universe_tickers_df.empty else []
+            # Get universe companies for this backtest
+            companies_df = self.db_manager.get_universe_companies(backtest.universe_id)
+            company_uids = companies_df['company_uid'].dropna().tolist() if not companies_df.empty else []
             
             # Get signal raw data filtered by signal IDs (more reliable than names)
             signals_df = self.db_manager.get_signals_raw(
-                tickers=tickers if tickers else None,
+                company_uids=company_uids if company_uids else None,
                 signal_ids=signal_ids,  # Use signal_ids instead of signal_names for more reliable filtering
                 start_date=start_date,
                 end_date=end_date
@@ -603,9 +623,9 @@ class DatabaseService:
             
             universes = []
             for _, row in universes_df.iterrows():
-                # Get ticker count for each universe
-                tickers_df = self.db_manager.get_universe_tickers(int(row['id']))
-                ticker_count = len(tickers_df)
+                # Get company count for each universe (using universe_companies)
+                companies_df = self.db_manager.get_universe_companies(int(row['id']))
+                company_count = len(companies_df)
                 
                 universe_data = {
                     "id": int(row['id']),
@@ -613,7 +633,7 @@ class DatabaseService:
                     "description": str(row.get('description')) if pd.notna(row.get('description')) else None,
                     "created_at": row['created_at'].isoformat() if pd.notna(row['created_at']) else None,
                     "updated_at": row['updated_at'].isoformat() if pd.notna(row['updated_at']) else None,
-                    "ticker_count": ticker_count
+                    "ticker_count": company_count  # Keep for backward compatibility, but it's actually company count
                 }
                 universes.append(universe_data)
             
@@ -630,9 +650,9 @@ class DatabaseService:
             if universe is None:
                 return None
             
-            # Get ticker count
-            tickers_df = self.db_manager.get_universe_tickers(universe_id)
-            ticker_count = len(tickers_df)
+            # Get company count (using universe_companies)
+            companies_df = self.db_manager.get_universe_companies(universe_id)
+            company_count = len(companies_df)
             
             return {
                 "id": universe.id,
@@ -640,7 +660,7 @@ class DatabaseService:
                 "description": universe.description,
                 "created_at": universe.created_at,
                 "updated_at": universe.updated_at,
-                "ticker_count": ticker_count
+                "ticker_count": company_count  # Keep for backward compatibility, but it's actually company count
             }
             
         except Exception as e:
@@ -670,7 +690,7 @@ class DatabaseService:
                 "description": description,
                 "created_at": universe.created_at,
                 "updated_at": universe.updated_at,
-                "ticker_count": 0
+                "ticker_count": 0  # Keep for backward compatibility, but it's actually company count
             }
             
         except Exception as e:
@@ -711,9 +731,9 @@ class DatabaseService:
             if updated_universe is None:
                 raise ValueError(f"Failed to retrieve updated universe {universe_id}")
             
-            # Get ticker count
-            tickers_df = self.db_manager.get_universe_tickers(universe_id)
-            ticker_count = len(tickers_df)
+            # Get company count (using universe_companies)
+            companies_df = self.db_manager.get_universe_companies(universe_id)
+            company_count = len(companies_df)
             
             return {
                 "id": updated_universe.id,
@@ -721,7 +741,7 @@ class DatabaseService:
                 "description": updated_universe.description,
                 "created_at": updated_universe.created_at,
                 "updated_at": updated_universe.updated_at,
-                "ticker_count": ticker_count
+                "ticker_count": company_count  # Keep for backward compatibility, but it's actually company count
             }
             
         except Exception as e:
@@ -736,23 +756,62 @@ class DatabaseService:
             logger.error(f"Error deleting universe {universe_id}: {e}")
             raise
     
-    def get_universe_tickers(self, universe_id: int) -> List[Dict[str, Any]]:
-        """Get all tickers for a universe."""
+    def get_universe_companies(self, universe_id: int) -> List[Dict[str, Any]]:
+        """Get all companies for a universe with company info and tickers."""
         try:
-            tickers_df = self.db_manager.get_universe_tickers(universe_id)
+            companies_df = self.db_manager.get_universe_companies(universe_id)
             
-            if tickers_df.empty:
+            if companies_df.empty:
+                return []
+            
+            companies = []
+            for _, row in companies_df.iterrows():
+                # Handle all_tickers array (PostgreSQL array)
+                all_tickers = row.get('all_tickers', [])
+                if isinstance(all_tickers, str):
+                    # If it's a string representation of array, parse it
+                    import re
+                    all_tickers = re.findall(r'"([^"]+)"', all_tickers) if all_tickers else []
+                elif pd.isna(all_tickers):
+                    all_tickers = []
+                
+                company_data = {
+                    "id": int(row['id']),
+                    "universe_id": int(row['universe_id']),
+                    "company_uid": str(row['company_uid']),
+                    "company_name": str(row['company_name']) if pd.notna(row.get('company_name')) else None,
+                    "main_ticker": str(row['main_ticker']) if pd.notna(row.get('main_ticker')) else None,
+                    "all_tickers": all_tickers if isinstance(all_tickers, list) else list(all_tickers) if all_tickers else [],
+                    "added_at": row['added_at'].isoformat() if pd.notna(row['added_at']) else None
+                }
+                companies.append(company_data)
+            
+            return companies
+            
+        except Exception as e:
+            logger.error(f"Error getting companies for universe {universe_id}: {e}")
+            raise
+    
+    def get_universe_tickers(self, universe_id: int) -> List[Dict[str, Any]]:
+        """Get all tickers for a universe (DEPRECATED - use get_universe_companies instead)."""
+        try:
+            # Use universe_companies and extract main tickers
+            companies_df = self.db_manager.get_universe_companies(universe_id)
+            
+            if companies_df.empty:
                 return []
             
             tickers = []
-            for _, row in tickers_df.iterrows():
-                ticker_data = {
-                    "id": int(row['id']),
-                    "universe_id": int(row['universe_id']),
-                    "ticker": str(row['ticker']),
-                    "added_at": row['added_at'].isoformat() if pd.notna(row['added_at']) else None
-                }
-                tickers.append(ticker_data)
+            for _, row in companies_df.iterrows():
+                main_ticker = row.get('main_ticker')
+                if pd.notna(main_ticker):
+                    ticker_data = {
+                        "id": int(row['id']),
+                        "universe_id": int(row['universe_id']),
+                        "ticker": str(main_ticker),
+                        "added_at": row['added_at'].isoformat() if pd.notna(row['added_at']) else None
+                    }
+                    tickers.append(ticker_data)
             
             return tickers
             
@@ -760,68 +819,129 @@ class DatabaseService:
             logger.error(f"Error getting tickers for universe {universe_id}: {e}")
             raise
     
-    def update_universe_tickers(self, universe_id: int, tickers: List[str]) -> List[Dict[str, Any]]:
-        """Update all tickers for a universe."""
+    def update_universe_companies(self, universe_id: int, tickers: List[str]) -> List[Dict[str, Any]]:
+        """
+        Update all companies for a universe (accepts tickers, auto-resolves to companies).
+        
+        Args:
+            universe_id: Universe ID
+            tickers: List of ticker symbols (will be resolved to company_uid)
+            
+        Returns:
+            List of company dictionaries with company info
+        """
         try:
+            from src.database.models import UniverseCompany
+            
             # Check if universe exists
             universe = self.db_manager.get_universe_by_id(universe_id)
             if universe is None:
                 raise ValueError(f"Universe {universe_id} not found")
             
-            # Remove all existing tickers
-            self.db_manager.delete_all_universe_tickers(universe_id)
+            # Remove all existing companies
+            self.db_manager.delete_all_universe_companies(universe_id)
             
-            # Add new tickers
+            # Resolve tickers to company_uids and add companies
             if tickers:
-                universe_tickers = []
+                universe_companies = []
                 for ticker in tickers:
-                    universe_ticker = UniverseTicker(
-                        universe_id=universe_id,
-                        ticker=ticker.strip().upper(),
-                        added_at=datetime.now()
-                    )
-                    universe_tickers.append(universe_ticker)
+                    try:
+                        # Resolve ticker to company_uid
+                        company_uid = self.db_manager.resolve_ticker_to_company_uid(ticker.strip().upper())
+                        
+                        universe_company = UniverseCompany(
+                            universe_id=universe_id,
+                            company_uid=company_uid,
+                            added_at=datetime.now()
+                        )
+                        universe_companies.append(universe_company)
+                    except ValueError as e:
+                        logger.warning(f"Ticker {ticker} not found in Varrock, skipping: {e}")
+                        continue
                 
-                self.db_manager.store_universe_tickers(universe_tickers)
+                if universe_companies:
+                    self.db_manager.store_universe_companies(universe_companies)
             
-            # Return updated ticker list
-            return self.get_universe_tickers(universe_id)
+            # Return updated company list
+            return self.get_universe_companies(universe_id)
             
         except Exception as e:
-            logger.error(f"Error updating tickers for universe {universe_id}: {e}")
+            logger.error(f"Error updating companies for universe {universe_id}: {e}")
             raise
     
-    def add_universe_ticker(self, universe_id: int, ticker: str) -> Dict[str, Any]:
-        """Add a single ticker to a universe."""
+    def update_universe_tickers(self, universe_id: int, tickers: List[str]) -> List[Dict[str, Any]]:
+        """Update all tickers for a universe (DEPRECATED - use update_universe_companies instead)."""
+        return self.update_universe_companies(universe_id, tickers)
+    
+    def add_universe_company(self, universe_id: int, ticker: str) -> Dict[str, Any]:
+        """
+        Add a single company to a universe (accepts ticker, auto-resolves to company).
+        
+        Args:
+            universe_id: Universe ID
+            ticker: Ticker symbol (will be resolved to company_uid)
+            
+        Returns:
+            Company dictionary with company info
+        """
         try:
+            from src.database.models import UniverseCompany
+            
             # Check if universe exists
             universe = self.db_manager.get_universe_by_id(universe_id)
             if universe is None:
                 raise ValueError(f"Universe {universe_id} not found")
             
-            universe_ticker = UniverseTicker(
+            # Resolve ticker to company_uid
+            company_uid = self.db_manager.resolve_ticker_to_company_uid(ticker.strip().upper())
+            
+            universe_company = UniverseCompany(
                 universe_id=universe_id,
-                ticker=ticker.strip().upper(),
+                company_uid=company_uid,
                 added_at=datetime.now()
             )
             
-            ticker_id = self.db_manager.store_universe_ticker(universe_ticker)
+            company_id = self.db_manager.store_universe_company(universe_company)
             
+            # Get full company info
+            companies = self.get_universe_companies(universe_id)
+            for company in companies:
+                if company['company_uid'] == company_uid:
+                    return company
+            
+            # Fallback if not found
             return {
-                "id": ticker_id,
+                "id": company_id,
                 "universe_id": universe_id,
-                "ticker": ticker.strip().upper(),
-                "added_at": universe_ticker.added_at
+                "company_uid": company_uid,
+                "company_name": None,
+                "main_ticker": ticker.strip().upper(),
+                "all_tickers": [ticker.strip().upper()],
+                "added_at": universe_company.added_at.isoformat() if universe_company.added_at else None
             }
             
         except Exception as e:
-            logger.error(f"Error adding ticker {ticker} to universe {universe_id}: {e}")
+            logger.error(f"Error adding company (ticker {ticker}) to universe {universe_id}: {e}")
+            raise
+    
+    def add_universe_ticker(self, universe_id: int, ticker: str) -> Dict[str, Any]:
+        """Add a single ticker to a universe (DEPRECATED - use add_universe_company instead)."""
+        return self.add_universe_company(universe_id, ticker)
+    
+    def remove_universe_company(self, universe_id: int, company_uid: str) -> bool:
+        """Remove a company from a universe."""
+        try:
+            return self.db_manager.delete_universe_company(universe_id, company_uid)
+        except Exception as e:
+            logger.error(f"Error removing company {company_uid} from universe {universe_id}: {e}")
             raise
     
     def remove_universe_ticker(self, universe_id: int, ticker: str) -> bool:
-        """Remove a ticker from a universe."""
+        """Remove a ticker from a universe (DEPRECATED - use remove_universe_company instead)."""
         try:
-            return self.db_manager.delete_universe_ticker(universe_id, ticker.strip().upper())
+            # Resolve ticker to company_uid first
+            company_uid = self.db_manager.resolve_ticker_to_company_uid(ticker.strip().upper())
+            return self.remove_universe_company(universe_id, company_uid)
         except Exception as e:
             logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
             raise
@@ -877,14 +997,16 @@ class DatabaseService:
     def get_signals_raw(self, tickers: Optional[List[str]] = None, 
                        signal_names: Optional[List[str]] = None,
                        signal_ids: Optional[List[int]] = None,
+                       company_uids: Optional[List[str]] = None,
                        start_date: Optional[date] = None, 
                        end_date: Optional[date] = None) -> List[Dict[str, Any]]:
-        """Get raw signals with optional filtering."""
+        """Get raw signals with optional filtering and company information."""
         try:
             signals_df = self.db_manager.get_signals_raw(
                 tickers=tickers,
                 signal_names=signal_names,
                 signal_ids=signal_ids,
+                company_uids=company_uids,
                 start_date=start_date,
                 end_date=end_date
             )
@@ -898,11 +1020,14 @@ class DatabaseService:
                 signal_data = {
                     "id": int(row.get('id')) if pd.notna(row.get('id')) else None,
                     "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
-                    "ticker": str(row['ticker']),
+                    "ticker": str(row.get('main_ticker') or row['ticker']),  # Use main_ticker if available
                     "signal_id": int(row['signal_id']) if pd.notna(row.get('signal_id')) else None,
                     "signal_name": str(row.get('signal_name_display') or row.get('signal_name', '')) if pd.notna(row.get('signal_name_display') or row.get('signal_name')) else None,
                     "value": float(row['value']) if pd.notna(row['value']) else None,
                     "metadata": self._parse_json_field(row.get('metadata')),
+                    "company_uid": str(row.get('company_uid')) if pd.notna(row.get('company_uid')) else None,
+                    "company_name": str(row.get('company_name')) if pd.notna(row.get('company_name')) else None,
+                    "main_ticker": str(row.get('main_ticker')) if pd.notna(row.get('main_ticker')) else None,
                     "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None
                 }
                 signals.append(signal_data)

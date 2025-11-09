@@ -53,10 +53,10 @@ const TickerBar: React.FC = () => {
     );
   }, [universesData]);
 
-  // Fetch tickers for both universes
-  const { data: movieCoreTickersData } = useQuery(
-    ['universe-tickers', movieCoreUniverse?.id],
-    () => universeApi.getUniverseTickers(movieCoreUniverse!.id),
+  // Fetch companies for both universes
+  const { data: movieCoreCompaniesData } = useQuery(
+    ['universe-companies', movieCoreUniverse?.id],
+    () => universeApi.getUniverseCompanies(movieCoreUniverse!.id),
     {
       enabled: !!movieCoreUniverse?.id,
       staleTime: 5 * 60 * 1000,
@@ -64,9 +64,9 @@ const TickerBar: React.FC = () => {
     }
   );
 
-  const { data: gameCoreTickersData } = useQuery(
-    ['universe-tickers', gameCoreUniverse?.id],
-    () => universeApi.getUniverseTickers(gameCoreUniverse!.id),
+  const { data: gameCoreCompaniesData } = useQuery(
+    ['universe-companies', gameCoreUniverse?.id],
+    () => universeApi.getUniverseCompanies(gameCoreUniverse!.id),
     {
       enabled: !!gameCoreUniverse?.id,
       staleTime: 5 * 60 * 1000,
@@ -74,24 +74,28 @@ const TickerBar: React.FC = () => {
     }
   );
 
-  // Combine all tickers
+  // Combine all tickers (using main_ticker from companies)
   const allTickers = useMemo(() => {
     const tickers: Array<{ symbol: string; universe: string }> = [];
     
-    if (movieCoreTickersData) {
-      movieCoreTickersData.tickers.forEach(t => {
-        tickers.push({ symbol: t.ticker, universe: 'MovieCore-8' });
+    if (movieCoreCompaniesData) {
+      movieCoreCompaniesData.companies.forEach(c => {
+        if (c.main_ticker) {
+          tickers.push({ symbol: c.main_ticker, universe: 'MovieCore-8' });
+        }
       });
     }
     
-    if (gameCoreTickersData) {
-      gameCoreTickersData.tickers.forEach(t => {
-        tickers.push({ symbol: t.ticker, universe: 'GameCore-12' });
+    if (gameCoreCompaniesData) {
+      gameCoreCompaniesData.companies.forEach(c => {
+        if (c.main_ticker) {
+          tickers.push({ symbol: c.main_ticker, universe: 'GameCore-12' });
+        }
       });
     }
     
     return tickers;
-  }, [movieCoreTickersData, gameCoreTickersData]);
+  }, [movieCoreCompaniesData, gameCoreCompaniesData]);
 
   // Fetch live prices for all tickers
   const { data: pricesData } = useQuery(

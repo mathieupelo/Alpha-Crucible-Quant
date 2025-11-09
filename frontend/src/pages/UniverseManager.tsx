@@ -305,7 +305,7 @@ const UniverseManager: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                     <Chip
                       icon={<GroupIcon />}
-                      label={`${universe.ticker_count} tickers`}
+                      label={`${universe.ticker_count} companies`}
                       sx={{
                         color: isDarkMode ? '#10b981' : '#059669',
                         borderColor: isDarkMode ? '#10b981' : '#059669',

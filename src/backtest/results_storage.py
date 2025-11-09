@@ -86,12 +86,29 @@ class BacktestResultsStorage:
                 current_nav = portfolio_values.get(date, config.initial_capital)
                 
                 # Create portfolio
+                # Convert signal_weights to native Python types for JSON serialization
+                import numpy as np
+                def convert_numpy_types(obj):
+                    if isinstance(obj, np.integer):
+                        return int(obj)
+                    elif isinstance(obj, np.floating):
+                        return float(obj)
+                    elif isinstance(obj, np.ndarray):
+                        return obj.tolist()
+                    elif isinstance(obj, dict):
+                        return {k: convert_numpy_types(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_numpy_types(item) for item in obj]
+                    return obj
+                
+                cleaned_signal_weights = convert_numpy_types(result.signal_weights) if result.signal_weights else {}
+                
                 portfolio = Portfolio(
                     run_id=result.backtest_id,
                     universe_id=config.universe_id,
                     asof_date=date,
                     method='optimization',
-                    params={'risk_aversion': result.signal_weights},
+                    params={'risk_aversion': cleaned_signal_weights},
                     cash=0.0,  # Always 0 since weights are normalized to sum to 1.0
                     total_value=current_nav,  # Total portfolio value available for investment
                     notes=f'Portfolio for {date}',
@@ -114,11 +131,23 @@ class BacktestResultsStorage:
                     except:
                         price_used = 0.0
                     
+                    # Resolve ticker to company_uid
+                    try:
+                        company_uid = self.database_manager.resolve_ticker_to_company_uid(ticker)
+                    except (ValueError, Exception) as e:
+                        logger.warning(f"Could not resolve ticker {ticker} to company_uid: {e}")
+                        company_uid = None
+                    
+                    # Ensure weight and price_used are native Python floats (not numpy types)
+                    weight_float = float(weight) if weight is not None else 0.0
+                    price_float = float(price_used) if price_used is not None else 0.0
+                    
                     position = PortfolioPosition(
                         portfolio_id=portfolio_id,
                         ticker=ticker,
-                        weight=float(weight),
-                        price_used=float(price_used),
+                        weight=weight_float,
+                        price_used=price_float,
+                        company_uid=company_uid,
                         created_at=datetime.now()
                     )
                     positions.append(position)

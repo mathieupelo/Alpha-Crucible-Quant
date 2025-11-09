@@ -70,13 +70,13 @@ async def create_backtest(request: BacktestCreateRequest):
                 error_code="UNIVERSE_NOT_FOUND"
             )
         
-        # Check ticker count
-        tickers = db_service.get_universe_tickers(request.universe_id)
-        if len(tickers) < 5:
+        # Check company count (using new company-based approach)
+        companies = db_service.get_universe_companies(request.universe_id)
+        if len(companies) < 5:
             raise ValidationError(
-                f"The selected universe '{universe['name']}' must contain at least 5 tickers. "
-                f"Please add more tickers or choose another universe. "
-                f"Current ticker count: {len(tickers)}",
+                f"The selected universe '{universe['name']}' must contain at least 5 companies. "
+                f"Please add more companies or choose another universe. "
+                f"Current company count: {len(companies)}",
                 error_code="INSUFFICIENT_TICKERS"
             )
         
@@ -107,8 +107,8 @@ async def create_backtest(request: BacktestCreateRequest):
         from src.backtest.engine import BacktestEngine
         engine = BacktestEngine()
         
-        # Get universe tickers
-        universe_tickers = [ticker['ticker'] for ticker in tickers]
+        # Get universe main tickers from companies
+        universe_tickers = [company['main_ticker'] for company in companies if company.get('main_ticker')]
         
         # Convert signal names to uppercase to match database
         signals_upper = [signal.upper() for signal in request.signals]

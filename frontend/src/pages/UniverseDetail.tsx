@@ -34,13 +34,12 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   ArrowBack as ArrowBackIcon,
-  Save as SaveIcon,
   Group as GroupIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 
 import { universeApi } from '@/services/api';
-import { TickerValidation } from '@/types';
+import { TickerValidation, UniverseCompany } from '@/types';
 
 const UniverseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,13 +49,13 @@ const UniverseDetail: React.FC = () => {
 
   // State
   const [tickerInput, setTickerInput] = useState('');
-  const [tickers, setTickers] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<UniverseCompany[]>([]);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [validationResults, setValidationResults] = useState<TickerValidation[]>([]);
   const [isValidating, setIsValidating] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [tickerToDelete, setTickerToDelete] = useState<string | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
 
   // Fetch universe details
   const {
@@ -67,29 +66,15 @@ const UniverseDetail: React.FC = () => {
     enabled: !!universeId,
   });
 
-  // Fetch universe tickers
+  // Fetch universe companies
   const {
-    data: tickersData,
-    // isLoading: tickersLoading,
-    error: tickersError,
-  } = useQuery(['universe-tickers', universeId], () => universeApi.getUniverseTickers(universeId), {
+    data: companiesData,
+    isLoading: companiesLoading,
+    error: companiesError,
+  } = useQuery(['universe-companies', universeId], () => universeApi.getUniverseCompanies(universeId), {
     enabled: !!universeId,
   });
 
-  // Update tickers mutation
-  const updateTickersMutation = useMutation(
-    (tickers: string[]) => universeApi.updateUniverseTickers(universeId, { tickers }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['universe-tickers', universeId]);
-        setHasChanges(false);
-        setError(null);
-      },
-      onError: (error: any) => {
-        setError(error.response?.data?.detail || 'Failed to update tickers');
-      },
-    }
-  );
 
   // Remove ticker mutation
   // const removeTickerMutation = useMutation(
@@ -118,48 +103,62 @@ const UniverseDetail: React.FC = () => {
     },
   });
 
-  // Initialize tickers when data loads
+  // Initialize companies when data loads
   useEffect(() => {
-    if (tickersData?.tickers) {
-      const tickerList = tickersData.tickers.map(t => t.ticker);
-      setTickers(tickerList);
+    if (companiesData?.companies) {
+      setCompanies(companiesData.companies);
     }
-  }, [tickersData]);
+  }, [companiesData]);
 
-  const handleAddTicker = () => {
+  const handleAddTicker = async () => {
     const ticker = tickerInput.trim().toUpperCase();
-    if (ticker && !tickers.includes(ticker)) {
-      const newTickers = [...tickers, ticker];
-      setTickers(newTickers);
+    if (!ticker) return;
+    
+    try {
+      await universeApi.addUniverseCompany(universeId, ticker);
+      queryClient.invalidateQueries(['universe-companies', universeId]);
       setTickerInput('');
-      setHasChanges(true);
+      setError(null);
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Failed to add company');
     }
   };
 
-  const handleRemoveTicker = (ticker: string) => {
-    setTickerToDelete(ticker);
+  const handleRemoveCompany = (companyUid: string) => {
+    setCompanyToDelete(companyUid);
     setDeleteDialogOpen(true);
   };
 
-  const confirmRemoveTicker = () => {
-    if (tickerToDelete) {
-      const newTickers = tickers.filter(t => t !== tickerToDelete);
-      setTickers(newTickers);
-      setHasChanges(true);
-      setTickerToDelete(null);
-      setDeleteDialogOpen(false);
+  const confirmRemoveCompany = async () => {
+    if (companyToDelete) {
+      try {
+        await universeApi.removeUniverseCompany(universeId, companyToDelete);
+        queryClient.invalidateQueries(['universe-companies', universeId]);
+        setCompanyToDelete(null);
+        setDeleteDialogOpen(false);
+        setError(null);
+      } catch (error: any) {
+        setError(error.response?.data?.detail || 'Failed to remove company');
+      }
     }
   };
 
+  const handleToggleExpand = (companyUid: string) => {
+    const newExpanded = new Set(expandedCompanies);
+    if (newExpanded.has(companyUid)) {
+      newExpanded.delete(companyUid);
+    } else {
+      newExpanded.add(companyUid);
+    }
+    setExpandedCompanies(newExpanded);
+  };
+
   const handleValidateTickers = async () => {
+    const tickers = companies.map(c => c.main_ticker).filter(Boolean);
     if (tickers.length === 0) return;
     
     setIsValidating(true);
     validateTickersMutation.mutate(tickers);
-  };
-
-  const handleSaveTickers = () => {
-    updateTickersMutation.mutate(tickers);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -175,7 +174,7 @@ const UniverseDetail: React.FC = () => {
   const allTickersValid = validationResults.length > 0 && validationResults.every(result => result.is_valid);
   const hasInvalidTickers = validationResults.some(result => !result.is_valid);
 
-  if (universeError || tickersError) {
+  if (universeError || companiesError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
         Failed to load universe data. Please check your connection and try again.
@@ -183,7 +182,7 @@ const UniverseDetail: React.FC = () => {
     );
   }
 
-  if (universeLoading) {
+  if (universeLoading || companiesLoading) {
     return (
       <Box>
         <Skeleton variant="text" height={40} width={300} />
@@ -224,7 +223,7 @@ const UniverseDetail: React.FC = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Chip
             icon={<GroupIcon />}
-            label={`${tickers.length} tickers`}
+            label={`${companies.length} companies`}
             color="primary"
             variant="outlined"
           />
@@ -262,32 +261,22 @@ const UniverseDetail: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Validation and Save Section */}
-      {tickers.length > 0 && (
+      {/* Validation Section */}
+      {companies.length > 0 && (
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
                 Ticker Validation
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleValidateTickers}
-                  disabled={isValidating || tickers.length === 0}
-                  startIcon={isValidating ? <CircularProgress size={16} /> : null}
-                >
-                  {isValidating ? 'Validating...' : 'Validate Tickers'}
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleSaveTickers}
-                  disabled={!hasChanges || hasInvalidTickers}
-                  startIcon={<SaveIcon />}
-                >
-                  Save Changes
-                </Button>
-              </Box>
+              <Button
+                variant="outlined"
+                onClick={handleValidateTickers}
+                disabled={isValidating || companies.length === 0}
+                startIcon={isValidating ? <CircularProgress size={16} /> : null}
+              >
+                {isValidating ? 'Validating...' : 'Validate Tickers'}
+              </Button>
             </Box>
             
             {validationResults.length > 0 && (
@@ -307,33 +296,51 @@ const UniverseDetail: React.FC = () => {
         </Card>
       )}
 
-      {/* Tickers List */}
+      {/* Companies List */}
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Current Tickers ({tickers.length})
+            Current Companies ({companies.length})
           </Typography>
           
-          {tickers.length === 0 ? (
+          {companies.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <GroupIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
               <Typography variant="body1" color="text.secondary">
-                No tickers added yet. Add some tickers to get started.
+                No companies added yet. Add some tickers to get started.
               </Typography>
             </Box>
           ) : (
             <List>
-              {tickers.map((ticker, index) => {
-                const validation = getValidationResult(ticker);
+              {companies.map((company, index) => {
+                const validation = getValidationResult(company.main_ticker);
+                const isExpanded = expandedCompanies.has(company.company_uid);
+                const hasMultipleTickers = company.all_tickers && company.all_tickers.length > 1;
+                
                 return (
-                  <React.Fragment key={ticker}>
+                  <React.Fragment key={company.company_uid}>
                     <ListItem>
                       <ListItemText
                         primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                             <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {ticker}
+                              {company.company_name || company.main_ticker}
                             </Typography>
+                            <Chip 
+                              label={company.main_ticker} 
+                              size="small" 
+                              variant="outlined"
+                              color="primary"
+                            />
+                            {hasMultipleTickers && (
+                              <Chip 
+                                label={`+${company.all_tickers.length - 1} more`}
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleToggleExpand(company.company_uid)}
+                                sx={{ cursor: 'pointer' }}
+                              />
+                            )}
                             {validation && (
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 {validation.is_valid ? (
@@ -341,26 +348,43 @@ const UniverseDetail: React.FC = () => {
                                 ) : (
                                   <CancelIcon color="error" fontSize="small" />
                                 )}
-                                <Typography 
-                                  variant="caption" 
-                                  color={validation.is_valid ? "success.main" : "error.main"}
-                                >
-                                  {validation.is_valid 
-                                    ? validation.company_name || "Valid"
-                                    : validation.error_message || "Invalid"
-                                  }
-                                </Typography>
                               </Box>
                             )}
                           </Box>
                         }
-                        secondary={validation?.is_valid ? validation.company_name : undefined}
+                        secondary={
+                          <Box>
+                            {validation?.is_valid && (
+                              <Typography variant="caption" color="success.main">
+                                {validation.company_name || "Valid"}
+                              </Typography>
+                            )}
+                            {isExpanded && hasMultipleTickers && (
+                              <Box sx={{ mt: 1 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                  All tickers:
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                  {company.all_tickers.map((ticker) => (
+                                    <Chip 
+                                      key={ticker}
+                                      label={ticker} 
+                                      size="small"
+                                      variant={ticker === company.main_ticker ? "filled" : "outlined"}
+                                      color={ticker === company.main_ticker ? "primary" : "default"}
+                                    />
+                                  ))}
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        }
                       />
                       <ListItemSecondaryAction>
-                        <Tooltip title="Remove Ticker">
+                        <Tooltip title="Remove Company">
                           <IconButton
                             edge="end"
-                            onClick={() => handleRemoveTicker(ticker)}
+                            onClick={() => handleRemoveCompany(company.company_uid)}
                             color="error"
                           >
                             <DeleteIcon />
@@ -368,7 +392,7 @@ const UniverseDetail: React.FC = () => {
                         </Tooltip>
                       </ListItemSecondaryAction>
                     </ListItem>
-                    {index < tickers.length - 1 && <Divider />}
+                    {index < companies.length - 1 && <Divider />}
                   </React.Fragment>
                 );
               })}
@@ -386,15 +410,15 @@ const UniverseDetail: React.FC = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Remove Ticker</DialogTitle>
+        <DialogTitle>Remove Company</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to remove "{tickerToDelete}" from this universe?
+            Are you sure you want to remove this company from this universe?
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={confirmRemoveTicker} color="error" variant="contained">
+          <Button onClick={confirmRemoveCompany} color="error" variant="contained">
             Remove
           </Button>
         </DialogActions>

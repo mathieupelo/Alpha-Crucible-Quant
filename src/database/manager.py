@@ -59,7 +59,9 @@ class DatabaseManager(
                 separator = '&' if has_query else '?'
                 self.database_url = f"{self.database_url}{separator}sslmode=require"
         self.host = host or os.getenv('DB_HOST', '127.0.0.1')
-        self.port = port or int(os.getenv('DB_PORT', '5432'))
+        # Handle empty string for DB_PORT
+        db_port_str = os.getenv('DB_PORT', '5432')
+        self.port = port or (int(db_port_str) if db_port_str and db_port_str.strip() else 5432)
         self.user = user or os.getenv('DB_USER', 'postgres')
         self.password = password or os.getenv('DB_PASSWORD', '')
         self.database = database or os.getenv('DB_NAME', 'postgres')

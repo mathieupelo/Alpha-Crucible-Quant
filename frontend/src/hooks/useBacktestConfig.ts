@@ -175,8 +175,8 @@ export const useBacktestConfig = () => {
         return { isValid: false, errors, warnings, rebalancingDates, signalGaps };
       }
 
-      const tickersData = await universeApi.getUniverseTickers(formData.universe_id);
-      const tickers = tickersData.tickers.map(t => t.ticker);
+      const companiesData = await universeApi.getUniverseCompanies(formData.universe_id);
+      const tickers = companiesData.companies.map(c => c.main_ticker).filter(Boolean) as string[];
 
       const validationResults = await universeApi.validateTickers(tickers);
       const invalidTickers = validationResults.filter(r => !r.is_valid);

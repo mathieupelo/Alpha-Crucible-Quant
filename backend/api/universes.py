@@ -15,6 +15,7 @@ from models import (
     UniverseResponse, UniverseListResponse, UniverseTickerResponse, 
     UniverseTickerListResponse, TickerValidationResponse,
     UniverseCreateRequest, UniverseUpdateRequest, UniverseTickerUpdateRequest,
+    UniverseCompanyResponse, UniverseCompanyListResponse, UniverseCompanyUpdateRequest,
     ErrorResponse, SuccessResponse
 )
 from services.database_service import DatabaseService
@@ -118,7 +119,7 @@ async def update_universe(universe_id: int, request: UniverseUpdateRequest):
 
 @router.delete("/universes/{universe_id}", response_model=SuccessResponse)
 async def delete_universe(universe_id: int):
-    """Delete a universe and all its tickers."""
+    """Delete a universe and all its companies."""
     try:
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
@@ -133,9 +134,11 @@ async def delete_universe(universe_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/universes/{universe_id}/tickers", response_model=UniverseTickerListResponse)
-async def get_universe_tickers(universe_id: int):
-    """Get all tickers for a universe."""
+# Company-based endpoints (Varrock schema)
+
+@router.get("/universes/{universe_id}/companies", response_model=UniverseCompanyListResponse)
+async def get_universe_companies(universe_id: int):
+    """Get all companies for a universe with company info and tickers."""
     try:
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
@@ -144,22 +147,22 @@ async def get_universe_tickers(universe_id: int):
         if universe is None:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
         
-        tickers = db_service.get_universe_tickers(universe_id)
-        return UniverseTickerListResponse(
-            tickers=[UniverseTickerResponse(**ticker) for ticker in tickers],
-            total=len(tickers),
+        companies = db_service.get_universe_companies(universe_id)
+        return UniverseCompanyListResponse(
+            companies=[UniverseCompanyResponse(**company) for company in companies],
+            total=len(companies),
             universe_id=universe_id
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting tickers for universe {universe_id}: {e}")
+        logger.error(f"Error getting companies for universe {universe_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/universes/{universe_id}/tickers", response_model=UniverseTickerListResponse)
-async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdateRequest):
-    """Update all tickers for a universe."""
+@router.put("/universes/{universe_id}/companies", response_model=UniverseCompanyListResponse)
+async def update_universe_companies(universe_id: int, request: UniverseCompanyUpdateRequest):
+    """Update all companies for a universe (accepts tickers, auto-resolves to companies)."""
     try:
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
@@ -168,23 +171,25 @@ async def update_universe_tickers(universe_id: int, request: UniverseTickerUpdat
         if universe is None:
             raise HTTPException(status_code=404, detail=f"Universe {universe_id} not found")
         
-        # Update tickers
-        tickers = db_service.update_universe_tickers(universe_id, request.tickers)
-        return UniverseTickerListResponse(
-            tickers=[UniverseTickerResponse(**ticker) for ticker in tickers],
-            total=len(tickers),
+        # Update companies (tickers will be resolved to company_uid)
+        companies = db_service.update_universe_companies(universe_id, request.tickers)
+        return UniverseCompanyListResponse(
+            companies=[UniverseCompanyResponse(**company) for company in companies],
+            total=len(companies),
             universe_id=universe_id
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error updating tickers for universe {universe_id}: {e}")
+        logger.error(f"Error updating companies for universe {universe_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/universes/{universe_id}/tickers", response_model=UniverseTickerResponse)
-async def add_universe_ticker(universe_id: int, ticker: str = Query(..., description="Ticker symbol to add")):
-    """Add a single ticker to a universe."""
+@router.post("/universes/{universe_id}/companies", response_model=UniverseCompanyResponse)
+async def add_universe_company(universe_id: int, ticker: str = Query(..., description="Ticker symbol to add (will be resolved to company)")):
+    """Add a single company to a universe (accepts ticker, auto-resolves to company)."""
     try:
         # Validate ticker
         validated_ticker = validate_ticker(ticker)
@@ -192,31 +197,31 @@ async def add_universe_ticker(universe_id: int, ticker: str = Query(..., descrip
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
         
-        ticker_data = db_service.add_universe_ticker(universe_id, validated_ticker)
-        return UniverseTickerResponse(**ticker_data)
+        company_data = db_service.add_universe_company(universe_id, validated_ticker)
+        return UniverseCompanyResponse(**company_data)
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error adding ticker {ticker} to universe {universe_id}: {e}")
+        logger.error(f"Error adding company (ticker {ticker}) to universe {universe_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/universes/{universe_id}/tickers/{ticker}", response_model=SuccessResponse)
-async def remove_universe_ticker(universe_id: int, ticker: str):
-    """Remove a ticker from a universe."""
+@router.delete("/universes/{universe_id}/companies/{company_uid}", response_model=SuccessResponse)
+async def remove_universe_company(universe_id: int, company_uid: str):
+    """Remove a company from a universe."""
     try:
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
-        success = db_service.remove_universe_ticker(universe_id, ticker)
+        success = db_service.remove_universe_company(universe_id, company_uid)
         if not success:
-            raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found in universe {universe_id}")
-        return SuccessResponse(message=f"Ticker {ticker} removed from universe {universe_id}")
+            raise HTTPException(status_code=404, detail=f"Company {company_uid} not found in universe {universe_id}")
+        return SuccessResponse(message=f"Company {company_uid} removed from universe {universe_id}")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
+        logger.error(f"Error removing company {company_uid} from universe {universe_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

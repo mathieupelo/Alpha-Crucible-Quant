@@ -64,6 +64,9 @@ export interface Position {
   ticker: string;
   weight: number;
   price_used: number;
+  company_uid?: string;
+  company_name?: string;
+  main_ticker?: string;
   created_at: string;
 }
 
@@ -78,6 +81,9 @@ export interface Signal {
   signal_name: string;
   value: number;
   metadata?: Record<string, any>;
+  company_uid?: string;
+  company_name?: string;
+  main_ticker?: string;
   created_at: string;
 }
 
@@ -88,6 +94,9 @@ export interface Score {
   score: number;
   method: string;
   params?: Record<string, any>;
+  company_uid?: string;
+  company_name?: string;
+  main_ticker?: string;
   created_at: string;
 }
 
@@ -180,6 +189,26 @@ export interface UniverseUpdateRequest {
 }
 
 export interface UniverseTickerUpdateRequest {
+  tickers: string[];
+}
+
+export interface UniverseCompany {
+  id: number;
+  universe_id: number;
+  company_uid: string;
+  company_name: string;
+  main_ticker: string;
+  all_tickers: string[];
+  added_at: string;
+}
+
+export interface UniverseCompanyListResponse {
+  companies: UniverseCompany[];
+  total: number;
+  universe_id: number;
+}
+
+export interface UniverseCompanyUpdateRequest {
   tickers: string[];
 }
 

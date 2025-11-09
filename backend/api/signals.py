@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from datetime import date
 import logging
+import pandas as pd
 
 from models import SignalResponse, ScoreResponse, ErrorResponse
 from services.database_service import DatabaseService
@@ -55,18 +56,44 @@ async def get_signals(
 
 @router.get("/scores")
 async def get_scores(
-    tickers: Optional[List[str]] = Query(None, description="Filter by tickers"),
+    tickers: Optional[List[str]] = Query(None, description="Filter by tickers (will be resolved to companies)"),
     methods: Optional[List[str]] = Query(None, description="Filter by combination methods"),
     start_date: Optional[date] = Query(None, description="Start date filter"),
     end_date: Optional[date] = Query(None, description="End date filter")
 ):
-    """Get combined scores with optional filtering."""
+    """Get combined scores with optional filtering and company information."""
     try:
-        # This would need to be implemented in the database service
-        # For now, return empty list
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        # Get scores from database service (tickers will be resolved to company_uids internally)
+        scores_df = db_service.db_manager.get_scores_combined(
+            tickers=tickers,
+            methods=methods,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        scores = []
+        if not scores_df.empty:
+            for _, row in scores_df.iterrows():
+                score_data = {
+                    "id": int(row.get('id')) if pd.notna(row.get('id')) else None,
+                    "asof_date": row['asof_date'].isoformat() if pd.notna(row['asof_date']) else None,
+                    "ticker": str(row.get('main_ticker') or row['ticker']),  # Use main_ticker if available
+                    "score": float(row['score']) if pd.notna(row['score']) else None,
+                    "method": str(row['method']),
+                    "params": db_service._parse_json_field(row.get('params')),
+                    "company_uid": str(row.get('company_uid')) if pd.notna(row.get('company_uid')) else None,
+                    "company_name": str(row.get('company_name')) if pd.notna(row.get('company_name')) else None,
+                    "main_ticker": str(row.get('main_ticker')) if pd.notna(row.get('main_ticker')) else None,
+                    "created_at": row['created_at'].isoformat() if pd.notna(row.get('created_at')) else None
+                }
+                scores.append(score_data)
+        
         return {
-            "scores": [],
-            "total": 0,
+            "scores": [ScoreResponse(**score) for score in scores],
+            "total": len(scores),
             "filters": {
                 "tickers": tickers,
                 "methods": methods,

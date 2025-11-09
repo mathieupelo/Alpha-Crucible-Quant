@@ -7,6 +7,7 @@ Defines configuration parameters for backtesting strategies.
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Optional, List, Dict
+import pandas as pd
 
 
 @dataclass
@@ -133,7 +134,14 @@ class BacktestConfig:
             raise ValueError(f"Universe with ID {self.universe_id} not found")
         
         # Check ticker count
-        tickers_df = database_manager.get_universe_tickers(self.universe_id)
+        companies_df = database_manager.get_universe_companies(self.universe_id)
+        # Extract main tickers from companies
+        if not companies_df.empty:
+            tickers_df = pd.DataFrame({
+                'ticker': companies_df['main_ticker'].dropna().tolist()
+            })
+        else:
+            tickers_df = pd.DataFrame(columns=['ticker'])
         ticker_count = len(tickers_df)
         
         if ticker_count < 5:

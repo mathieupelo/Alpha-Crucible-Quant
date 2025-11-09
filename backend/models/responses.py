@@ -77,9 +77,12 @@ class PositionResponse(BaseModel):
     """Portfolio position response model."""
     id: int = Field(..., description="Position ID")
     portfolio_id: int = Field(..., description="Associated portfolio ID")
-    ticker: str = Field(..., description="Stock ticker")
+    ticker: str = Field(..., description="Stock ticker (main ticker)")
     weight: float = Field(..., description="Portfolio weight")
     price_used: float = Field(..., description="Price used for calculation")
+    company_uid: Optional[str] = Field(None, description="Company UID from Varrock schema")
+    company_name: Optional[str] = Field(None, description="Company name")
+    main_ticker: Optional[str] = Field(None, description="Main ticker symbol")
     created_at: datetime = Field(..., description="Creation timestamp")
     
     model_config = {"from_attributes": True}
@@ -112,10 +115,13 @@ class SignalResponse(BaseModel):
     """Signal response model."""
     id: int = Field(..., description="Signal ID")
     asof_date: date = Field(..., description="Signal date")
-    ticker: str = Field(..., description="Stock ticker")
+    ticker: str = Field(..., description="Stock ticker (main ticker)")
     signal_name: str = Field(..., description="Signal type (RSI, SMA, MACD)")
     value: float = Field(..., description="Signal value")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Signal metadata")
+    company_uid: Optional[str] = Field(None, description="Company UID from Varrock schema")
+    company_name: Optional[str] = Field(None, description="Company name")
+    main_ticker: Optional[str] = Field(None, description="Main ticker symbol")
     created_at: datetime = Field(..., description="Creation timestamp")
     
     model_config = {"from_attributes": True}
@@ -125,10 +131,13 @@ class ScoreResponse(BaseModel):
     """Combined score response model."""
     id: int = Field(..., description="Score ID")
     asof_date: date = Field(..., description="Score date")
-    ticker: str = Field(..., description="Stock ticker")
+    ticker: str = Field(..., description="Stock ticker (main ticker)")
     score: float = Field(..., description="Combined score value")
     method: str = Field(..., description="Combination method")
     params: Optional[Dict[str, Any]] = Field(None, description="Method parameters")
+    company_uid: Optional[str] = Field(None, description="Company UID from Varrock schema")
+    company_name: Optional[str] = Field(None, description="Company name")
+    main_ticker: Optional[str] = Field(None, description="Main ticker symbol")
     created_at: datetime = Field(..., description="Creation timestamp")
     
     model_config = {"from_attributes": True}
@@ -233,3 +242,28 @@ class UniverseUpdateRequest(BaseModel):
 class UniverseTickerUpdateRequest(BaseModel):
     """Universe ticker update request model."""
     tickers: List[str] = Field(..., description="List of tickers to add/update")
+
+
+class UniverseCompanyResponse(BaseModel):
+    """Universe company response model."""
+    id: int = Field(..., description="Company ID")
+    universe_id: int = Field(..., description="Associated universe ID")
+    company_uid: str = Field(..., description="Company UID from Varrock schema")
+    company_name: str = Field(..., description="Company name")
+    main_ticker: str = Field(..., description="Main ticker symbol")
+    all_tickers: List[str] = Field(..., description="All tickers for this company")
+    added_at: datetime = Field(..., description="Addition timestamp")
+    
+    model_config = {"from_attributes": True}
+
+
+class UniverseCompanyListResponse(BaseModel):
+    """Universe company list response model."""
+    companies: List[UniverseCompanyResponse] = Field(..., description="List of companies")
+    total: int = Field(..., description="Total number of companies")
+    universe_id: int = Field(..., description="Associated universe ID")
+
+
+class UniverseCompanyUpdateRequest(BaseModel):
+    """Universe company update request model."""
+    tickers: List[str] = Field(..., description="List of tickers to add/update (will be resolved to companies)")

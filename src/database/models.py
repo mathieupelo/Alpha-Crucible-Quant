@@ -32,6 +32,7 @@ class SignalRaw:
     value: float
     signal_name: Optional[str] = None  # Kept for backward compatibility
     metadata: Optional[Dict[str, Any]] = None
+    company_uid: Optional[str] = None  # Foreign key to varrock.companies
     created_at: Optional[datetime] = None
     id: Optional[int] = None
 
@@ -44,6 +45,7 @@ class ScoreCombined:
     score: float
     method: str
     params: Optional[Dict[str, Any]] = None
+    company_uid: Optional[str] = None  # Foreign key to varrock.companies
     created_at: Optional[datetime] = None
 
 
@@ -69,6 +71,7 @@ class PortfolioPosition:
     ticker: str
     weight: float
     price_used: float
+    company_uid: Optional[str] = None  # Foreign key to varrock.companies
     created_at: Optional[datetime] = None
     id: Optional[int] = None
 
@@ -124,6 +127,15 @@ class UniverseTicker:
     """Represents a ticker within a universe."""
     universe_id: int
     ticker: str
+    added_at: Optional[datetime] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class UniverseCompany:
+    """Represents a company within a universe (Varrock schema)."""
+    universe_id: int
+    company_uid: str
     added_at: Optional[datetime] = None
     id: Optional[int] = None
 

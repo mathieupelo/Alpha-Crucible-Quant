@@ -34,7 +34,7 @@ dag = DAG(
     'alpha-crucible-data-news',
     default_args=default_args,
     description='Fetch news data and store in ORE database',
-    schedule_interval='0 2 * * *',  # Daily at 2 AM EST (7 AM UTC)
+    schedule_interval='0 7 * * *',  # Daily at 2 AM EST (7 AM UTC)
     start_date=days_ago(1),
     catchup=False,
     tags=['repos', 'data', 'news'],

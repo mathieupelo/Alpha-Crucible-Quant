@@ -191,7 +191,12 @@ export const useBacktestConfig = () => {
         
         const current = new Date(startDate);
         
-        if (frequency === 'weekly') {
+        if (frequency === 'daily') {
+          while (current <= endDate) {
+            rebalancingDates.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 1);
+          }
+        } else if (frequency === 'weekly') {
           while (current <= endDate) {
             rebalancingDates.push(current.toISOString().split('T')[0]);
             current.setDate(current.getDate() + 7);

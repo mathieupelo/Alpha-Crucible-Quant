@@ -34,7 +34,7 @@ dag = DAG(
     'alpha-crucible-signals-news',
     default_args=default_args,
     description='Calculate signals from ORE data and store in main database',
-    schedule_interval='0 3 * * *',  # Daily at 3 AM EST (8 AM UTC) - runs after data-news
+    schedule_interval='0 8 * * *',  # Daily at 3 AM EST (8 AM UTC) - runs after data-news
     start_date=days_ago(1),
     catchup=False,
     tags=['repos', 'signals', 'news'],

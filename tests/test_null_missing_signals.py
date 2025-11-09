@@ -31,6 +31,68 @@ from src.signals.reader import SignalReader
 # Test universe name
 TEST_UNIVERSE_NAME = "__TEST_UNIVERSE_NULL_SIGNALS__"
 
+# Test signal names used in tests
+TEST_SIGNAL_NAMES = [
+    'TEST_SIGNAL_NULL',
+    'TEST_SIGNAL_PORTFOLIO',
+    'TEST_SIGNAL_MISSING',
+    'TEST_SIGNAL_FULL'
+]
+
+
+@pytest.fixture(autouse=True)
+def cleanup_test_signals():
+    """Clean up test signals from database before and after each test."""
+    db_service = DatabaseService()
+    if not db_service.ensure_connection():
+        yield
+        return
+    
+    db_manager = db_service.db_manager
+    
+    # Clean up before test (in case previous test failed)
+    for signal_name in TEST_SIGNAL_NAMES:
+        try:
+            signal = db_manager.get_signal_by_name(signal_name)
+            if signal:
+                signal_id = signal.id
+                # Delete from signal_raw table
+                db_manager.execute_query(
+                    "DELETE FROM signal_raw WHERE signal_id = %s",
+                    (signal_id,)
+                )
+                # Delete the signal definition
+                db_manager.execute_query(
+                    "DELETE FROM signals WHERE id = %s",
+                    (signal_id,)
+                )
+        except Exception as e:
+            # Ignore errors during cleanup
+            pass
+    
+    yield
+    
+    # Clean up after test
+    if db_service.ensure_connection():
+        for signal_name in TEST_SIGNAL_NAMES:
+            try:
+                signal = db_manager.get_signal_by_name(signal_name)
+                if signal:
+                    signal_id = signal.id
+                    # Delete from signal_raw table
+                    db_manager.execute_query(
+                        "DELETE FROM signal_raw WHERE signal_id = %s",
+                        (signal_id,)
+                    )
+                    # Delete the signal definition
+                    db_manager.execute_query(
+                        "DELETE FROM signals WHERE id = %s",
+                        (signal_id,)
+                    )
+            except Exception as e:
+                # Ignore errors during cleanup
+                pass
+
 
 @pytest.fixture(autouse=True)
 def setup_test_universe():

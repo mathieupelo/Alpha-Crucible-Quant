@@ -21,7 +21,11 @@ import {
   TickerValidation,
   UniverseCreateRequest,
   UniverseUpdateRequest,
-  BacktestCreateRequest
+  BacktestCreateRequest,
+  TickerInfo,
+  CompanyInfo,
+  TickerListResponse,
+  CompanySearchResponse
 } from '@/types';
 
 // Create axios instance with base configuration
@@ -607,6 +611,65 @@ export const newsApi = {
 export const healthApi = {
   check: async (): Promise<{ status: string; service: string }> => {
     const response = await api.get('/health');
+    return response.data;
+  }
+};
+
+// Ticker Management API calls
+export const tickerApi = {
+  // Fetch ticker info from yfinance (without saving)
+  fetchTickerInfo: async (ticker: string): Promise<TickerInfo> => {
+    const response = await api.get('/tickers/fetch-info', {
+      params: { ticker }
+    });
+    return response.data;
+  },
+
+  // Create a new ticker in the database
+  createTicker: async (ticker: string, yfinanceInfo?: TickerInfo): Promise<{ message: string }> => {
+    const response = await api.post('/tickers/create', {
+      ticker,
+      yfinance_info: yfinanceInfo
+    });
+    return response.data;
+  },
+
+  // Add alternative ticker to existing company
+  addAlternativeTicker: async (companyUid: string, ticker: string, market: string): Promise<{
+    message: string;
+    company_uid: string;
+    company_name?: string;
+    main_ticker?: string;
+    new_ticker: string;
+    market: string;
+  }> => {
+    const response = await api.post('/tickers/add-alternative', {
+      company_uid: companyUid,
+      ticker,
+      market
+    });
+    return response.data;
+  },
+
+  // Get company info for validation
+  getCompanyInfo: async (companyUid: string): Promise<CompanyInfo> => {
+    const response = await api.get(`/tickers/company/${companyUid}`);
+    return response.data;
+  },
+
+  // Get all tickers with pagination
+  getAllTickers: async (page: number = 1, size: number = 50): Promise<TickerListResponse> => {
+    const response = await api.get('/tickers/all', {
+      params: { page, size }
+    });
+    return response.data;
+  },
+
+  // Search companies
+  searchCompanies: async (query: string, limit: number = 10): Promise<CompanySearchResponse> => {
+    const response = await api.get('/tickers/search', {
+      params: { query, limit }
+    });
     return response.data;
   }
 };

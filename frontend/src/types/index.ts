@@ -234,3 +234,61 @@ export interface BacktestCreateRequest {
   forward_fill_signals?: boolean;
 }
 
+export interface TickerInfo {
+  ticker: string;
+  company_name?: string;
+  short_name?: string;
+  sector?: string;
+  industry?: string;
+  market_cap?: number;
+  currency?: string;
+  exchange?: string;
+  country?: string;
+  website?: string;
+  description?: string;
+  employees?: number;
+  founded_year?: number;
+  city?: string;
+  state?: string;
+  address?: string;
+  phone?: string;
+}
+
+export interface CompanyInfo {
+  company_uid: string;
+  company_name?: string;
+  sector?: string;
+  industry?: string;
+  country?: string;
+  currency?: string;
+  exchange?: string;
+  market_cap?: number;
+  main_ticker?: string;
+  tickers: Array<{
+    ticker: string;
+    market?: string;
+    exchange?: string;
+    is_main_ticker: boolean;
+    is_active: boolean;
+    is_in_yfinance: boolean;
+  }>;
+}
+
+export interface TickerListResponse {
+  companies: CompanyInfo[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface CompanySearchResult {
+  company_uid: string;
+  company_name?: string;
+  main_ticker?: string;
+}
+
+export interface CompanySearchResponse {
+  results: CompanySearchResult[];
+  total: number;
+}
+

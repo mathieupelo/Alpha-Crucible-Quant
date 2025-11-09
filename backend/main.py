@@ -24,7 +24,7 @@ else:
     # Fallback to current directory (for Docker)
     load_dotenv()
 
-from api import backtests, portfolios, signals, nav, universes, market, news
+from api import backtests, portfolios, signals, nav, universes, market, news, tickers
 from models import ErrorResponse
 
 # Configure logging
@@ -161,6 +161,7 @@ app.include_router(nav.router, prefix="/api", tags=["nav"], dependencies=[Depend
 app.include_router(universes.router, prefix="/api", tags=["universes"], dependencies=[Depends(verify_api_key)])
 app.include_router(market.router, prefix="/api", tags=["market"], dependencies=[Depends(verify_api_key)])
 app.include_router(news.router, prefix="/api", tags=["news"], dependencies=[Depends(verify_api_key)])
+app.include_router(tickers.router, prefix="/api", tags=["tickers"], dependencies=[Depends(verify_api_key)])
 
 @app.get("/")
 async def root():

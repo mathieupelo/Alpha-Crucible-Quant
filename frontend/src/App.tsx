@@ -12,6 +12,7 @@ import UniverseManager from '@/pages/UniverseManager';
 import UniverseDetail from '@/pages/UniverseDetail';
 import RunBacktest from '@/pages/RunBacktest';
 import NewsDeepDive from '@/pages/NewsDeepDive';
+import TickerManager from '@/pages/TickerManager';
 import Layout from '@/components/common/Layout';
 import { AppProviders } from '@/providers/AppProviders';
 
@@ -28,6 +29,7 @@ const App: React.FC = () => {
               <Route path="/universes" element={<UniverseManager />} />
               <Route path="/universes/:id" element={<UniverseDetail />} />
               <Route path="/news-deep-dive" element={<NewsDeepDive />} />
+              <Route path="/tickers" element={<TickerManager />} />
             </Routes>
           </Layout>
         </Box>

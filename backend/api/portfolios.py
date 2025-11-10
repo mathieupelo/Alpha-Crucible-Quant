@@ -45,6 +45,7 @@ async def get_portfolio_positions(portfolio_id: int):
             raise HTTPException(status_code=404, detail=f"Portfolio {portfolio_id} not found")
         
         positions = portfolio.get("positions", [])
+        
         return {
             "positions": positions,
             "total": len(positions),
@@ -61,14 +62,18 @@ async def get_portfolio_positions(portfolio_id: int):
 async def get_portfolio_signals(portfolio_id: int):
     """Get signal scores for a portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         signals = db_service.get_portfolio_signals(portfolio_id)
         return {
             "signals": signals,
             "total": len(signals),
             "portfolio_id": portfolio_id
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}")
+        logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -76,14 +81,18 @@ async def get_portfolio_signals(portfolio_id: int):
 async def get_portfolio_scores(portfolio_id: int):
     """Get combined scores for a portfolio."""
     try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
         scores = db_service.get_portfolio_scores(portfolio_id)
         return {
             "scores": scores,
             "total": len(scores),
             "portfolio_id": portfolio_id
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}")
+        logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

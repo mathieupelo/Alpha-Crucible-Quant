@@ -238,18 +238,24 @@ class DatabaseService:
             positions = []
             if not positions_df.empty:
                 for _, row in positions_df.iterrows():
-                    position = PositionResponse(
-                        id=int(row['id']),
-                        portfolio_id=int(row['portfolio_id']),
-                        ticker=str(row.get('main_ticker') or row['ticker']),  # Use main_ticker if available
-                        weight=float(row['weight']),
-                        price_used=float(row['price_used']),
-                        company_uid=str(row.get('company_uid')) if pd.notna(row.get('company_uid')) else None,
-                        company_name=str(row.get('company_name')) if pd.notna(row.get('company_name')) else None,
-                        main_ticker=str(row.get('main_ticker')) if pd.notna(row.get('main_ticker')) else None,
-                        created_at=row['created_at']
-                    )
-                    positions.append(position)
+                    # Convert pandas Timestamp to Python datetime if needed
+                    created_at = row['created_at']
+                    if pd.notna(created_at) and hasattr(created_at, 'to_pydatetime'):
+                        created_at = created_at.to_pydatetime()
+                    
+                    # Convert to dictionary directly for JSON serialization
+                    position_dict = {
+                        "id": int(row['id']),
+                        "portfolio_id": int(row['portfolio_id']),
+                        "ticker": str(row.get('main_ticker') or row['ticker']),  # Use main_ticker if available
+                        "weight": float(row['weight']),
+                        "price_used": float(row['price_used']),
+                        "company_uid": str(row.get('company_uid')) if pd.notna(row.get('company_uid')) else None,
+                        "company_name": str(row.get('company_name')) if pd.notna(row.get('company_name')) else None,
+                        "main_ticker": str(row.get('main_ticker')) if pd.notna(row.get('main_ticker')) else None,
+                        "created_at": created_at
+                    }
+                    positions.append(position_dict)
             
             # Get universe information
             universe = self.db_manager.get_universe_by_id(portfolio.universe_id)
@@ -289,6 +295,8 @@ class DatabaseService:
             
             # Get company_uids from universe
             company_uids = companies_df['company_uid'].dropna().tolist()
+            if not company_uids:
+                return []
             
             # Get signal scores for the portfolio date and all universe companies
             signals_df = self.db_manager.get_signals_raw(
@@ -298,17 +306,29 @@ class DatabaseService:
             )
             
             signals = []
-            if not signals_df.empty:
+            available_signals = []
+            
+            # Prepare signals DataFrame for efficient lookup
+            signals_df_copy = None
+            if not signals_df.empty and 'company_uid' in signals_df.columns:
+                # Create a copy and convert company_uid to string for comparison (once, not per iteration)
+                signals_df_copy = signals_df.copy()
+                signals_df_copy['company_uid'] = signals_df_copy['company_uid'].astype(str)
+                
                 # Get all unique signal names from the data
-                available_signals = signals_df['signal_name_display'].dropna().unique().tolist()
-                if not available_signals:
-                    available_signals = signals_df['signal_name'].dropna().unique().tolist()
-            else:
-                available_signals = []
+                if 'signal_name_display' in signals_df_copy.columns:
+                    available_signals = signals_df_copy['signal_name_display'].dropna().unique().tolist()
+                if not available_signals and 'signal_name' in signals_df_copy.columns:
+                    available_signals = signals_df_copy['signal_name'].dropna().unique().tolist()
+                # Convert to strings and ensure they're valid
+                available_signals = [str(s) for s in available_signals if s]
             
             # Create signal data for ALL universe companies, not just those with data
             for _, company_row in companies_df.iterrows():
-                company_uid = str(company_row['company_uid'])
+                company_uid = str(company_row['company_uid']) if pd.notna(company_row.get('company_uid')) else None
+                if not company_uid:
+                    continue
+                    
                 main_ticker = str(company_row['main_ticker']) if pd.notna(company_row.get('main_ticker')) else None
                 company_name = str(company_row['company_name']) if pd.notna(company_row.get('company_name')) else None
                 
@@ -317,23 +337,39 @@ class DatabaseService:
                     'company_name': company_name,
                     'main_ticker': main_ticker,
                     'ticker': main_ticker,  # Keep for backward compatibility
-                    'available_signals': [str(signal) for signal in available_signals]
+                    'available_signals': available_signals
                 }
                 
                 # Add signal values if they exist for this company
-                if not signals_df.empty:
-                    company_signals = signals_df[signals_df['company_uid'] == company_uid]
+                if signals_df_copy is not None:
+                    company_signals = signals_df_copy[signals_df_copy['company_uid'] == company_uid]
+                    
                     for _, row in company_signals.iterrows():
-                        signal_name = str(row.get('signal_name_display') or row.get('signal_name', ''))
+                        # Get signal name safely
+                        signal_name = None
+                        if 'signal_name_display' in row.index and pd.notna(row.get('signal_name_display')):
+                            signal_name = str(row['signal_name_display'])
+                        elif 'signal_name' in row.index and pd.notna(row.get('signal_name')):
+                            signal_name = str(row['signal_name'])
+                        
                         if signal_name:
-                            signal_data[signal_name] = float(row['value']) if pd.notna(row['value']) else None
+                            # Sanitize signal name for use as dictionary key (replace invalid chars)
+                            signal_name_key = signal_name.replace(' ', '_').replace('-', '_').replace('.', '_')
+                            # Get value safely
+                            value = None
+                            if 'value' in row.index and pd.notna(row.get('value')):
+                                try:
+                                    value = float(row['value'])
+                                except (ValueError, TypeError):
+                                    value = None
+                            signal_data[signal_name_key] = value
                 
                 signals.append(signal_data)
             
             return signals
             
         except Exception as e:
-            logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}")
+            logger.error(f"Error getting signals for portfolio {portfolio_id}: {e}", exc_info=True)
             raise
     
     def get_portfolio_scores(self, portfolio_id: int) -> List[Dict[str, Any]]:
@@ -351,6 +387,8 @@ class DatabaseService:
             
             # Get company_uids from universe
             company_uids = companies_df['company_uid'].dropna().tolist()
+            if not company_uids:
+                return []
             
             # Get combined scores for the portfolio date and all universe companies
             scores_df = self.db_manager.get_scores_combined(
@@ -361,9 +399,19 @@ class DatabaseService:
             
             scores = []
             
+            # Prepare scores DataFrame for efficient lookup
+            scores_df_copy = None
+            if not scores_df.empty and 'company_uid' in scores_df.columns:
+                # Create a copy and convert company_uid to string for comparison (once, not per iteration)
+                scores_df_copy = scores_df.copy()
+                scores_df_copy['company_uid'] = scores_df_copy['company_uid'].astype(str)
+            
             # Create score data for ALL universe companies, not just those with data
             for _, company_row in companies_df.iterrows():
-                company_uid = str(company_row['company_uid'])
+                company_uid = str(company_row['company_uid']) if pd.notna(company_row.get('company_uid')) else None
+                if not company_uid:
+                    continue
+                    
                 main_ticker = str(company_row['main_ticker']) if pd.notna(company_row.get('main_ticker')) else None
                 company_name = str(company_row['company_name']) if pd.notna(company_row.get('company_name')) else None
                 
@@ -377,19 +425,24 @@ class DatabaseService:
                 }
                 
                 # Add score data if it exists for this company
-                if not scores_df.empty:
-                    company_scores = scores_df[scores_df['company_uid'] == company_uid]
+                if scores_df_copy is not None:
+                    company_scores = scores_df_copy[scores_df_copy['company_uid'] == company_uid]
                     if not company_scores.empty:
                         row = company_scores.iloc[0]
-                        score_data['combined_score'] = float(row['score']) if pd.notna(row['score']) else None
-                        score_data['method'] = str(row['method'])
+                        if 'score' in row.index and pd.notna(row.get('score')):
+                            try:
+                                score_data['combined_score'] = float(row['score'])
+                            except (ValueError, TypeError):
+                                score_data['combined_score'] = None
+                        if 'method' in row.index and pd.notna(row.get('method')):
+                            score_data['method'] = str(row['method'])
                 
                 scores.append(score_data)
             
             return scores
             
         except Exception as e:
-            logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}")
+            logger.error(f"Error getting scores for portfolio {portfolio_id}: {e}", exc_info=True)
             raise
     
     def get_backtest_signals(self, run_id: str, start_date: Optional[date] = None,

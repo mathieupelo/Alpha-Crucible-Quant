@@ -23,7 +23,9 @@ if exist venv (
 
 REM Set PYTHONPATH to include root directory for src imports
 REM This allows 'from src.database import ...' to work correctly
-set PYTHONPATH=%CD%;%CD%\backend;%PYTHONPATH%
+REM Save the repo root path before changing directories
+set REPO_ROOT=%CD%
+set PYTHONPATH=%REPO_ROOT%;%REPO_ROOT%\backend;%PYTHONPATH%
 
 REM Check if .env file exists in repo root
 if not exist .env (
@@ -56,8 +58,9 @@ echo Press Ctrl+C to stop the server.
 echo.
 
 REM Start the backend with hot reload
-REM Change to backend directory but keep PYTHONPATH pointing to repo root
+REM Change to backend directory - main.py uses relative imports
 cd backend
-REM Watch multiple directories for changes, including services
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir .. --reload-dir ../src --reload-dir ../backend/services --reload-dir ../backend/api
+REM Run uvicorn from backend directory where main.py is located
+REM PYTHONPATH is already set to include repo root for src imports
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir .. --reload-dir ../src
 

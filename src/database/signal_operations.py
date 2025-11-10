@@ -296,9 +296,14 @@ class SignalOperationsMixin:
         
         if company_uids and has_company_uid:
             placeholders = ','.join(['%s'] * len(company_uids))
-            query += f" AND (sr.company_uid IN ({placeholders}) OR sr.ticker IN ({','.join(['%s'] * len(tickers))}))"
-            params.extend(company_uids)
-            params.extend(tickers)
+            if tickers:
+                ticker_placeholders = ','.join(['%s'] * len(tickers))
+                query += f" AND (sr.company_uid IN ({placeholders}) OR sr.ticker IN ({ticker_placeholders}))"
+                params.extend(company_uids)
+                params.extend(tickers)
+            else:
+                query += f" AND sr.company_uid IN ({placeholders})"
+                params.extend(company_uids)
         elif tickers:
             # Fallback to ticker filter (always works)
             placeholders = ','.join(['%s'] * len(tickers))

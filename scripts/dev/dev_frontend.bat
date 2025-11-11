@@ -7,8 +7,8 @@ echo   Vite Frontend - Development Mode
 echo ==============================================
 echo.
 
-REM Move to repo root
-cd /d "%~dp0..\frontend"
+REM Move to frontend directory
+cd /d "%~dp0..\..\frontend"
 
 REM Check if node_modules exists
 if not exist node_modules (

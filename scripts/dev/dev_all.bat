@@ -1,6 +1,9 @@
 @echo off
 REM Start both frontend and backend in development mode
 REM Opens separate windows for each service
+REM Supports both uvicorn and python main.py backend modes
+
+setlocal ENABLEDELAYEDEXPANSION
 
 echo ==============================================
 echo   Starting Full Stack Development
@@ -10,8 +13,24 @@ echo.
 REM Move to repo root
 cd /d "%~dp0..\.."
 
+REM Check if user wants simple mode (python main.py) or uvicorn mode
+REM Default to simple mode (easier, matches user's preference)
+set USE_SIMPLE=1
+if "%1"=="uvicorn" (
+    set USE_SIMPLE=0
+    echo Using uvicorn mode (with hot reload)
+) else (
+    echo Using simple mode (python main.py)
+    echo To use uvicorn mode, run: scripts\dev\dev_all.bat uvicorn
+)
+
+echo.
 echo Starting Backend...
-start "Alpha Crucible - Backend" cmd /k "scripts\dev\dev_backend.bat"
+if !USE_SIMPLE!==1 (
+    start "Alpha Crucible - Backend" cmd /k "scripts\dev\dev_backend_simple.bat"
+) else (
+    start "Alpha Crucible - Backend" cmd /k "scripts\dev\dev_backend.bat"
+)
 
 echo Waiting 5 seconds for backend to initialize...
 timeout /t 5 /nobreak >nul
@@ -31,6 +50,11 @@ echo.
 echo Both servers are running in separate windows.
 echo Close the windows or press Ctrl+C in each to stop.
 echo.
+echo TIP: For final testing with ngrok, run:
+echo   scripts\ngrok\Prepare_and_start_ngrok.bat
+echo.
 echo Waiting 3 seconds before closing this window...
 timeout /t 3 /nobreak >nul
+
+endlocal
 

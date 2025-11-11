@@ -64,7 +64,7 @@ Before committing, test the full production-like stack:
 
 2. **Start ngrok for external access:**
    ```bash
-   scripts\ngrok\Prepare_and_start_ngrok.bat
+   scripts\ngrok\start_ngrok_dev.bat
    ```
 
    This script automatically:
@@ -144,7 +144,7 @@ The frontend automatically:
 
 ## Ngrok Setup
 
-The `Prepare_and_start_ngrok.bat` script:
+The `start_ngrok_dev.bat` script:
 
 1. **Detects your setup:**
    - If Docker is running (port 8080): Uses Docker setup
@@ -192,7 +192,7 @@ Alpha-Crucible-Quant/
 │   │   ├── dev_backend_simple.bat  # Backend (python main.py)
 │   │   └── dev_frontend.bat # Frontend
 │   └── ngrok/
-│       └── Prepare_and_start_ngrok.bat  # Ngrok setup
+│       └── start_ngrok_dev.bat  # Ngrok setup (dev)
 └── .env                     # Environment variables
 ```
 
@@ -200,7 +200,7 @@ Alpha-Crucible-Quant/
 
 1. Try `scripts\dev\dev_all.bat` to start everything
 2. Make a change and see it update instantly
-3. When ready to test, run `scripts\ngrok\Prepare_and_start_ngrok.bat`
+3. When ready to test, run `scripts\ngrok\start_ngrok_dev.bat`
 
 Happy coding! 🚀
 

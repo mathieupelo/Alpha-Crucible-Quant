@@ -45,7 +45,7 @@ scripts\dev\dev_all.bat uvicorn
 
 2. **Start ngrok:**
    ```bash
-   scripts\ngrok\Prepare_and_start_ngrok.bat
+   scripts\ngrok\start_ngrok_dev.bat
    ```
 
    This automatically detects your setup (local or Docker) and starts ngrok on the correct port.

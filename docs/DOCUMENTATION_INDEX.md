@@ -47,9 +47,24 @@ This document provides an overview of all documentation files and their purposes
 1. `docs/AIRFLOW.md` - Airflow setup and configuration
 2. `docs/FEATURES.md` - Feature details
 
+## Script Documentation
+
+- **`scripts/README.md`** - Complete scripts directory documentation
+- **`scripts/dev/QUICK_START.md`** - Quick start guide for development
+- **`scripts/dev/LOCAL_DEVELOPMENT_GUIDE.md`** - Detailed local development guide
+- **`scripts/test/README.md`** - Test scripts documentation
+- **`scripts/cli/README.md`** - CLI tools documentation
+- **`scripts/troubleshoot/`** - Troubleshooting guides
+
+## Airflow Documentation
+
+- **`airflow/dags/README.md`** - Airflow DAGs overview
+- **`airflow/dags/WEEKLY_BACKTEST_README.md`** - Weekly backtest DAG documentation
+- **`airflow/dags/SENTIMENT_REDDIT_README.md`** - Sentiment Reddit DAG documentation
+
 ## Notes
 
 - Root-level markdown files (`*.md`) are typically high-level overviews
 - Detailed documentation is in the `docs/` directory
-- Script documentation is in `scripts/README.md`
+- Script documentation is in `scripts/README.md` and subdirectories
 - All documentation is kept up-to-date with the current system

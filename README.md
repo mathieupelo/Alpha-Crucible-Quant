@@ -72,7 +72,7 @@ scripts\dev_frontend.bat   # Terminal 2: Frontend
 - ⚡ **Instant hot reload** (changes reflect in < 1 second)
 - 🚀 **Fast startup** (< 5 seconds)
 - 🔧 **Better debugging experience**
-- 📝 **See [Quick Start Guide](docs/QUICK_START_DEVELOPMENT.md) for details**
+- 📝 **See [Development Guide](docs/DEVELOPMENT.md) for details**
 
 **Initial Setup (one-time):**
 ```bash
@@ -117,8 +117,8 @@ docker-compose up -d
 # API Docs: http://localhost:8000/api/docs
 # Nginx Proxy: http://localhost:8080
 
-# For external access via ngrok
-scripts\prepare_and_start_ngrok_final.bat
+# For external access via ngrok (automatically starts Docker Desktop if needed)
+scripts\ngrok\prepare_and_start_ngrok_final.bat
 ```
 
 ## 📊 Database Schema

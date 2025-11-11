@@ -153,7 +153,7 @@ For external access via ngrok:
 
 ```bash
 # Windows
-scripts\prepare_and_start_ngrok_final.bat
+scripts\ngrok\prepare_and_start_ngrok_final.bat
 
 # Linux/Mac
 scripts/prepare_and_start_ngrok_final.sh

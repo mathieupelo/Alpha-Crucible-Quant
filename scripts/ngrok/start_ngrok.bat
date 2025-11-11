@@ -1,12 +1,31 @@
 @echo off
 REM Ngrok startup script for Windows
 REM This script starts Ngrok tunnel for Alpha Crucible Quant
+REM Assumes services are already running on port 8080
 
 echo Starting Ngrok tunnel for Alpha Crucible Quant...
 echo.
 
 REM Change to project root directory (where .env should be)
 cd /d "%~dp0..\.."
+
+REM Check if services are running on port 8080
+netstat -ano | findstr ":8080 " | findstr "LISTENING" >nul
+if errorlevel 1 (
+    echo ERROR: No service detected on port 8080!
+    echo.
+    echo Please ensure Docker services are running first:
+    echo   docker-compose up -d
+    echo.
+    echo Or use the full deployment script:
+    echo   scripts\ngrok\prepare_and_start_ngrok_final.bat
+    echo.
+    echo For local development, use:
+    echo   scripts\ngrok\start_ngrok_dev.bat
+    echo.
+    pause
+    exit /b 1
+)
 
 REM Check if .env file exists
 if not exist .env (

@@ -51,7 +51,7 @@ echo Both servers are running in separate windows.
 echo Close the windows or press Ctrl+C in each to stop.
 echo.
 echo TIP: For final testing with ngrok, run:
-echo   scripts\ngrok\Prepare_and_start_ngrok.bat
+echo   scripts\ngrok\start_ngrok_dev.bat
 echo.
 echo Waiting 3 seconds before closing this window...
 timeout /t 3 /nobreak >nul

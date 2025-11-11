@@ -16,7 +16,11 @@ if %errorlevel% equ 0 (
     )
 ) else (
     echo Ngrok is not running.
-    echo Run scripts\ngrok\start_ngrok.bat to start the tunnel.
+    echo.
+    echo To start ngrok:
+    echo   - Full deployment: scripts\ngrok\prepare_and_start_ngrok_final.bat
+    echo   - Dev/local: scripts\ngrok\start_ngrok_dev.bat
+    echo   - Manual (if services running): scripts\ngrok\start_ngrok.bat
 )
 
 echo.

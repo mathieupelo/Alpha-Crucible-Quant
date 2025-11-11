@@ -14,7 +14,7 @@ This directory contains all deployment, development, and utility scripts for the
   - Performs comprehensive health checks
   - Starts ngrok tunnel for public access
 - **Usage**: `scripts\prepare_and_start_ngrok_final.bat`
-- **Dependencies**: `fix_nginx_ips_v2.bat`, `start_ngrok.bat`
+- **Dependencies**: `fix_nginx_ips_v2.bat`
 
 ### `quick_start.bat`
 **Simple deployment workflow.**
@@ -83,10 +83,16 @@ This directory contains all deployment, development, and utility scripts for the
 ## Ngrok Management Scripts
 
 ### `start_ngrok.bat`
-**Start ngrok tunnel.**
-- **Purpose**: Configure and start ngrok on port 8080
-- **Usage**: `scripts\start_ngrok.bat`
-- **Note**: Called by `prepare_and_start_ngrok_final.bat`
+**Start ngrok tunnel (manual use).**
+- **Purpose**: Configure and start ngrok on port 8080 (assumes services already running)
+- **Usage**: `scripts\ngrok\start_ngrok.bat`
+- **Note**: Only use if Docker services are already running. For full deployment, use `prepare_and_start_ngrok_final.bat`
+
+### `start_ngrok_dev.bat`
+**Start ngrok for development (auto-detects local/Docker).**
+- **Purpose**: Automatically detects if services are running locally or in Docker and starts ngrok accordingly
+- **Usage**: `scripts\ngrok\start_ngrok_dev.bat`
+- **Note**: Best for development use - works with both local dev servers and Docker
 
 ### `kill_ngrok.bat`
 **Stop all ngrok processes.**

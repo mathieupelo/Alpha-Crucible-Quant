@@ -43,36 +43,156 @@ if not errorlevel 1 (
   echo   Port 80 is free
 )
 
-REM Check if Docker is running and fully ready
+REM Check if Docker Desktop is running and start if needed
 echo [1/7] Checking Docker Desktop...
-docker --version >nul 2>&1
-if errorlevel 1 (
-  echo   ERROR: Docker Desktop is not running!
-  echo   Please start Docker Desktop and wait for it to fully load.
-  echo   Look for the whale icon in your system tray.
+
+REM First, quickly check if Docker engine is already ready (best case)
+docker ps >nul 2>&1
+if not errorlevel 1 (
+  echo   Docker Desktop is running and engine is ready
+  goto :continue
+)
+
+REM Docker engine is not ready, check if Docker Desktop process is running
+tasklist /FI "IMAGENAME eq Docker Desktop.exe" 2>nul | find /I /N "Docker Desktop.exe">nul
+if "%ERRORLEVEL%"=="0" (
+  echo   Docker Desktop process is running, but engine is not ready
+  echo   This may indicate Docker Desktop needs to be restarted
   echo.
-  echo Press any key to close this window...
+  echo   Options:
+  echo   1. Wait for Docker Desktop to finish starting (may take 30-60 seconds)
+  echo   2. Restart Docker Desktop to fix potential issues
+  echo.
+  choice /C YN /M "Restart Docker Desktop now? (Y=Yes, N=No - will wait)"
+  if errorlevel 2 goto :check_docker_engine
+  if errorlevel 1 goto :restart_docker
+)
+
+REM Docker Desktop is not running, try to start it
+echo   Docker Desktop is not running, attempting to start it...
+echo   This may take a moment...
+
+REM Try common Docker Desktop installation paths
+set DOCKER_STARTED=0
+
+REM Try Program Files path
+if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
+  start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+  set DOCKER_STARTED=1
+  goto :docker_started
+)
+
+REM Try Program Files (x86) path
+if exist "C:\Program Files (x86)\Docker\Docker\Docker Desktop.exe" (
+  start "" "C:\Program Files (x86)\Docker\Docker\Docker Desktop.exe"
+  set DOCKER_STARTED=1
+  goto :docker_started
+)
+
+REM Try PowerShell to start Docker Desktop (works with Start menu shortcut)
+powershell -Command "Start-Process 'Docker Desktop'" >nul 2>&1
+if not errorlevel 1 (
+  set DOCKER_STARTED=1
+  goto :docker_started
+)
+
+REM If we couldn't start it, give helpful error
+if %DOCKER_STARTED%==0 (
+  echo   ERROR: Could not start Docker Desktop automatically!
+  echo   Please start Docker Desktop manually and run this script again.
+  echo   Look for Docker Desktop in your Start menu or system tray.
+  echo.
   pause >nul
   exit /b 1
 )
 
-echo   Docker Desktop is starting, waiting for it to be fully ready...
+:restart_docker
+REM Restart Docker Desktop
+echo   Restarting Docker Desktop...
+echo   Stopping Docker Desktop...
+
+REM Try to stop Docker Desktop gracefully first
+taskkill /IM "Docker Desktop.exe" /T >nul 2>&1
+ping 127.0.0.1 -n 3 >nul
+
+REM Make sure it's stopped
+taskkill /F /IM "Docker Desktop.exe" /T >nul 2>&1
+ping 127.0.0.1 -n 5 >nul
+
+REM Now start it
+echo   Starting Docker Desktop...
+if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
+  start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+  goto :docker_started
+)
+if exist "C:\Program Files (x86)\Docker\Docker\Docker Desktop.exe" (
+  start "" "C:\Program Files (x86)\Docker\Docker\Docker Desktop.exe"
+  goto :docker_started
+)
+powershell -Command "Start-Process 'Docker Desktop'" >nul 2>&1
+goto :docker_started
+
+:docker_started
+echo   Docker Desktop is starting, please wait...
+echo   (This may take 30-60 seconds for Docker Desktop to fully initialize)
+
+:check_docker_engine
+REM Wait for Docker engine to be ready (check docker ps command)
+echo   Waiting for Docker engine to be ready...
 set /a _COUNT=0
 :wait_docker
 set /a _COUNT+=1
 docker ps >nul 2>&1
 if not errorlevel 1 goto :docker_ready
-if %_COUNT% GEQ 60 goto :docker_timeout
-echo     Waiting for Docker engine... (%_COUNT%/60)
+if %_COUNT% GEQ 90 goto :docker_timeout
+
+REM Show progress and helpful messages
+if %_COUNT%==1 (
+  echo   Checking Docker engine status...
+)
+if %_COUNT%==15 (
+  echo   Still waiting... Docker Desktop engine initialization can take 30-60 seconds
+)
+if %_COUNT%==30 (
+  echo   This is taking longer than usual...
+  echo   If Docker Desktop is stuck, you may need to restart it manually
+)
+if %_COUNT%==60 (
+  echo   Docker Desktop is taking a very long time to start
+  echo   Consider checking Docker Desktop's status in the system tray
+)
+if %_COUNT%==75 (
+  echo   Almost at timeout... If this fails, try restarting Docker Desktop manually
+)
+
+REM Show progress every 5 seconds
+set /a _MOD=!_COUNT! %% 5
+if !_MOD!==0 (
+  echo     Waiting... (%_COUNT%/90)
+)
 ping 127.0.0.1 -n 3 >nul
 goto :wait_docker
 
 :docker_ready
-echo   Docker Desktop is fully ready
+echo   Docker Desktop engine is ready
 goto :continue
 
 :docker_timeout
-echo   WARNING: Docker Desktop may not be fully ready, but continuing...
+echo   ERROR: Docker Desktop engine did not become ready after 90 seconds
+echo.
+echo   Possible issues:
+echo   - Docker Desktop may be stuck or in a bad state
+echo   - Try restarting Docker Desktop manually
+echo   - Check Docker Desktop's status in the system tray
+echo   - Look for error messages in Docker Desktop
+echo.
+choice /C YN /M "Continue anyway? (may fail) (Y=Yes, N=No)"
+if errorlevel 2 (
+  echo   Exiting. Please fix Docker Desktop and try again.
+  pause >nul
+  exit /b 1
+)
+echo   Continuing despite timeout warning...
 goto :continue
 
 :continue
@@ -206,12 +326,33 @@ goto :wait_proxy_api_loop
 
 REM 7) Start ngrok
 echo [7/7] Starting ngrok on port 8080 ...
-if exist scripts\ngrok\start_ngrok.bat (
-  start "ngrok" cmd /c scripts\ngrok\start_ngrok.bat
-) else (
-  echo   ERROR: scripts\ngrok\start_ngrok.bat not found.
-  exit /b 1
+
+REM Load NGROK_AUTHTOKEN from .env
+set NGROK_AUTHTOKEN=
+for /f "usebackq tokens=1,2 delims==" %%a in (.env) do (
+    if "%%a"=="NGROK_AUTHTOKEN" (
+        set NGROK_AUTHTOKEN=%%b
+        goto :found_token_final
+    )
 )
+
+:found_token_final
+if "%NGROK_AUTHTOKEN%"=="" (
+    echo   ERROR: NGROK_AUTHTOKEN not found in .env file!
+    echo   Please add NGROK_AUTHTOKEN=your_token_here to your .env file.
+    pause >nul
+    exit /b 1
+)
+
+REM Configure ngrok auth token (idempotent)
+ngrok config add-authtoken %NGROK_AUTHTOKEN% >nul 2>&1
+
+REM Stop any existing ngrok processes
+call "%~dp0kill_ngrok.bat" >nul 2>&1
+ping 127.0.0.1 -n 2 >nul
+
+REM Start ngrok in a new window
+start "ngrok" cmd /k "ngrok http 8080 --log=stdout"
 
 echo.
 echo ==============================================

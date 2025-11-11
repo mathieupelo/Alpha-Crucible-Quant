@@ -6,6 +6,7 @@ setlocal ENABLEDELAYEDEXPANSION
 echo ==============================================
 echo   Prepare stack and start ngrok (Windows)
 echo   with IIS conflict resolution
+echo   Includes: Main app + Airflow + Ngrok
 echo ==============================================
 echo.
 
@@ -16,7 +17,7 @@ REM Ensure no stray ngrok is running (non-blocking)
 taskkill /F /IM ngrok.exe >nul 2>&1
 
 REM Check for IIS port conflicts and fix them
-echo [0.5/7] Checking for IIS port conflicts...
+echo [0.5/8] Checking for IIS port conflicts...
 netstat -ano | findstr ":80 " | findstr "LISTENING" >nul
 if not errorlevel 1 (
   echo   Port 80 is in use by another service (likely IIS)
@@ -44,7 +45,7 @@ if not errorlevel 1 (
 )
 
 REM Check if Docker Desktop is running and start if needed
-echo [1/7] Checking Docker Desktop...
+echo [1/8] Checking Docker Desktop...
 
 REM First, quickly check if Docker engine is already ready (best case)
 docker ps >nul 2>&1
@@ -198,7 +199,7 @@ goto :continue
 :continue
 
 REM Ensure docker stack is up
-echo [2/7] Starting Docker services...
+echo [2/8] Starting Docker services...
 echo   This may take several minutes if images need to be rebuilt...
 
 REM Try docker-compose up with retry logic
@@ -219,7 +220,7 @@ goto :fix_nginx_ips
 
 :fix_nginx_ips
 REM Ensure nginx.conf uses container names (not IPs) - Docker DNS handles resolution
-echo [2.5/7] Verifying nginx configuration...
+echo [2.5/8] Verifying nginx configuration...
 REM Check if nginx.conf uses container names (correct) or IPs (needs fixing)
 findstr /C:"proxy_pass http://frontend:3000" nginx.conf >nul
 if errorlevel 1 (
@@ -248,7 +249,7 @@ exit /b 1
 :health_checks
 
 REM 3) Wait for nginx on port 8080 (app health)
-echo [3/7] Checking app health on http://localhost:8080/health ...
+echo [3/8] Checking app health on http://localhost:8080/health ...
 set /a _COUNT=0
 :wait_nginx
 set /a _COUNT+=1
@@ -267,7 +268,7 @@ goto :wait_nginx
 
 :wait_root
 REM 4) Wait for frontend root through nginx
-echo [4/7] Checking frontend root on http://localhost:8080/ ...
+echo [4/8] Checking frontend root on http://localhost:8080/ ...
 set /a _COUNT=0
 :wait_root_loop
 set /a _COUNT+=1
@@ -286,7 +287,7 @@ goto :wait_root_loop
 
 :wait_backend
 REM 5) Wait for backend on port 8000 (API health)
-echo [5/7] Checking backend health on http://localhost:8000/api/health ...
+echo [5/8] Checking backend health on http://localhost:8000/api/health ...
 set /a _COUNT=0
 :wait_backend_loop
 set /a _COUNT+=1
@@ -305,27 +306,75 @@ goto :wait_backend_loop
 
 :wait_proxy_api
 REM 6) Wait for proxied API via nginx
-echo [6/7] Checking proxied API on http://localhost:8080/api/health/db ...
+echo [6/8] Checking proxied API on http://localhost:8080/api/health/db ...
 set /a _COUNT=0
 :wait_proxy_api_loop
 set /a _COUNT+=1
 powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8080/api/health/db' -UseBasicParsing -TimeoutSec 5; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }"
 if not errorlevel 1 (
   echo   OK: proxied API is reachable
-  goto :start_ngrok
+  goto :start_airflow
 )
 if %_COUNT% GEQ 60 (
-  echo   WARNING: proxied API check timed out, continuing to ngrok...
-  goto :start_ngrok
+  echo   WARNING: proxied API check timed out, continuing to Airflow...
+  goto :start_airflow
 )
 echo     Waiting for proxied API... (%_COUNT%/60)
 ping 127.0.0.1 -n 3 >nul
 goto :wait_proxy_api_loop
 
+:start_airflow
+
+REM 7) Start Airflow services
+echo [7/8] Starting Airflow services...
+
+REM Check if Airflow is already running
+docker ps --format "{{.Names}}" | findstr /I "airflow-webserver" >nul 2>&1
+if not errorlevel 1 (
+  echo   Airflow services are already running
+  goto :start_ngrok
+)
+
+REM Start Airflow
+docker-compose -f docker-compose.airflow.yml up -d
+if errorlevel 1 (
+  echo   WARNING: Failed to start Airflow services
+  echo   Continuing with main deployment...
+  goto :start_ngrok
+)
+
+echo   Waiting for Airflow to be ready...
+set /a _COUNT=0
+:wait_airflow_ready
+set /a _COUNT+=1
+powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8081/health' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if not errorlevel 1 (
+  echo   OK: Airflow is ready
+  goto :start_ngrok
+)
+if !_COUNT! GEQ 60 (
+  echo   WARNING: Airflow health check timed out, but continuing...
+  echo   Airflow may still be starting. Check http://localhost:8081 in a few moments
+  goto :start_ngrok
+)
+if !_COUNT!==1 (
+  echo   Waiting for Airflow webserver...
+)
+if !_COUNT!==30 (
+  echo   Still waiting... Airflow initialization can take 30-60 seconds
+)
+REM Show progress every 10 seconds
+set /a _MOD=!_COUNT! %% 10
+if !_MOD!==0 (
+  echo     Waiting... (!_COUNT!/60)
+)
+ping 127.0.0.1 -n 3 >nul
+goto :wait_airflow_ready
+
 :start_ngrok
 
-REM 7) Start ngrok
-echo [7/7] Starting ngrok on port 8080 ...
+REM 8) Start ngrok
+echo [8/8] Starting ngrok on port 8080 ...
 
 REM Load NGROK_AUTHTOKEN from .env
 set NGROK_AUTHTOKEN=
@@ -358,6 +407,11 @@ echo.
 echo ==============================================
 echo   Deployment completed successfully!
 echo ==============================================
+echo.
+echo Services running:
+echo   - Main App: http://localhost:8080
+echo   - Airflow UI: http://localhost:8081 (airflow / airflow)
+echo   - Ngrok: Check http://localhost:4040/api/tunnels for public URL
 echo.
 echo Done. If the ngrok URL wasn't shown, open http://localhost:4040/api/tunnels to view it.
 echo.

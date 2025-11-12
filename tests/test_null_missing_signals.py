@@ -127,8 +127,8 @@ def setup_test_universe():
     universe = db_service.create_universe(name=TEST_UNIVERSE_NAME)
     universe_id = universe['id']
     
-    # Add test tickers
-    test_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+    # Add test tickers - use tickers that exist in Varrock schema
+    test_tickers = ['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA']  # Replaced GOOGL, AMZN, TSLA with available tickers
     for ticker in test_tickers:
         try:
             db_service.add_universe_ticker(universe_id, ticker)
@@ -183,7 +183,7 @@ def test_signal_combination_with_null_values(setup_test_universe):
         ),
         SignalRaw(
             asof_date=test_date,
-            ticker='GOOGL',
+            ticker='CMCSA',  # Use ticker that exists in Varrock schema
             signal_id=signal.id,
             signal_name=signal_name,
             value=0.7
@@ -195,7 +195,7 @@ def test_signal_combination_with_null_values(setup_test_universe):
     
     # Fetch signals back
     signals_df = db_manager.get_signals_raw(
-        tickers=['AAPL', 'MSFT', 'GOOGL'],
+        tickers=['AAPL', 'MSFT', 'CMCSA'],  # Use ticker that exists in Varrock schema
         signal_names=[signal_name],
         start_date=test_date,
         end_date=test_date
@@ -239,14 +239,14 @@ def test_signal_combination_with_null_values(setup_test_universe):
     )
     
     combined_scores = data_prep._combine_signals_to_scores(
-        signals_df, ['AAPL', 'MSFT', 'GOOGL'], [signal_name], config
+        signals_df, ['AAPL', 'MSFT', 'CMCSA'], [signal_name], config  # Use ticker that exists in Varrock schema
     )
     
-    # Should only have scores for AAPL and GOOGL (not MSFT with NULL/NaN)
+    # Should only have scores for AAPL and CMCSA (not MSFT with NULL/NaN)
     assert not combined_scores.empty, "Should have some combined scores"
     assert 'MSFT' not in combined_scores['ticker'].values, "MSFT with NULL/NaN should be excluded"
     assert 'AAPL' in combined_scores['ticker'].values, "AAPL should have a score"
-    assert 'GOOGL' in combined_scores['ticker'].values, "GOOGL should have a score"
+    assert 'CMCSA' in combined_scores['ticker'].values, "CMCSA should have a score"
 
 
 def test_signal_combination_equal_weight_with_null():
@@ -376,7 +376,7 @@ def test_portfolio_creation_with_null_signals(setup_test_universe):
         ),
         SignalRaw(
             asof_date=test_date,
-            ticker='GOOGL',
+            ticker='CMCSA',  # Use ticker that exists in Varrock schema
             signal_id=signal.id,
             signal_name=signal_name,
             value=0.6
@@ -387,7 +387,7 @@ def test_portfolio_creation_with_null_signals(setup_test_universe):
     
     # Fetch and modify to simulate NULL for MSFT
     signals_df = db_manager.get_signals_raw(
-        tickers=['AAPL', 'MSFT', 'GOOGL'],
+        tickers=['AAPL', 'MSFT', 'CMCSA'],  # Use ticker that exists in Varrock schema
         signal_names=[signal_name],
         start_date=test_date,
         end_date=test_date
@@ -416,10 +416,10 @@ def test_portfolio_creation_with_null_signals(setup_test_universe):
         max_weight=0.5
     )
     
-    # Run backtest
+    # Run backtest - use tickers that exist in Varrock schema
     engine = BacktestEngine()
     result = engine.run_backtest(
-        tickers=['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'],
+        tickers=['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA'],  # Replaced GOOGL, AMZN, TSLA with available tickers
         signals=[signal_name],
         config=config
     )
@@ -429,7 +429,7 @@ def test_portfolio_creation_with_null_signals(setup_test_universe):
     assert hasattr(result, 'backtest_id'), "Result should have backtest_id"
     
     # Check that portfolios were created (if we have enough data)
-    # The portfolio should only include AAPL and GOOGL, not MSFT with NULL
+    # The portfolio should only include AAPL and CMCSA, not MSFT with NULL
 
 
 def test_backtest_with_missing_signals(setup_test_universe):
@@ -454,12 +454,12 @@ def test_backtest_with_missing_signals(setup_test_universe):
         ),
         SignalRaw(
             asof_date=test_date,
-            ticker='GOOGL',
+            ticker='CMCSA',  # Use ticker that exists in Varrock schema
             signal_id=signal.id,
             signal_name=signal_name,
             value=0.7
         ),
-        # MSFT, AMZN, TSLA have no signals - should be excluded
+        # MSFT, DIS, EA have no signals - should be excluded
     ]
     
     db_manager.store_signals_raw(signals)
@@ -475,10 +475,10 @@ def test_backtest_with_missing_signals(setup_test_universe):
         max_weight=0.5
     )
     
-    # Run backtest with all tickers (some missing signals)
+    # Run backtest with all tickers (some missing signals) - use tickers that exist in Varrock schema
     engine = BacktestEngine()
     result = engine.run_backtest(
-        tickers=['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'],
+        tickers=['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA'],  # Replaced GOOGL, AMZN, TSLA with available tickers
         signals=[signal_name],
         config=config
     )
@@ -498,7 +498,7 @@ def test_signal_pivot_with_null_values():
     test_date = date.today()
     signals_df = pd.DataFrame({
         'asof_date': [test_date] * 4,
-        'ticker': ['AAPL', 'MSFT', 'GOOGL', 'AMZN'],
+        'ticker': ['AAPL', 'MSFT', 'CMCSA', 'DIS'],  # Use tickers that exist in Varrock schema
         'value': [0.5, np.nan, 0.7, 0.6]  # MSFT has NULL/NaN
     })
     
@@ -522,8 +522,8 @@ def test_signal_pivot_with_null_values():
     
     assert 'MSFT' not in date_scores_clean.index, "MSFT should be filtered out"
     assert 'AAPL' in date_scores_clean.index, "AAPL should remain"
-    assert 'GOOGL' in date_scores_clean.index, "GOOGL should remain"
-    assert 'AMZN' in date_scores_clean.index, "AMZN should remain"
+    assert 'CMCSA' in date_scores_clean.index, "CMCSA should remain"
+    assert 'DIS' in date_scores_clean.index, "DIS should remain"
 
 
 def test_zscore_combination_with_null():
@@ -595,7 +595,7 @@ def test_full_backtest_with_null_and_missing(setup_test_universe):
     
     # Insert signals with mix of values and missing (no NULL since DB may not allow)
     signals = []
-    test_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+    test_tickers = ['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA']  # Use tickers that exist in Varrock schema
     
     for i, ticker in enumerate(test_tickers):
         for day_offset in range(6):  # 6 days of data
@@ -603,17 +603,17 @@ def test_full_backtest_with_null_and_missing(setup_test_universe):
             
             # AAPL: all values present
             # MSFT: missing for some dates (will simulate NULL later)
-            # GOOGL: all values present
-            # AMZN: missing for some dates
-            # TSLA: missing all dates (will simulate NULL later)
+            # CMCSA: all values present
+            # DIS: missing for some dates
+            # EA: missing all dates (will simulate NULL later)
             
             if ticker == 'MSFT' and day_offset % 2 == 0:
                 # Missing for even days (will add as NaN later)
                 continue
-            elif ticker == 'AMZN' and day_offset < 2:
+            elif ticker == 'DIS' and day_offset < 2:
                 # Missing for first 2 days
                 continue
-            elif ticker == 'TSLA':
+            elif ticker == 'EA':
                 # Missing all (will add as NaN later)
                 continue
             else:
@@ -628,7 +628,7 @@ def test_full_backtest_with_null_and_missing(setup_test_universe):
     
     db_manager.store_signals_raw(signals)
     
-    # Now fetch and add NaN values to simulate NULL for MSFT and TSLA
+    # Now fetch and add NaN values to simulate NULL for MSFT and EA (replacing TSLA)
     signals_df = db_manager.get_signals_raw(
         tickers=test_tickers,
         signal_names=[signal_name],
@@ -651,19 +651,19 @@ def test_full_backtest_with_null_and_missing(setup_test_universe):
             })
             signals_df = pd.concat([signals_df, msft_row], ignore_index=True)
     
-    # Add TSLA with NaN for all days
+    # Add EA with NaN for all days (replacing TSLA)
     for day_offset in range(6):
         test_date = start_date + timedelta(days=day_offset)
-        tsla_row = pd.DataFrame({
+        ea_row = pd.DataFrame({
             'asof_date': [test_date],
-            'ticker': ['TSLA'],
+            'ticker': ['EA'],  # Use ticker that exists in Varrock schema
             'signal_id': [signal.id],
             'signal_name': [signal_name],
             'value': [np.nan],
             'metadata': [None],
             'created_at': [datetime.now()]
         })
-        signals_df = pd.concat([signals_df, tsla_row], ignore_index=True)
+        signals_df = pd.concat([signals_df, ea_row], ignore_index=True)
     
     # Store the modified DataFrame back (this simulates having NULL in DB)
     # In reality, we'd need to update the DB schema, but for testing we'll work with NaN

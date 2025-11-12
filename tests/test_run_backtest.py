@@ -57,7 +57,8 @@ def setup_test_universe():
     universe_id = universe['id']
     
     # Add some valid tickers (at least 5 required for backtest)
-    test_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+    # Use tickers that exist in Varrock schema
+    test_tickers = ['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA']  # Replaced GOOGL, AMZN, TSLA with available tickers
     for ticker in test_tickers:
         try:
             db_service.add_universe_ticker(universe_id, ticker)

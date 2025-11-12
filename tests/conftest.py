@@ -50,7 +50,8 @@ def sample_price_data():
 @pytest.fixture
 def sample_tickers():
     """Create sample ticker list."""
-    return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+    # Use tickers that exist in Varrock schema
+    return ['AAPL', 'MSFT', 'CMCSA', 'DIS', 'EA']
 
 
 @pytest.fixture
@@ -68,7 +69,7 @@ def sample_date_range():
 @pytest.fixture
 def sample_signal_scores():
     """Create sample signal scores."""
-    tickers = ['AAPL', 'MSFT', 'GOOGL']
+    tickers = ['AAPL', 'MSFT', 'CMCSA']  # Use tickers that exist in Varrock schema
     signals = ['SENTIMENT']
     dates = pd.date_range(start='2024-01-01', end='2024-01-31', freq='D')
     
@@ -154,7 +155,7 @@ def sample_portfolio():
     
     portfolio.add_position('AAPL', 0.1, 0.5)
     portfolio.add_position('MSFT', 0.2, 0.3)
-    portfolio.add_position('GOOGL', 0.05, 0.4)
+    portfolio.add_position('CMCSA', 0.05, 0.4)  # Use ticker that exists in Varrock schema
     
     return portfolio
 
@@ -167,7 +168,7 @@ def sample_backtest_result():
     result = BacktestResult(
         start_date=date(2024, 1, 1),
         end_date=date(2024, 12, 31),
-        tickers=['AAPL', 'MSFT', 'GOOGL'],
+        tickers=['AAPL', 'MSFT', 'CMCSA'],  # Use tickers that exist in Varrock schema
         signals=['SENTIMENT'],
         total_return=0.15,
         annualized_return=0.12,

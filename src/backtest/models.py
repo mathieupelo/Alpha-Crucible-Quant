@@ -56,6 +56,7 @@ class BacktestResult:
     execution_time_seconds: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
     
     def get_summary(self) -> Dict[str, Any]:
         """

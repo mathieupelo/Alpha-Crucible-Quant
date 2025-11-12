@@ -126,7 +126,8 @@ REM Wait for Airflow webserver to be ready
 set /a _COUNT=0
 :wait_airflow
 set /a _COUNT+=1
-powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8081/health' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200){ exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+REM Check root endpoint (more reliable than /health which may require auth)
+powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://localhost:8081/' -UseBasicParsing -TimeoutSec 3; if($r.StatusCode -eq 200 -or $r.StatusCode -eq 302){ exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
 if not errorlevel 1 (
   echo   Airflow is ready!
   goto :airflow_ready

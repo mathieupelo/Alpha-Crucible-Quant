@@ -46,7 +46,8 @@ services:
         airflow_version_comparable=$$(ver $${airflow_version})
         min_airflow_version=2.2.0
         min_airflow_version_comparable=$$(ver $${min_airflow_version})
-        if (( airflow_version_comparable < min_airflow_version_comparable )); then
+        # Fix: Use base 10 explicitly to avoid octal interpretation (020800 would be treated as octal)
+        if (( 10#$${airflow_version_comparable} < 10#$${min_airflow_version_comparable} )); then
           echo
           echo -e "\033[1;31mERROR!!!: Too old Airflow version $${airflow_version}!\033[0m"
           echo "The minimum Airflow version supported: $${min_airflow_version}. Only use this or higher!"
@@ -95,9 +96,14 @@ services:
           echo "   https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html#before-you-begin"
           echo
         fi
-        mkdir -p /sources/logs /sources/dags /sources/plugins
-        chown -R "$${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
-        exec /entrypoint airflow version
+        # Remove /sources directory creation - volumes are already mounted to /opt/airflow/
+        # Ensure directories exist (they should from volume mounts, but just in case)
+        mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins
+        chown -R "$${AIRFLOW_UID}:0" /opt/airflow/{logs,dags,plugins} 2>/dev/null || true
+        # Actually initialize the database (not just print version)
+        /entrypoint airflow db init
+        # Create default admin user if it doesn't exist (ignore error if user already exists)
+        /entrypoint airflow users create --username airflow --firstname Airflow --lastname Admin --role Admin --email admin@example.com --password airflow 2>/dev/null || true
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow

@@ -1,16 +1,11 @@
 /**
  * Animated Background Component
  * Creates stunning animated backgrounds with particles and gradients
- * Also includes backtest chart in the background
  */
 
 import React, { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useQuery } from 'react-query';
-import { backtestApi, navApi } from '@/services/api';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis } from 'recharts';
-import { motion } from 'framer-motion';
 
 interface Particle {
   x: number;
@@ -26,42 +21,6 @@ const AnimatedBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const animationFrameRef = useRef<number>();
-
-  // Fetch most recent backtest for background chart
-  const { data: latestBacktestData } = useQuery(
-    'latest-backtest-bg',
-    () => backtestApi.getBacktests(1, 1),
-    {
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const latestBacktest = latestBacktestData?.backtests?.[0];
-  const latestRunId = latestBacktest?.run_id;
-
-  // Fetch NAV data for the latest backtest
-  const { data: latestNavData, isLoading: navLoading } = useQuery(
-    ['backtest-nav-bg', latestRunId],
-    () => navApi.getBacktestNav(latestRunId!),
-    {
-      enabled: !!latestRunId,
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-
-  // Debug: log data availability
-  React.useEffect(() => {
-    console.log('AnimatedBackground - Chart data status:', {
-      hasBacktest: !!latestBacktest,
-      runId: latestRunId,
-      hasNavData: !!latestNavData,
-      navDataLength: latestNavData?.nav_data?.length || 0,
-      isLoading: navLoading,
-    });
-  }, [latestBacktest, latestRunId, latestNavData, navLoading]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,109 +154,6 @@ const AnimatedBackground: React.FC = () => {
 
   return (
     <>
-      {/* Backtest Chart Background - No text, just the graph */}
-      {latestNavData?.nav_data && latestNavData.nav_data.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.4 }}
-          transition={{ duration: 2, ease: 'easeOut' }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 0,
-            pointerEvents: 'none',
-            overflow: 'hidden',
-          }}
-        >
-          <motion.div
-            animate={{
-              scale: [1, 1.04, 1],
-              y: [0, -15, 0],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-            }}
-          >
-            <Box
-              sx={{
-                width: '100%',
-                height: '100%',
-                '& svg': {
-                  filter: 'blur(4px)',
-                  transition: 'filter 0.3s ease',
-                },
-                '& .recharts-wrapper': {
-                  pointerEvents: 'none !important',
-                },
-                '& .recharts-tooltip-wrapper': {
-                  display: 'none !important',
-                },
-                '& .recharts-legend-wrapper': {
-                  display: 'none !important',
-                },
-                '& .recharts-cartesian-grid': {
-                  display: 'none !important',
-                },
-                '& .recharts-cartesian-axis': {
-                  display: 'none !important',
-                },
-                '& text': {
-                  display: 'none !important',
-                  opacity: 0,
-                },
-                '& .recharts-cartesian-axis-tick-value': {
-                  display: 'none !important',
-                },
-                '& .recharts-layer': {
-                  '& text': {
-                    display: 'none !important',
-                  },
-                },
-              }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={latestNavData.nav_data.map(item => ({
-                    date: item.nav_date,
-                    portfolio: item.portfolio_nav,
-                  }))}
-                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="bgChartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5}/>
-                      <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" hide />
-                  <YAxis hide />
-                  <Area
-                    type="monotone"
-                    dataKey="portfolio"
-                    stroke="#60a5fa"
-                    fill="url(#bgChartGradient)"
-                    strokeWidth={3}
-                    isAnimationActive={true}
-                    animationDuration={2000}
-                    animationEasing="ease-out"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Box>
-          </motion.div>
-        </motion.div>
-      )}
-
       {/* Particles Canvas */}
       <Box
         component="canvas"

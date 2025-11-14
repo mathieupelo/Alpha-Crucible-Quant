@@ -772,7 +772,7 @@ const BacktestManager: React.FC = () => {
                 </Box>
 
                 {/* Overview Tab */}
-                {mainTab === 0 && (
+                {mainTab === 0 ? (
                   <CardContent>
                     {/* Performance Metrics */}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -875,7 +875,7 @@ const BacktestManager: React.FC = () => {
                       )}
                     </Box>
                   </CardContent>
-                )}
+                ) : null}
 
                 {/* Signals Tab */}
                 {mainTab === 1 && (

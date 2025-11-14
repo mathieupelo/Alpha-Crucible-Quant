@@ -153,15 +153,9 @@ const AnimatedBackground: React.FC = () => {
 
       const width = canvas.width / (window.devicePixelRatio || 1);
       const height = canvas.height / (window.devicePixelRatio || 1);
-      const connectionDistance = 200; // Much larger connection distance for more connections
-      const strokeOpacity = isDarkMode ? 0.2 : 0.15;
 
       // Update and draw particles
       const particles = particlesRef.current;
-      
-      // Draw lines first (connections)
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
       
       for (let i = 0; i < particles.length; i++) {
         const particle = particles[i];
@@ -176,43 +170,6 @@ const AnimatedBackground: React.FC = () => {
         particle.y = Math.max(0, Math.min(height, particle.y));
       }
 
-      // Draw connections as lines (data-driven network)
-      // Connect each particle to nearby particles
-      for (let i = 0; i < particles.length; i++) {
-        const particle = particles[i];
-        
-        // Connect to multiple nearest neighbors
-        const connections: Array<{ particle: Particle; distance: number }> = [];
-        
-        for (let j = 0; j < particles.length; j++) {
-          if (i === j) continue;
-          const other = particles[j];
-          const dx = particle.x - other.x;
-          const dy = particle.y - other.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < connectionDistance) {
-            connections.push({ particle: other, distance });
-          }
-        }
-        
-        // Sort by distance and connect to nearest neighbors (more connections)
-        connections.sort((a, b) => a.distance - b.distance);
-        const maxConnections = Math.min(connections.length, 5); // Connect to up to 5 nearest neighbors
-        
-        for (let k = 0; k < maxConnections; k++) {
-          const other = connections[k];
-          const opacity = strokeOpacity * (1 - other.distance / connectionDistance);
-          
-          // Draw line with gradient-like opacity
-          ctx.beginPath();
-          ctx.moveTo(particle.x, particle.y);
-          ctx.lineTo(other.particle.x, other.particle.y);
-          ctx.strokeStyle = `rgba(59, 130, 246, ${opacity})`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
 
       // Draw particles as small points (data points)
       for (let i = 0; i < particles.length; i++) {

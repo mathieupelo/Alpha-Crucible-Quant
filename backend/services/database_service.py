@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import date, datetime
 import pandas as pd
+import numpy as np
 import logging
 
 from src.database import DatabaseManager
@@ -633,11 +634,59 @@ class DatabaseService:
             # Win rate
             win_rate = (returns > 0).mean() * 100
             
-            # Alpha, Beta, Information Ratio (simplified)
-            alpha = 0.0  # Would need benchmark data for proper calculation
-            beta = 1.0   # Would need benchmark data for proper calculation
-            information_ratio = 0.0  # Would need benchmark data for proper calculation
-            tracking_error = 0.0     # Would need benchmark data for proper calculation
+            # Alpha, Beta, Information Ratio - Calculate from benchmark NAV if available
+            alpha = 0.0
+            beta = 1.0
+            information_ratio = 0.0
+            tracking_error = 0.0
+            
+            # Check if we have benchmark NAV data
+            if 'benchmark_nav' in nav_df.columns:
+                benchmark_nav = nav_df['benchmark_nav'].dropna()
+                
+                # Only calculate if we have sufficient benchmark data
+                if len(benchmark_nav) >= 2 and len(nav_series) >= 2:
+                    # Align portfolio and benchmark data
+                    aligned_data = pd.DataFrame({
+                        'portfolio': nav_series,
+                        'benchmark': benchmark_nav
+                    }).dropna()
+                    
+                    if len(aligned_data) >= 2:
+                        # Calculate returns for both portfolio and benchmark
+                        portfolio_returns = aligned_data['portfolio'].pct_change().dropna()
+                        benchmark_returns = aligned_data['benchmark'].pct_change().dropna()
+                        
+                        # Align returns
+                        aligned_returns = pd.DataFrame({
+                            'portfolio': portfolio_returns,
+                            'benchmark': benchmark_returns
+                        }).dropna()
+                        
+                        if len(aligned_returns) >= 2:
+                            port_ret = aligned_returns['portfolio']
+                            bench_ret = aligned_returns['benchmark']
+                            
+                            # Calculate excess returns
+                            excess_returns = port_ret - bench_ret
+                            
+                            # Calculate alpha (annualized excess return)
+                            alpha = excess_returns.mean() * 252 * 100  # Convert to percentage
+                            
+                            # Calculate beta (covariance / variance)
+                            if bench_ret.var() > 0:
+                                beta = np.cov(port_ret, bench_ret)[0, 1] / bench_ret.var()
+                            else:
+                                beta = 1.0
+                            
+                            # Calculate information ratio (annualized)
+                            if excess_returns.std() > 0:
+                                information_ratio = excess_returns.mean() / excess_returns.std() * np.sqrt(252)
+                            else:
+                                information_ratio = 0.0
+                            
+                            # Calculate tracking error (annualized standard deviation of excess returns)
+                            tracking_error = excess_returns.std() * np.sqrt(252) * 100  # Convert to percentage
             
             # Portfolio metrics
             portfolios = self.get_backtest_portfolios(run_id)

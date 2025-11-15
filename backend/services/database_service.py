@@ -144,10 +144,24 @@ class DatabaseService:
             raise
     
     def get_backtest_nav(self, run_id: str, start_date: Optional[date] = None, 
-                        end_date: Optional[date] = None) -> List[Dict[str, Any]]:
-        """Get NAV data for a backtest."""
+                        end_date: Optional[date] = None,
+                        starting_capital: Optional[float] = None) -> List[Dict[str, Any]]:
+        """
+        Get NAV data for a backtest.
+        
+        Args:
+            run_id: Backtest run ID
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            starting_capital: Optional starting capital to reconstruct NAV values dynamically.
+                           If provided, NAV will be calculated using the new starting capital.
+                           If None, uses original initial_capital from backtests.params
+        
+        Returns:
+            List of NAV records with reconstructed values if starting_capital is provided
+        """
         try:
-            nav_df = self.db_manager.get_backtest_nav(run_id, start_date, end_date)
+            nav_df = self.db_manager.get_backtest_nav(run_id, start_date, end_date, starting_capital)
             
             if nav_df.empty:
                 logger.warning(f"No NAV data found in database for backtest {run_id}")

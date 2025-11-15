@@ -110,6 +110,8 @@ class BacktestNav:
     nav: float
     benchmark_nav: Optional[float] = None
     pnl: Optional[float] = None
+    return_pct: Optional[float] = None  # Percentage change from baseline (e.g., 0.15 = 15% gain)
+    benchmark_return_pct: Optional[float] = None  # Percentage change for benchmark
 
 
 @dataclass
@@ -346,7 +348,9 @@ class DataFrameConverter:
                 'date': nav.date,
                 'nav': nav.nav,
                 'benchmark_nav': nav.benchmark_nav,
-                'pnl': nav.pnl
+                'pnl': nav.pnl,
+                'return_pct': nav.return_pct,
+                'benchmark_return_pct': nav.benchmark_return_pct
             })
         return pd.DataFrame(data)
     
@@ -360,7 +364,9 @@ class DataFrameConverter:
                 date=row['date'],
                 nav=row['nav'],
                 benchmark_nav=row.get('benchmark_nav'),
-                pnl=row.get('pnl')
+                pnl=row.get('pnl'),
+                return_pct=row.get('return_pct'),
+                benchmark_return_pct=row.get('benchmark_return_pct')
             ))
         return nav_data
     

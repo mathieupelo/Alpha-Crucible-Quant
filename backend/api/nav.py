@@ -23,9 +23,16 @@ db_service = DatabaseService()
 async def get_backtest_nav(
     run_id: str,
     start_date: Optional[date] = Query(None, description="Start date filter"),
-    end_date: Optional[date] = Query(None, description="End date filter")
+    end_date: Optional[date] = Query(None, description="End date filter"),
+    starting_capital: Optional[float] = Query(None, description="Starting capital to reconstruct NAV values dynamically. If not provided, uses original initial_capital from backtest params.")
 ):
-    """Get NAV data for a backtest."""
+    """
+    Get NAV data for a backtest.
+    
+    The NAV values can be reconstructed with a different starting capital by providing
+    the starting_capital parameter. This allows viewing the same backtest performance
+    with different initial investment amounts.
+    """
     try:
         if not db_service.ensure_connection():
             raise HTTPException(status_code=503, detail="Database service unavailable")
@@ -34,7 +41,7 @@ async def get_backtest_nav(
         if backtest is None:
             raise HTTPException(status_code=404, detail=f"Backtest {run_id} not found")
         
-        nav_data = db_service.get_backtest_nav(run_id, start_date, end_date)
+        nav_data = db_service.get_backtest_nav(run_id, start_date, end_date, starting_capital)
         
         # Determine actual date range
         actual_start_date = backtest["start_date"]

@@ -397,12 +397,42 @@ if "%NGROK_AUTHTOKEN%"=="" (
 REM Configure ngrok auth token (idempotent)
 ngrok config add-authtoken %NGROK_AUTHTOKEN% >nul 2>&1
 
-REM Stop any existing ngrok processes
-call "%~dp0kill_ngrok.bat" >nul 2>&1
-ping 127.0.0.1 -n 2 >nul
+REM Stop any existing ngrok processes and tunnels
+echo   Stopping any existing ngrok processes and tunnels...
+call "%~dp0kill_ngrok.bat"
+ping 127.0.0.1 -n 3 >nul
 
-REM Start ngrok in a new window
-start "ngrok" cmd /k "ngrok http 8080 --log=stdout"
+REM Check if there's still an active tunnel via API (if ngrok web interface is running)
+powershell -NoProfile -Command "try { $tunnels = Invoke-RestMethod -Uri 'http://localhost:4040/api/tunnels' -ErrorAction SilentlyContinue; if ($tunnels.tunnels.Count -gt 0) { Write-Host '   WARNING: Found active tunnels via API. Attempting to stop...'; foreach ($tunnel in $tunnels.tunnels) { try { Invoke-RestMethod -Uri \"http://localhost:4040/api/tunnels/$($tunnel.name)/stop\" -Method Post -ErrorAction SilentlyContinue | Out-Null } catch { } } } } catch { }" >nul 2>&1
+ping 127.0.0.1 -n 3 >nul
+
+REM Start ngrok tunnel
+echo   Starting ngrok tunnel...
+echo   The ngrok window will open separately - check it for the public URL.
+echo   If you see an error about endpoint already online, the script will try with pooling enabled.
+echo.
+
+REM First, try to start ngrok normally (will get a new random endpoint)
+REM Start ngrok in a new window that stays open so we can see any errors
+REM Using /k to keep window open even if there's an error
+start "ngrok - Port 8080" cmd /k "ngrok http 8080 --log=stdout"
+
+REM Wait a moment for ngrok to start
+ping 127.0.0.1 -n 3 >nul
+
+REM Verify ngrok started
+tasklist | findstr /I "ngrok.exe" >nul
+if errorlevel 1 (
+    echo   WARNING: ngrok process not found. Check the ngrok window for errors.
+    echo   You may need to start ngrok manually or check for port conflicts.
+) else (
+    echo   ngrok process is running
+    echo   Waiting a moment for tunnel to establish...
+    ping 127.0.0.1 -n 5 >nul
+    
+    REM Try to get tunnel URL
+    powershell -NoProfile -Command "try { Start-Sleep -Seconds 2; $response = Invoke-RestMethod -Uri 'http://localhost:4040/api/tunnels' -ErrorAction Stop; if ($response.tunnels.Count -gt 0) { Write-Host ''; Write-Host '   Ngrok tunnel is active!'; foreach ($tunnel in $response.tunnels) { Write-Host ('   Public URL: ' + $tunnel.public_url); Write-Host ('   Forwarding: ' + $tunnel.config.addr) } } else { Write-Host '   Tunnel is starting...' } } catch { Write-Host '   Tunnel is still initializing...' }" 2>nul
+)
 
 echo.
 echo ==============================================

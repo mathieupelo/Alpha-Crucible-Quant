@@ -1050,6 +1050,20 @@ class BacktestEngine:
         try:
             # Store backtest NAV data
             nav_objects = []
+            
+            # Get baseline values (first NAV values) for calculating percentage change
+            baseline_nav = config.initial_capital
+            baseline_benchmark_nav = None
+            if not portfolio_values.empty:
+                first_date = portfolio_values.index[0]
+                first_nav = portfolio_values.iloc[0]
+                if not pd.isna(first_nav) and first_nav > 0:
+                    baseline_nav = first_nav
+                
+                first_benchmark = benchmark_values.get(first_date, None)
+                if first_benchmark and not pd.isna(first_benchmark) and first_benchmark > 0:
+                    baseline_benchmark_nav = first_benchmark
+            
             for date, portfolio_value in portfolio_values.items():
                 if pd.isna(portfolio_value):
                     continue
@@ -1068,12 +1082,27 @@ class BacktestEngine:
                         if prev_portfolio_value > 0:
                             pnl = portfolio_value - prev_portfolio_value
                 
+                # Calculate return_pct as percentage change from baseline
+                # e.g., if baseline=10000 and nav=11500, return_pct = (11500-10000)/10000 = 0.15 (15% gain)
+                return_pct = (portfolio_value - baseline_nav) / baseline_nav if baseline_nav > 0 else 0.0
+                
+                # Calculate benchmark_return_pct if benchmark exists
+                benchmark_return_pct = None
+                if benchmark_value > 0:
+                    if baseline_benchmark_nav and baseline_benchmark_nav > 0:
+                        benchmark_return_pct = (benchmark_value - baseline_benchmark_nav) / baseline_benchmark_nav
+                    elif baseline_nav > 0:
+                        # Use portfolio baseline if benchmark baseline not available
+                        benchmark_return_pct = (benchmark_value - baseline_nav) / baseline_nav
+                
                 nav_obj = BacktestNav(
                     run_id=result.backtest_id,
                     date=date,
                     nav=float(portfolio_value),
                     benchmark_nav=float(benchmark_value) if benchmark_value > 0 else None,
-                    pnl=float(pnl)
+                    pnl=float(pnl),
+                    return_pct=float(return_pct),
+                    benchmark_return_pct=float(benchmark_return_pct) if benchmark_return_pct is not None else None
                 )
                 nav_objects.append(nav_obj)
             

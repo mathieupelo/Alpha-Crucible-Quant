@@ -112,6 +112,20 @@ def test_backtest_full_flow():
         if len(nav_df) > 0:
             logger.info(f"   First NAV: {nav_df.iloc[0]['nav']:.2f} on {nav_df.iloc[0]['date']}")
             logger.info(f"   Last NAV: {nav_df.iloc[-1]['nav']:.2f} on {nav_df.iloc[-1]['date']}")
+            
+            # Verify return_pct is stored
+            if 'return_pct' in nav_df.columns:
+                first_return_pct = nav_df.iloc[0].get('return_pct')
+                last_return_pct = nav_df.iloc[-1].get('return_pct')
+                logger.info(f"   First return_pct: {first_return_pct:.4f}")
+                logger.info(f"   Last return_pct: {last_return_pct:.4f}")
+                
+                # Verify first return_pct is ~0 (baseline)
+                if first_return_pct is not None:
+                    assert abs(first_return_pct) < 0.001, f"First return_pct should be ~0, got {first_return_pct}"
+                    logger.info("   ✅ return_pct baseline verified")
+            else:
+                logger.warning("   ⚠️ return_pct column not found - migration may be needed")
         else:
             logger.error("❌ No NAV data stored!")
             logger.error(f"   Portfolio values empty: {result.portfolio_values.empty}")

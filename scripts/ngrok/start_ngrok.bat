@@ -61,16 +61,18 @@ ngrok config add-authtoken %NGROK_AUTHTOKEN%
 
 REM Stop any existing Ngrok tunnels
 echo Stopping any existing Ngrok tunnels...
-call "%~dp0kill_ngrok.bat" >nul 2>&1
-
-REM Wait a moment for processes to stop
+call "%~dp0kill_ngrok.bat"
 ping 127.0.0.1 -n 3 >nul
 
-REM Start Ngrok tunnel
-echo Starting Ngrok tunnel on port 8080...
+REM Check if there's still an active tunnel via API
+powershell -NoProfile -Command "try { $tunnels = Invoke-RestMethod -Uri 'http://localhost:4040/api/tunnels' -ErrorAction SilentlyContinue; if ($tunnels.tunnels.Count -gt 0) { Write-Host 'WARNING: Found active tunnels. Attempting to stop...'; foreach ($tunnel in $tunnels.tunnels) { try { Invoke-RestMethod -Uri \"http://localhost:4040/api/tunnels/$($tunnel.name)/stop\" -Method Post -ErrorAction SilentlyContinue | Out-Null } catch { } } } } catch { }" >nul 2>&1
+ping 127.0.0.1 -n 2 >nul
+
+REM Start Ngrok tunnel with pooling enabled to avoid conflicts
+echo Starting Ngrok tunnel on port 8080 (with pooling enabled)...
 echo Your app will be accessible via the public URL shown below.
 echo.
 echo Ngrok is running in the background. Check the URL above.
 echo To stop ngrok, run: scripts\ngrok\kill_ngrok.bat
 echo.
-ngrok http 8080 --log=stdout
+ngrok http 8080 --log=stdout --pooling-enabled

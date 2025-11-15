@@ -239,12 +239,14 @@ class BacktestOperationsMixin:
             return 0
         
         query = """
-        INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl, return_pct, benchmark_return_pct)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (run_id, date) DO UPDATE SET 
             nav = EXCLUDED.nav,
             benchmark_nav = EXCLUDED.benchmark_nav,
-            pnl = EXCLUDED.pnl
+            pnl = EXCLUDED.pnl,
+            return_pct = EXCLUDED.return_pct,
+            benchmark_return_pct = EXCLUDED.benchmark_return_pct
         """
         
         params_list = []
@@ -254,15 +256,32 @@ class BacktestOperationsMixin:
                 nav.date,
                 nav.nav,
                 nav.benchmark_nav,
-                nav.pnl
+                nav.pnl,
+                nav.return_pct,
+                nav.benchmark_return_pct
             ))
         
         return self.execute_many(query, params_list)
     
     def get_backtest_nav(self, run_id: Optional[str] = None,
                         start_date: Optional[date] = None,
-                        end_date: Optional[date] = None) -> pd.DataFrame:
-        """Retrieve backtest NAV data from the database."""
+                        end_date: Optional[date] = None,
+                        starting_capital: Optional[float] = None) -> pd.DataFrame:
+        """
+        Retrieve backtest NAV data from the database.
+        
+        Args:
+            run_id: Backtest run ID to filter by
+            start_date: Start date filter
+            end_date: End date filter
+            starting_capital: Optional starting capital to reconstruct NAV values.
+                             If provided, NAV will be calculated as: starting_capital * (1 + return_pct)
+                             If None, uses original initial_capital from backtests.params
+        
+        Returns:
+            DataFrame with NAV data. If starting_capital is provided, nav and benchmark_nav
+            columns will be reconstructed using the new starting capital.
+        """
         query = "SELECT * FROM backtest_nav WHERE 1=1"
         params = []
         
@@ -285,5 +304,37 @@ class BacktestOperationsMixin:
         else:
             query += " ORDER BY run_id, date"
         
-        return self.execute_query(query, tuple(params) if params else None)
+        nav_df = self.execute_query(query, tuple(params) if params else None)
+        
+        # If starting_capital is provided and we have return_pct, reconstruct NAV values
+        if starting_capital is not None and not nav_df.empty and 'return_pct' in nav_df.columns:
+            # Get original initial_capital from backtests.params if run_id is provided
+            original_capital = None
+            if run_id:
+                backtest = self.get_backtest_by_run_id(run_id, include_signals=False)
+                if backtest and backtest.params and 'initial_capital' in backtest.params:
+                    original_capital = backtest.params['initial_capital']
+            
+            # If we don't have original_capital, use the first nav value as baseline
+            if original_capital is None and not nav_df.empty:
+                # Get first nav value (sorted by date)
+                first_nav = nav_df.sort_values('date').iloc[0]['nav']
+                if first_nav and first_nav > 0:
+                    original_capital = first_nav
+            
+            # Default to 10000 if we still don't have a baseline
+            if original_capital is None:
+                original_capital = 10000.0
+            
+            # Reconstruct NAV: nav = starting_capital * (1 + return_pct)
+            # But we need to adjust for the original baseline
+            # If original baseline was 10000 and return_pct=0.15, then nav=11500
+            # If new starting_capital=50000, new nav should be 50000 * (1 + 0.15) = 57500
+            nav_df['nav'] = starting_capital * (1 + nav_df['return_pct'].fillna(0))
+            
+            # Reconstruct benchmark_nav if benchmark_return_pct exists
+            if 'benchmark_return_pct' in nav_df.columns:
+                nav_df['benchmark_nav'] = starting_capital * (1 + nav_df['benchmark_return_pct'].fillna(0))
+        
+        return nav_df
 

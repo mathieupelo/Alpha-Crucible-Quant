@@ -220,6 +220,8 @@ def create_tables():
                 nav FLOAT NOT NULL,
                 benchmark_nav FLOAT,
                 pnl FLOAT,
+                return_pct FLOAT DEFAULT NULL,
+                benchmark_return_pct FLOAT DEFAULT NULL,
                 UNIQUE KEY unique_backtest_nav (run_id, date),
                 INDEX idx_run_id (run_id),
                 INDEX idx_date (date),

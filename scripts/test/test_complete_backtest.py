@@ -107,6 +107,30 @@ def test_complete_backtest():
         logger.info(f"   First NAV: {nav_df.iloc[0]['nav']:.2f} on {nav_df.iloc[0]['date']}")
         logger.info(f"   Last NAV: {nav_df.iloc[-1]['nav']:.2f} on {nav_df.iloc[-1]['date']}")
         
+        # Verify return_pct is stored
+        if 'return_pct' in nav_df.columns:
+            first_return_pct = nav_df.iloc[0].get('return_pct')
+            last_return_pct = nav_df.iloc[-1].get('return_pct')
+            logger.info(f"   First return_pct: {first_return_pct:.4f}")
+            logger.info(f"   Last return_pct: {last_return_pct:.4f}")
+            
+            # Verify first return_pct is ~0 (baseline)
+            if first_return_pct is not None:
+                assert abs(first_return_pct) < 0.001, f"First return_pct should be ~0, got {first_return_pct}"
+                logger.info("   ✅ return_pct baseline verified")
+            
+            # Test dynamic starting capital
+            new_capital = 200000.0
+            nav_df_new = db.get_backtest_nav(result.backtest_id, starting_capital=new_capital)
+            if not nav_df_new.empty and 'return_pct' in nav_df_new.columns:
+                first_new_nav = nav_df_new.iloc[0]['nav']
+                last_new_nav = nav_df_new.iloc[-1]['nav']
+                logger.info(f"   ✅ Dynamic capital test (${new_capital:,.0f}):")
+                logger.info(f"      First NAV: ${first_new_nav:,.2f}")
+                logger.info(f"      Last NAV: ${last_new_nav:,.2f}")
+        else:
+            logger.warning("   ⚠️ return_pct column not found - migration may be needed")
+        
         # Verify portfolios
         portfolios_df = db.execute_query(
             "SELECT COUNT(*) as count FROM portfolios WHERE run_id = %s",

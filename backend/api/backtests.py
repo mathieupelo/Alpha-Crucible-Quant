@@ -114,16 +114,46 @@ async def create_backtest(request: BacktestCreateRequest):
         signals_upper = [signal.upper() for signal in request.signals]
         
         # Run backtest
-        result = engine.run_backtest(
-            tickers=universe_tickers,
-            signals=signals_upper,
-            config=config
-        )
+        try:
+            result = engine.run_backtest(
+                tickers=universe_tickers,
+                signals=signals_upper,
+                config=config
+            )
+        except ValueError as e:
+            # Handle validation errors from simulation/storage
+            error_msg = str(e)
+            logger.error(f"Backtest validation error: {error_msg}")
+            raise BacktestError(
+                f"Backtest execution failed: {error_msg}",
+                error_code="EXECUTION_FAILED"
+            )
+        except Exception as e:
+            # Handle other execution errors
+            error_msg = str(e)
+            logger.error(f"Backtest execution error: {error_msg}", exc_info=True)
+            raise BacktestError(
+                f"Backtest execution failed: {error_msg}",
+                error_code="EXECUTION_FAILED"
+            )
+        
+        # Validate that backtest was created successfully
+        if result.error_message:
+            raise BacktestError(
+                f"Backtest completed with errors: {result.error_message}",
+                error_code="EXECUTION_ERROR"
+            )
         
         # Get the created backtest from database
         backtest = db_service.get_backtest_by_run_id(result.backtest_id)
         if backtest is None:
             raise BacktestError("Failed to retrieve created backtest", error_code="RETRIEVAL_FAILED")
+        
+        # Verify that NAV data was stored
+        nav_data = db_service.get_backtest_nav(result.backtest_id)
+        if not nav_data or len(nav_data) == 0:
+            logger.warning(f"Backtest {result.backtest_id} created but no NAV data found. This may indicate a storage issue.")
+            # Don't fail here, but log the warning - the frontend will handle the 404 when fetching metrics
         
         return BacktestResponse(**backtest)
         

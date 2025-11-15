@@ -238,30 +238,88 @@ class BacktestOperationsMixin:
         if not nav_data:
             return 0
         
-        query = """
-        INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl, return_pct, benchmark_return_pct)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (run_id, date) DO UPDATE SET 
-            nav = EXCLUDED.nav,
-            benchmark_nav = EXCLUDED.benchmark_nav,
-            pnl = EXCLUDED.pnl,
-            return_pct = EXCLUDED.return_pct,
-            benchmark_return_pct = EXCLUDED.benchmark_return_pct
-        """
+        # Check if return_pct and benchmark_return_pct columns exist
+        has_return_pct_columns = self._check_nav_columns_exist()
         
-        params_list = []
-        for nav in nav_data:
-            params_list.append((
-                nav.run_id,
-                nav.date,
-                nav.nav,
-                nav.benchmark_nav,
-                nav.pnl,
-                nav.return_pct,
-                nav.benchmark_return_pct
-            ))
+        if has_return_pct_columns:
+            # Use INSERT with return_pct columns
+            query = """
+            INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl, return_pct, benchmark_return_pct)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (run_id, date) DO UPDATE SET 
+                nav = EXCLUDED.nav,
+                benchmark_nav = EXCLUDED.benchmark_nav,
+                pnl = EXCLUDED.pnl,
+                return_pct = EXCLUDED.return_pct,
+                benchmark_return_pct = EXCLUDED.benchmark_return_pct
+            """
+            
+            params_list = []
+            for nav in nav_data:
+                params_list.append((
+                    nav.run_id,
+                    nav.date,
+                    nav.nav,
+                    nav.benchmark_nav,
+                    nav.pnl,
+                    nav.return_pct,
+                    nav.benchmark_return_pct
+                ))
+        else:
+            # Use INSERT without return_pct columns (backward compatibility)
+            query = """
+            INSERT INTO backtest_nav (run_id, date, nav, benchmark_nav, pnl)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (run_id, date) DO UPDATE SET 
+                nav = EXCLUDED.nav,
+                benchmark_nav = EXCLUDED.benchmark_nav,
+                pnl = EXCLUDED.pnl
+            """
+            
+            params_list = []
+            for nav in nav_data:
+                params_list.append((
+                    nav.run_id,
+                    nav.date,
+                    nav.nav,
+                    nav.benchmark_nav,
+                    nav.pnl
+                ))
         
         return self.execute_many(query, params_list)
+    
+    def _check_nav_columns_exist(self) -> bool:
+        """Check if return_pct and benchmark_return_pct columns exist in backtest_nav table."""
+        try:
+            # Ensure connection is established
+            if not self.is_connected():
+                if not self.connect():
+                    logger.warning("Cannot check columns - database not connected")
+                    return False
+            
+            cursor = self._connection.cursor()
+            try:
+                # Check if columns exist using information_schema (PostgreSQL)
+                # Need to check table_schema as well for PostgreSQL
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public'
+                    AND table_name = 'backtest_nav' 
+                    AND column_name IN ('return_pct', 'benchmark_return_pct')
+                """)
+                count = cursor.fetchone()[0]
+                cursor.close()
+                # Both columns must exist
+                return count == 2
+            except Exception as e:
+                logger.warning(f"Error checking for return_pct columns: {e}")
+                cursor.close()
+                return False
+        except Exception as e:
+            logger.warning(f"Error checking column existence: {e}")
+            # If we can't check, assume columns don't exist to be safe
+            return False
     
     def get_backtest_nav(self, run_id: Optional[str] = None,
                         start_date: Optional[date] = None,

@@ -157,6 +157,22 @@ class BacktestEngine:
             )
             logger.info(f"Simulation completed. Portfolio values: {len(portfolio_values)}, Benchmark values: {len(benchmark_values)}")
             
+            # Validate simulation results
+            if portfolio_values.empty:
+                error_msg = f"Simulation returned empty portfolio values for backtest {run_id}. This may indicate a problem with price data or portfolio creation."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            if first_rebalance_date is None:
+                error_msg = f"No valid rebalancing date found for backtest {run_id}. Check that portfolios were created successfully."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            if len(portfolio_values) == 0:
+                error_msg = f"Simulation returned zero portfolio value records for backtest {run_id}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
             # Step 6: Insert backtest in database
             self._store_backtest_results(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date)
             
@@ -671,7 +687,9 @@ class BacktestEngine:
             self._store_portfolio_data(result, portfolio_values, benchmark_values, weights_history, first_rebalance_date, config)
             logger.info("Stored portfolio data in database")
         except Exception as e:
-            logger.error(f"Error storing portfolio data: {e}")
+            logger.error(f"Error storing portfolio data: {e}", exc_info=True)
+            # Re-raise to ensure the error is not silently ignored
+            raise
         
         # Calculate execution time
         result.execution_time_seconds = time.time() - start_time
@@ -1048,6 +1066,19 @@ class BacktestEngine:
                             benchmark_values: pd.Series, weights_history: pd.DataFrame, first_rebalance_date: date, config: BacktestConfig):
         """Store portfolio data in the database."""
         try:
+            # Validate that we have data to store
+            if portfolio_values.empty:
+                error_msg = f"No portfolio values to store for backtest {result.backtest_id}. Simulation may have failed."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            if len(portfolio_values) == 0:
+                error_msg = f"Portfolio values series is empty for backtest {result.backtest_id}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            logger.info(f"Preparing to store {len(portfolio_values)} NAV records for backtest {result.backtest_id}")
+            
             # Store backtest NAV data
             nav_objects = []
             
@@ -1109,12 +1140,18 @@ class BacktestEngine:
             if nav_objects:
                 try:
                     stored_count = self.database_manager.store_backtest_nav(nav_objects)
-                    logger.info(f"Stored {stored_count} NAV records for backtest {result.backtest_id}")
+                    if stored_count == 0:
+                        error_msg = f"Failed to store NAV data: store_backtest_nav returned 0 records for backtest {result.backtest_id}"
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
+                    logger.info(f"Successfully stored {stored_count} NAV records for backtest {result.backtest_id}")
                 except Exception as e:
-                    logger.error(f"Failed to store NAV data for backtest {result.backtest_id}: {e}")
+                    logger.error(f"Failed to store NAV data for backtest {result.backtest_id}: {e}", exc_info=True)
                     raise
             else:
-                logger.warning(f"No NAV data to store for backtest {result.backtest_id}")
+                error_msg = f"No NAV data to store for backtest {result.backtest_id}. Portfolio values may be empty or invalid."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Store portfolios and positions
             for date, weights_row in weights_history.iterrows():

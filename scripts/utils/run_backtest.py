@@ -18,7 +18,8 @@ from backtest import BacktestEngine, BacktestConfig
 from signals import SignalReader
 from database import DatabaseManager
 from utils import PriceFetcher
-from data import RealTimeDataFetcher, DataValidator
+from data import RealTimeDataFetcher
+from utils.data_validator import DataValidator
 
 
 def main():

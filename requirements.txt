@@ -2,7 +2,7 @@
 # Note: Backend-specific dependencies are in backend/requirements.txt
 # Install both: pip install -r requirements.txt -r backend/requirements.txt
 
-# Plotting (used by src/backtest/plotting.py)
+# Plotting (used by src/backtest/engine.py for visualization)
 matplotlib>=3.7.0,<4.0.0
 seaborn>=0.12.0,<1.0.0
 

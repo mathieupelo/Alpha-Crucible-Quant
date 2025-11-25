@@ -129,7 +129,7 @@ async def create_ticker(
                 detail=f"Ticker {validated_ticker} already exists in database"
             )
         
-        # Fetch info from yfinance if not provided
+        # Fetch info from yfinance if not provided, or if provided but missing critical fields
         if not yfinance_info:
             yf_result = ticker_validator.validate_ticker(validated_ticker)
             if not yf_result.get('is_valid'):
@@ -141,6 +141,105 @@ async def create_ticker(
             import yfinance as yf
             ticker_obj = yf.Ticker(validated_ticker)
             yfinance_info = ticker_obj.info
+        else:
+            # If yfinance_info is provided (from frontend), check if we have a company name
+            # If not, fetch raw yfinance data to ensure we have all fields
+            has_name = bool(
+                yfinance_info.get('company_name') or 
+                yfinance_info.get('longName') or 
+                yfinance_info.get('shortName') or 
+                yfinance_info.get('name')
+            )
+            if not has_name:
+                logger.info(f"yfinance_info provided but missing company name, fetching from yfinance for {validated_ticker}")
+                try:
+                    import yfinance as yf
+                    ticker_obj = yf.Ticker(validated_ticker)
+                    raw_info = ticker_obj.info
+                    # Merge raw_info into yfinance_info, preferring provided values but filling missing ones
+                    for key, value in raw_info.items():
+                        if key not in yfinance_info or not yfinance_info[key]:
+                            yfinance_info[key] = value
+                except Exception as e:
+                    logger.warning(f"Failed to fetch raw yfinance data as fallback: {e}")
+        
+        # Helper function to extract company name from either format
+        # Frontend sends 'company_name', raw yfinance has 'longName', 'shortName', or 'name'
+        def get_company_name(info: Dict[str, Any]) -> Optional[str]:
+            name = (info.get('company_name') or 
+                   info.get('longName') or 
+                   info.get('shortName') or 
+                   info.get('name'))
+            if name:
+                name_str = str(name).strip()
+                return name_str if name_str else None
+            return None
+        
+        # Helper function to get full name (longName or company_name)
+        def get_full_name(info: Dict[str, Any]) -> Optional[str]:
+            name = info.get('longName') or info.get('company_name')
+            if name:
+                return str(name).strip() if name else None
+            return None
+        
+        # Helper function to get short name
+        def get_short_name(info: Dict[str, Any]) -> Optional[str]:
+            name = info.get('shortName')
+            if name:
+                return str(name).strip() if name else None
+            return None
+        
+        # Helper function to get market cap (handles both 'marketCap' and 'market_cap')
+        def get_market_cap(info: Dict[str, Any]) -> Optional[float]:
+            cap = info.get('marketCap') or info.get('market_cap')
+            if cap is not None:
+                try:
+                    return float(cap)
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
+        # Helper function to get description (handles both 'longBusinessSummary' and 'description')
+        def get_description(info: Dict[str, Any]) -> Optional[str]:
+            desc = info.get('longBusinessSummary') or info.get('description')
+            if desc:
+                return str(desc).strip() if desc else None
+            return None
+        
+        # Helper function to get employees (handles both 'fullTimeEmployees' and 'employees')
+        def get_employees(info: Dict[str, Any]) -> Optional[int]:
+            emp = info.get('fullTimeEmployees') or info.get('employees')
+            if emp is not None:
+                try:
+                    return int(emp)
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
+        # Helper function to get address (handles both 'address1' and 'address')
+        def get_address(info: Dict[str, Any]) -> Optional[str]:
+            addr = info.get('address1') or info.get('address')
+            if addr:
+                return str(addr).strip() if addr else None
+            return None
+        
+        # Log the info structure for debugging (only if name is missing)
+        company_name = get_company_name(yfinance_info)
+        if not company_name:
+            logger.warning(f"No company name found in yfinance_info for {validated_ticker}. Keys: {list(yfinance_info.keys())}")
+            logger.warning(f"yfinance_info sample: {str(yfinance_info)[:500]}")
+            # If we still don't have a name, try to fetch it directly from yfinance as fallback
+            try:
+                import yfinance as yf
+                ticker_obj = yf.Ticker(validated_ticker)
+                raw_info = ticker_obj.info
+                company_name = get_company_name(raw_info)
+                if company_name:
+                    logger.info(f"Fetched company name from yfinance fallback: {company_name}")
+                    # Merge raw_info into yfinance_info to ensure we have all fields
+                    yfinance_info = {**yfinance_info, **raw_info}
+            except Exception as e:
+                logger.error(f"Failed to fetch fallback name from yfinance: {e}")
         
         # Create company
         company_uid = str(uuid.uuid4())
@@ -186,24 +285,24 @@ async def create_ticker(
             company_info_query,
             (
                 company_info_uid, company_uid,
-                yfinance_info.get('longName') or yfinance_info.get('shortName') or yfinance_info.get('name'),
-                yfinance_info.get('longName'),
-                yfinance_info.get('shortName'),
+                get_company_name(yfinance_info),
+                get_full_name(yfinance_info),
+                get_short_name(yfinance_info),
                 yfinance_info.get('country'),
                 yfinance_info.get('city'),
                 yfinance_info.get('state'),
-                yfinance_info.get('address1'),
+                get_address(yfinance_info),
                 yfinance_info.get('phone'),
                 yfinance_info.get('website'),
                 yfinance_info.get('sector'),
                 yfinance_info.get('industry'),
-                yfinance_info.get('marketCap'),
+                get_market_cap(yfinance_info),
                 yfinance_info.get('currency'),
                 exchange,
-                yfinance_info.get('longBusinessSummary'),
-                yfinance_info.get('longBusinessSummary'),
-                yfinance_info.get('fullTimeEmployees'),
-                yfinance_info.get('foundedYear'),
+                get_description(yfinance_info),
+                get_description(yfinance_info),
+                get_employees(yfinance_info),
+                yfinance_info.get('foundedYear') or yfinance_info.get('founded_year'),
                 'yfinance'
             )
         )

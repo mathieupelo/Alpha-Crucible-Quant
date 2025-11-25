@@ -10,16 +10,36 @@ from fastapi import HTTPException
 
 
 def validate_ticker(ticker: str) -> str:
-    """Validate and sanitize ticker symbol."""
+    """Validate and sanitize ticker symbol.
+    
+    Supports various ticker formats:
+    - US tickers: AAPL, MSFT (1-10 alphanumeric)
+    - International with exchange: 9697.T, 0700.HK, BP.L (base + . + exchange code)
+    - Allows dots for exchange suffixes
+    """
     if not ticker or not isinstance(ticker, str):
         raise HTTPException(status_code=400, detail="Ticker must be a non-empty string")
     
     # Remove whitespace and convert to uppercase
     ticker = ticker.strip().upper()
     
-    # Validate format (1-5 alphanumeric characters)
-    if not re.match(r'^[A-Z0-9]{1,5}$', ticker):
-        raise HTTPException(status_code=400, detail="Invalid ticker format")
+    # Check for SQL injection patterns
+    validate_sql_injection(ticker)
+    
+    # Validate format:
+    # - Base ticker: 1-10 alphanumeric characters
+    # - Optional exchange suffix: . followed by 1-4 alphanumeric characters (e.g., .T, .HK, .L)
+    # - Total length should be reasonable (max 20 characters)
+    if len(ticker) > 20:
+        raise HTTPException(status_code=400, detail="Ticker symbol too long (max 20 characters)")
+    
+    # Pattern: base ticker (1-10 alphanumeric) optionally followed by .exchange (1-4 alphanumeric)
+    # Examples: AAPL, 9697.T, 0700.HK, BP.L, TSLA
+    if not re.match(r'^[A-Z0-9]{1,10}(\.[A-Z0-9]{1,4})?$', ticker):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid ticker format. Expected format: BASE or BASE.EXCHANGE (e.g., AAPL or 9697.T)"
+        )
     
     return ticker
 

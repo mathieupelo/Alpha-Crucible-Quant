@@ -13,8 +13,9 @@ def validate_ticker(ticker: str) -> str:
     """Validate and sanitize ticker symbol.
     
     Supports various ticker formats:
-    - US tickers: AAPL, MSFT (1-10 alphanumeric)
+    - US tickers: AAPL, MSFT (alphanumeric)
     - International with exchange: 9697.T, 0700.HK, BP.L (base + . + exchange code)
+    - Tickers with special characters: EMBRACER-GROUP, TICKER_NAME (dashes and underscores)
     - Allows dots for exchange suffixes
     """
     if not ticker or not isinstance(ticker, str):
@@ -27,18 +28,18 @@ def validate_ticker(ticker: str) -> str:
     validate_sql_injection(ticker)
     
     # Validate format:
-    # - Base ticker: 1-10 alphanumeric characters
+    # - Base ticker: 1-20 alphanumeric characters, dashes, and underscores
     # - Optional exchange suffix: . followed by 1-4 alphanumeric characters (e.g., .T, .HK, .L)
-    # - Total length should be reasonable (max 20 characters)
-    if len(ticker) > 20:
-        raise HTTPException(status_code=400, detail="Ticker symbol too long (max 20 characters)")
+    # - Total length should be reasonable (max 20 characters for base, plus exchange suffix)
+    if len(ticker) > 25:  # Increased to allow for longer tickers with exchange suffixes
+        raise HTTPException(status_code=400, detail="Ticker symbol too long (max 25 characters)")
     
-    # Pattern: base ticker (1-10 alphanumeric) optionally followed by .exchange (1-4 alphanumeric)
-    # Examples: AAPL, 9697.T, 0700.HK, BP.L, TSLA
-    if not re.match(r'^[A-Z0-9]{1,10}(\.[A-Z0-9]{1,4})?$', ticker):
+    # Pattern: base ticker (1-20 alphanumeric, dashes, underscores) optionally followed by .exchange (1-4 alphanumeric)
+    # Examples: AAPL, 9697.T, 0700.HK, BP.L, TSLA, EMBRACER-GROUP, TICKER_NAME
+    if not re.match(r'^[A-Z0-9_-]{1,20}(\.[A-Z0-9]{1,4})?$', ticker):
         raise HTTPException(
             status_code=400, 
-            detail=f"Invalid ticker format. Expected format: BASE or BASE.EXCHANGE (e.g., AAPL or 9697.T)"
+            detail=f"Invalid ticker format. Expected format: BASE or BASE.EXCHANGE (e.g., AAPL, 9697.T, or EMBRACER-GROUP)"
         )
     
     return ticker

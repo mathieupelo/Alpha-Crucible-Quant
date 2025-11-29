@@ -671,6 +671,28 @@ export const tickerApi = {
       params: { query, limit }
     });
     return response.data;
+  },
+
+  // Check company dependencies
+  checkCompanyDependencies: async (companyUid: string): Promise<{
+    company_uid: string;
+    dependencies: {
+      universe_companies: number;
+      signal_raw: number;
+      scores_combined: number;
+      portfolio_positions: number;
+    };
+    total_dependencies: number;
+    can_delete: boolean;
+  }> => {
+    const response = await api.get(`/tickers/company/${companyUid}/dependencies`);
+    return response.data;
+  },
+
+  // Delete company and all its tickers
+  deleteCompany: async (companyUid: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/tickers/company/${companyUid}`);
+    return response.data;
   }
 };
 

@@ -1062,6 +1062,22 @@ class DatabaseService:
             logger.error(f"Error removing ticker {ticker} from universe {universe_id}: {e}")
             raise
     
+    def check_company_dependencies(self, company_uid: str) -> Dict[str, int]:
+        """Check if a company has dependencies in other tables."""
+        try:
+            return self.db_manager.check_company_dependencies(company_uid)
+        except Exception as e:
+            logger.error(f"Error checking dependencies for company {company_uid}: {e}")
+            raise
+    
+    def delete_company_and_tickers(self, company_uid: str) -> bool:
+        """Delete a company and all its tickers from the database."""
+        try:
+            return self.db_manager.delete_company_and_tickers(company_uid)
+        except Exception as e:
+            logger.error(f"Error deleting company {company_uid}: {e}")
+            raise
+    
     def get_all_signals(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
         """Get all signal definitions."""
         try:

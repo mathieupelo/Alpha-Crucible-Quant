@@ -39,6 +39,7 @@ import {
   Search as SearchIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 
@@ -89,6 +90,13 @@ const TickerManager: React.FC = () => {
   // State for all tickers section
   const [page, setPage] = useState(1);
   const pageSize = 20;
+
+  // State for delete dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<{ company_uid: string; company_name: string | null; main_ticker: string | null } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [checkingDependencies, setCheckingDependencies] = useState(false);
+  const [dependencies, setDependencies] = useState<{ [key: string]: number } | null>(null);
 
   // Fetch all tickers
   const {
@@ -165,6 +173,57 @@ const TickerManager: React.FC = () => {
       },
     }
   );
+
+  // Delete company mutation
+  const deleteCompanyMutation = useMutation(
+    (companyUid: string) => tickerApi.deleteCompany(companyUid),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('tickers');
+        setDeleteDialogOpen(false);
+        setCompanyToDelete(null);
+        setDeleteError(null);
+        setDependencies(null);
+      },
+      onError: (error: any) => {
+        setDeleteError(error.response?.data?.detail || 'Failed to delete company');
+      },
+    }
+  );
+
+  // Handle delete button click
+  const handleDeleteClick = async (company: { company_uid: string; company_name?: string | null; main_ticker?: string | null }) => {
+    setCompanyToDelete({
+      company_uid: company.company_uid,
+      company_name: company.company_name ?? null,
+      main_ticker: company.main_ticker ?? null
+    });
+    setDeleteError(null);
+    setDependencies(null);
+    setCheckingDependencies(true);
+    setDeleteDialogOpen(true);
+
+    try {
+      const deps = await tickerApi.checkCompanyDependencies(company.company_uid);
+      setDependencies(deps.dependencies);
+    } catch (error: any) {
+      setDeleteError(error.response?.data?.detail || 'Failed to check dependencies');
+    } finally {
+      setCheckingDependencies(false);
+    }
+  };
+
+  // Handle confirm delete
+  const handleConfirmDelete = () => {
+    if (!companyToDelete) return;
+    
+    if (dependencies && Object.values(dependencies).some(count => count > 0)) {
+      setDeleteError('Cannot delete: company has dependencies. Please remove references first.');
+      return;
+    }
+
+    deleteCompanyMutation.mutate(companyToDelete.company_uid);
+  };
 
   // Fetch ticker info from yfinance
   const handleFetchTickerInfo = async () => {
@@ -513,6 +572,7 @@ const TickerManager: React.FC = () => {
                           <TableCell>Country</TableCell>
                           <TableCell>Market Cap</TableCell>
                           <TableCell>Currency</TableCell>
+                          <TableCell>Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -545,6 +605,28 @@ const TickerManager: React.FC = () => {
                             <TableCell>{company.country || 'N/A'}</TableCell>
                             <TableCell>{formatMarketCap(company.market_cap)}</TableCell>
                             <TableCell>{company.currency || 'N/A'}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="text"
+                                color="error"
+                                size="small"
+                                onClick={() => handleDeleteClick({
+                                  company_uid: company.company_uid,
+                                  company_name: company.company_name ?? null,
+                                  main_ticker: company.main_ticker ?? null
+                                })}
+                                sx={{
+                                  minWidth: 'auto',
+                                  padding: '4px',
+                                  '&:hover': {
+                                    backgroundColor: 'error.light',
+                                    color: 'error.contrastText',
+                                  },
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -688,6 +770,129 @@ const TickerManager: React.FC = () => {
             }}
           >
             {createTickerMutation.isLoading ? 'Creating...' : 'Accept & Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setCompanyToDelete(null);
+          setDeleteError(null);
+          setDependencies(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: isDarkMode
+              ? 'linear-gradient(145deg, #1e293b 0%, #334155 100%)'
+              : 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+          },
+        }}
+      >
+        <DialogTitle>Delete Company</DialogTitle>
+        <DialogContent>
+          {checkingDependencies ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+              <CircularProgress size={24} />
+              <Typography>Checking dependencies...</Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Are you sure you want to delete{' '}
+                <strong>{companyToDelete?.company_name || companyToDelete?.main_ticker || 'this company'}</strong>?
+              </Typography>
+              
+              {companyToDelete?.main_ticker && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Main Ticker: <strong>{companyToDelete.main_ticker}</strong>
+                </Typography>
+              )}
+
+              {deleteError && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
+                  {deleteError}
+                </Alert>
+              )}
+
+              {dependencies && Object.values(dependencies).some(count => count > 0) && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Cannot delete: This company is referenced in:
+                  </Typography>
+                  <Box component="ul" sx={{ margin: 0, paddingLeft: 2 }}>
+                    {dependencies.universe_companies > 0 && (
+                      <li>{dependencies.universe_companies} universe(s)</li>
+                    )}
+                    {dependencies.signal_raw > 0 && (
+                      <li>{dependencies.signal_raw} signal(s)</li>
+                    )}
+                    {dependencies.scores_combined > 0 && (
+                      <li>{dependencies.scores_combined} score(s)</li>
+                    )}
+                    {dependencies.portfolio_positions > 0 && (
+                      <li>{dependencies.portfolio_positions} portfolio position(s)</li>
+                    )}
+                  </Box>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Please remove these references first before deleting.
+                  </Typography>
+                </Alert>
+              )}
+
+              {dependencies && Object.values(dependencies).every(count => count === 0) && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  This will permanently delete the company and all its tickers from the database.
+                  This action cannot be undone.
+                </Alert>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setCompanyToDelete(null);
+              setDeleteError(null);
+              setDependencies(null);
+            }}
+            startIcon={<CancelIcon />}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            disabled={
+              checkingDependencies ||
+              deleteCompanyMutation.isLoading ||
+              (dependencies !== null && Object.values(dependencies).some(count => count > 0))
+            }
+            startIcon={
+              deleteCompanyMutation.isLoading ? (
+                <CircularProgress size={20} />
+              ) : (
+                <DeleteIcon />
+              )
+            }
+            sx={{
+              background: isDarkMode
+                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                : 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              '&:hover': {
+                background: isDarkMode
+                  ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                  : 'linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)',
+              },
+            }}
+          >
+            {deleteCompanyMutation.isLoading ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -322,4 +322,106 @@ class UniverseOperationsMixin:
             raise
         finally:
             cursor.close()
+    
+    def check_company_dependencies(self, company_uid: str) -> Dict[str, int]:
+        """
+        Check if a company has dependencies in other tables.
+        Returns a dictionary with counts of references in each table.
+        """
+        self.ensure_connection()
+        dependencies = {
+            'universe_companies': 0,
+            'signal_raw': 0,
+            'scores_combined': 0,
+            'portfolio_positions': 0
+        }
+        
+        try:
+            # Check universe_companies
+            query = "SELECT COUNT(*) as count FROM universe_companies WHERE company_uid = %s"
+            df = self.execute_query(query, (company_uid,))
+            if not df.empty:
+                dependencies['universe_companies'] = int(df.iloc[0]['count'])
+            
+            # Check signal_raw (if company_uid column exists)
+            try:
+                query = "SELECT COUNT(*) as count FROM signal_raw WHERE company_uid = %s"
+                df = self.execute_query(query, (company_uid,))
+                if not df.empty:
+                    dependencies['signal_raw'] = int(df.iloc[0]['count'])
+            except Exception:
+                # Column might not exist, ignore
+                pass
+            
+            # Check scores_combined (if company_uid column exists)
+            try:
+                query = "SELECT COUNT(*) as count FROM scores_combined WHERE company_uid = %s"
+                df = self.execute_query(query, (company_uid,))
+                if not df.empty:
+                    dependencies['scores_combined'] = int(df.iloc[0]['count'])
+            except Exception:
+                # Column might not exist, ignore
+                pass
+            
+            # Check portfolio_positions (if company_uid column exists)
+            try:
+                query = "SELECT COUNT(*) as count FROM portfolio_positions WHERE company_uid = %s"
+                df = self.execute_query(query, (company_uid,))
+                if not df.empty:
+                    dependencies['portfolio_positions'] = int(df.iloc[0]['count'])
+            except Exception:
+                # Column might not exist, ignore
+                pass
+        except Exception as e:
+            logger.error(f"Error checking dependencies for company {company_uid}: {e}")
+        
+        return dependencies
+    
+    def delete_company_and_tickers(self, company_uid: str) -> bool:
+        """
+        Delete a company and all its tickers from the database.
+        This will fail if the company has dependencies in other tables.
+        """
+        self.ensure_connection()
+        cursor = self._connection.cursor()
+        
+        # Store original autocommit setting
+        original_autocommit = self._connection.autocommit
+        
+        try:
+            # Start transaction
+            self._connection.autocommit = False
+            
+            # Delete all tickers for this company
+            delete_tickers_query = "DELETE FROM varrock.tickers WHERE company_uid = %s"
+            cursor.execute(delete_tickers_query, (company_uid,))
+            tickers_deleted = cursor.rowcount
+            
+            # Delete company info
+            delete_company_info_query = "DELETE FROM varrock.company_info WHERE company_uid = %s"
+            cursor.execute(delete_company_info_query, (company_uid,))
+            
+            # Delete company
+            delete_company_query = "DELETE FROM varrock.companies WHERE company_uid = %s"
+            cursor.execute(delete_company_query, (company_uid,))
+            companies_deleted = cursor.rowcount
+            
+            # Commit transaction
+            self._connection.commit()
+            
+            logger.info(f"Deleted company {company_uid} and {tickers_deleted} ticker(s)")
+            return companies_deleted > 0
+            
+        except PgError as e:
+            self._connection.rollback()
+            logger.error(f"Error deleting company {company_uid}: {e}")
+            raise
+        except Exception as e:
+            self._connection.rollback()
+            logger.error(f"Error deleting company {company_uid}: {e}")
+            raise
+        finally:
+            # Restore original autocommit setting
+            self._connection.autocommit = original_autocommit
+            cursor.close()
 

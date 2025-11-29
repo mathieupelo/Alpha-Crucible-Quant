@@ -648,3 +648,75 @@ async def search_companies(
         logger.error(f"Error searching companies: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/tickers/company/{company_uid}/dependencies")
+async def check_company_dependencies(company_uid: str):
+    """
+    Check if a company has dependencies in other tables.
+    Returns counts of references in each table.
+    """
+    try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        dependencies = db_service.check_company_dependencies(company_uid)
+        total_dependencies = sum(dependencies.values())
+        
+        return {
+            "company_uid": company_uid,
+            "dependencies": dependencies,
+            "total_dependencies": total_dependencies,
+            "can_delete": total_dependencies == 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking dependencies for company {company_uid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/tickers/company/{company_uid}")
+async def delete_company(company_uid: str):
+    """
+    Delete a company and all its tickers from the database.
+    This will fail if the company has dependencies in other tables.
+    """
+    try:
+        if not db_service.ensure_connection():
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+        
+        # Check dependencies first
+        dependencies = db_service.check_company_dependencies(company_uid)
+        total_dependencies = sum(dependencies.values())
+        
+        if total_dependencies > 0:
+            # Build a detailed error message
+            dependency_details = []
+            if dependencies.get('universe_companies', 0) > 0:
+                dependency_details.append(f"{dependencies['universe_companies']} universe(s)")
+            if dependencies.get('signal_raw', 0) > 0:
+                dependency_details.append(f"{dependencies['signal_raw']} signal(s)")
+            if dependencies.get('scores_combined', 0) > 0:
+                dependency_details.append(f"{dependencies['scores_combined']} score(s)")
+            if dependencies.get('portfolio_positions', 0) > 0:
+                dependency_details.append(f"{dependencies['portfolio_positions']} portfolio position(s)")
+            
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete company: it is referenced in {', '.join(dependency_details)}. Please remove these references first."
+            )
+        
+        # Delete the company and all its tickers
+        success = db_service.delete_company_and_tickers(company_uid)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Company {company_uid} not found")
+        
+        return SuccessResponse(message=f"Company {company_uid} and all its tickers deleted successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting company {company_uid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

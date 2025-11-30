@@ -37,10 +37,10 @@ default_args = {
 
 # Create DAG
 dag = DAG(
-    'sentiment-reddit',
+    'alpha-crucible-data-reddit',
     default_args=default_args,
     description='Fetch Reddit posts for QUEST Core Gaming (QUEST) universe (id 491) - previous 2 days',
-    schedule_interval='0 2 * * *',  # Daily at 2 AM EST (7 AM UTC)
+    schedule_interval='0 8 * * *',  # Daily at 3 AM EST (8 AM UTC)
     start_date=days_ago(1),
     catchup=False,
     tags=['repos', 'data', 'reddit', 'quest'],
